@@ -14,6 +14,8 @@ score and who booked what).
 **Flow on a disruption:** we go with our prediction and calculation engine. The code pricing engine prices every
 request. Only for outliers does an LLM reason about the request and sort it into **green / yellow / red**;
 each bucket is handled differently.
+**Speed bottleneck:** waiting for the 2–5 carrier replies by email (not the RFQ timing; RFQs come every 6 min
+per the brief, check timestamps from 16:00).
 
 - **AI reads, code prices.** The funnel (routing, reading RFQs, bids, tariff sheets) is AI-led.
   The price itself comes from our own pricing engine, in code, no LLM.
