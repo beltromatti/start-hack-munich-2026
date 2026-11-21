@@ -144,6 +144,23 @@ def thread(root: int) -> list[dict]:
     return [_row(r, "attachments") for r in _q("SELECT * FROM mails WHERE root = ? ORDER BY id", (root,))]
 
 
+def carrier_mails(deal_id: str) -> list[dict]:
+    """The carriers' replies to the requests we sent for a deal (each request starts its own thread)."""
+    sent = [int(r[0].split(":", 1)[1]) for r in _q("SELECT k FROM kv WHERE k LIKE 'bidreq:%' AND v = ?", (deal_id,))]
+    if not sent:
+        return []
+    marks = ",".join("?" * len(sent))
+    mails = [_row(r, "attachments") for r in _q(
+        f"SELECT * FROM mails WHERE direction='in' AND (root IN ({marks}) OR in_reply_to IN ({marks})) ORDER BY id",
+        tuple(sent) + tuple(sent))]
+    return [{**m, "read": kv_get(f"read:{m['id']}")} for m in mails]
+
+
+def mail(mail_id: int) -> dict | None:
+    r = _q("SELECT * FROM mails WHERE id = ?", (mail_id,))
+    return _row(r[0], "attachments") if r else None
+
+
 def unhandled() -> list[dict]:
     return [_row(r, "attachments") for r in _q("SELECT * FROM mails WHERE direction='in' AND handled=0 ORDER BY id")]
 

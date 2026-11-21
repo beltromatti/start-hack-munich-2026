@@ -410,6 +410,8 @@ class Forwarder:
                     a.get("filename", ""), self.api.attachment(m["id"], a.get("id")), run_id=f"deal-{m.get('root')}"))
             except Exception as e:
                 parts.append(f"[attachment {a.get('filename')}: could not be read: {e!r}]")
+        if len(parts) > 1:  # kept, so the team sees in the UI what we read from each file (a transcript, a scan)
+            store.kv_set(f"read:{m['id']}", "\n\n".join(parts[1:]))
         return {**m, "body": "\n\n".join(parts)} if len(parts) > 1 else m
 
     def on_bid(self, m: dict) -> None:

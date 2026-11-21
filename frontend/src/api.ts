@@ -4,9 +4,11 @@ export type DealRow = {
   response_seconds: number | null; booking: string | null; flag: string | null; cost_usd: number;
 };
 
+export type Attachment = { id: number; filename: string; content_type?: string; size?: number };
+
 export type Mail = {
   id: number; direction: "in" | "out"; sender: string; recipient: string; subject: string; body: string;
-  received_at: string | null; kind: string | null;
+  received_at: string | null; kind: string | null; attachments?: Attachment[] | null; read?: string | null;
 };
 
 export type Item = {
@@ -31,10 +33,11 @@ export type Deal = {
     root: number; customer: string; subject: string; received_at: string; preference?: string;
     request?: Record<string, string | number | null>; quote?: { amount: string; option: string; response_seconds: number };
     booking?: { booking_reference?: string; team_reference: string; status: string; airline: string; route: string;
+      via?: string; amount?: string; price_changed?: { quoted: string; booked: string };
       carrier_status?: { text: string; at: string } };
     notes?: { at: number; text: string; flag: string }[]; flag?: string;
   };
-  mails: Mail[]; events: EventRow[];
+  mails: Mail[]; carrier_mails?: Mail[]; events: EventRow[];
   usage: { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };
   session: { status: string; items: Item[] } | null;
 };

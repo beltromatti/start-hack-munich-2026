@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
-import { Deal, Item, Option, post } from "./api";
+import { Attachment, Deal, Item, Mail, Option, post } from "./api";
 import { STATUS, clock, parseJSON, usd, who } from "./format";
 
 type Step =
-  | { k: "mail"; from: string; at: string; subject: string; body: string }
+  | { k: "mail"; id: number; from: string; at: string; subject: string; body: string; lang: string | null }
   | { k: "said"; who: string; text: string; system: boolean }
   | { k: "nudge"; text: string }
   | { k: "tool"; name: string; args: Record<string, any>; out: Record<string, any> | null }
   | { k: "journal"; text: string };
 
-const MAIL = /New mail in this thread: id (\d+), from (\S+), at (\S+)\nSubject: (.*)\n\n([\s\S]*)$/;
+const MAIL = /New mail in this thread: id (\d+), from (\S+), at (\S+)\n(?:Their own words are in (\w+)\.\n)?Subject: (.*)\n\n([\s\S]*)$/;
 
 function steps(items: Item[]): Step[] {
   const outputs = new Map<string, Record<string, any> | null>();
@@ -20,7 +20,7 @@ function steps(items: Item[]): Step[] {
       const c = it.content;
       if (c.startsWith("(system)")) { out.push({ k: "nudge", text: c.replace("(system) ", "") }); continue; }
       const m = c.match(MAIL);
-      if (m) { out.push({ k: "mail", from: m[2], at: m[3], subject: m[4], body: m[5].trim() }); continue; }
+      if (m) { out.push({ k: "mail", id: Number(m[1]), from: m[2], at: m[3], lang: m[4] ?? null, subject: m[5], body: m[6].trim() }); continue; }
       for (const part of c.split(/\n\n(?=Message from |Update from the system)/)) {
         const sys = part.match(/Update from the system \(([^)]*)\): ([\s\S]*)/);
         const op = part.match(/Message from (.+?) \(a person on our team, [^)]*\): ([\s\S]*)/);
@@ -35,6 +35,90 @@ function steps(items: Item[]): Step[] {
     }
   }
   return out;
+}
+
+/** The mail's own words, and what we read from each attachment ("[attachment NAME]\n..."), apart. */
+function splitRead(body: string): { text: string; read: Map<string, string> } {
+  const parts = body.split(/\n\n(?=\[attachment [^\]\n]+\]\n)/);
+  const read = new Map<string, string>();
+  for (const p of parts.slice(1)) {
+    const m = p.match(/^\[attachment ([^\]\n]+)\]\n([\s\S]*)$/);
+    if (m) read.set(m[1], m[2].trim());
+  }
+  return { text: parts[0], read };
+}
+
+function kindOf(a: Attachment): string {
+  const n = a.filename.toLowerCase(), ct = a.content_type ?? "";
+  if (ct.startsWith("audio/") || /\.(mp3|wav|m4a|ogg|aac|flac|webm)$/.test(n)) return "voice";
+  if (ct.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/.test(n)) return "picture";
+  if (n.endsWith(".pdf")) return "pdf";
+  if (/\.(docx?|odt|rtf)$/.test(n)) return "doc";
+  if (/\.(xlsx?|csv|ods)$/.test(n)) return "sheet";
+  return "file";
+}
+
+const ICON: Record<string, string> = { voice: "🎙", picture: "🖼", pdf: "📄", doc: "📝", sheet: "📊", file: "📎" };
+const READ_AS: Record<string, string> = { voice: "Transcript", picture: "What the picture says", pdf: "Text read", doc: "Text read", sheet: "Rows read", file: "Text read" };
+
+function Attachments({ mailId, files, read }: { mailId: number; files: Attachment[]; read?: Map<string, string> }) {
+  const [open, setOpen] = useState<string | null>(null);
+  if (!files.length) return null;
+  return (
+    <div className="atts">
+      <div className="att-row">
+        {files.map((a) => {
+          const k = kindOf(a), text = read?.get(a.filename);
+          return (
+            <span key={a.id} className="att">
+              <a href={`/api/mails/${mailId}/attachments/${a.id}`} target="_blank" rel="noreferrer" title="Open the original file">
+                <span className="att-icon">{ICON[k]}</span>{a.filename}
+              </a>
+              {a.size ? <span className="att-size">{a.size > 1e6 ? `${(a.size / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(a.size / 1000))} kB`}</span> : null}
+              {text ? <button className={`att-read${open === a.filename ? " on" : ""}`} onClick={() => setOpen(open === a.filename ? null : a.filename)}>{READ_AS[k]}</button> : null}
+            </span>
+          );
+        })}
+      </div>
+      {open && read?.get(open) ? <pre className="body read">{read.get(open)}</pre> : null}
+    </div>
+  );
+}
+
+function CarrierMails({ mails }: { mails: Mail[] }) {
+  const [open, setOpen] = useState(false);
+  const [one, setOne] = useState<number | null>(null);
+  if (!mails.length) return null;
+  const files = mails.reduce((n, m) => n + (m.attachments?.length ?? 0), 0);
+  return (
+    <div className="carriers">
+      <button className="step-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="tool">carriers</span>
+        <span className="title">{mails.length} replies from airlines and truckers{files ? ` · ${files} attachment${files > 1 ? "s" : ""}` : ""}</span>
+        <span className="chev">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <ul className="carrier-list">
+          {mails.map((m) => (
+            <li key={m.id}>
+              <button className="carrier-row" onClick={() => setOne(one === m.id ? null : m.id)}>
+                <span className="mono">{m.sender.split("@")[0]}</span>
+                <span className="muted">{m.received_at ? clock(m.received_at) : ""}</span>
+                <span className="preview">{m.body.replace(/\s+/g, " ").slice(0, 110)}</span>
+                {m.attachments?.length ? <span className="att-count">{m.attachments.map((a) => ICON[kindOf(a)]).join(" ")}</span> : null}
+              </button>
+              {one === m.id && (
+                <div className="carrier-mail">
+                  <pre className="body">{m.body}</pre>
+                  <Attachments mailId={m.id} files={m.attachments ?? []} read={m.read ? splitRead("\n\n" + m.read).read : undefined} />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 const KIND: Record<string, string> = {
@@ -163,10 +247,16 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
         <dl className="deal-kpis">
           <div><dt>Quote</dt><dd className="mono">{d.quote?.amount ?? "–"}</dd></div>
           <div><dt>Reply in</dt><dd>{d.quote ? `${Math.round(d.quote.response_seconds)} s` : "–"}</dd></div>
-          <div><dt>Booking</dt><dd className="mono">{d.booking?.booking_reference ?? (d.booking ? d.booking.status : "–")}</dd></div>
+          <div><dt>Booking</dt><dd className="mono">{d.booking?.booking_reference ?? (d.booking ? (d.booking.via === "email" ? "requested by mail" : d.booking.status) : "–")}</dd></div>
           <div><dt>Model cost</dt><dd>{usd(deal.usage.cost_usd)}</dd></div>
         </dl>
       </header>
+
+      {d.booking?.price_changed ? (
+        <div className="banner warn-banner"><strong>Booked at another price</strong> · the airline booked {d.booking.price_changed.booked} all-in, against the {d.booking.price_changed.quoted} quoted</div>
+      ) : null}
+
+      <CarrierMails mails={deal.carrier_mails ?? []} />
 
       {d.booking?.carrier_status ? (
         <div className="banner"><strong>Latest airline status</strong> · {d.booking.carrier_status.at}<pre className="body">{d.booking.carrier_status.text}</pre></div>
@@ -175,13 +265,21 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
       <ol className="timeline">
         {list.map((s, i) => (
           <li key={i} className={`t-${s.k}`}>
-            {s.k === "mail" && (
-              <div className="card in">
-                <div className="card-head"><span className="tag">Mail in</span><span className="mono">{s.from}</span><span className="muted">{clock(s.at)}</span></div>
-                <div className="subject">{s.subject}</div>
-                <pre className="body">{s.body}</pre>
-              </div>
-            )}
+            {s.k === "mail" && (() => {
+              const { text, read } = splitRead(s.body);
+              const files = deal.mails.find((m) => m.id === s.id)?.attachments ?? [];
+              return (
+                <div className="card in">
+                  <div className="card-head">
+                    <span className="tag">Mail in</span><span className="mono">{s.from}</span><span className="muted">{clock(s.at)}</span>
+                    {s.lang ? <span className="lang" title="Counted by code from their own words, given to the agent as a fact">{s.lang}</span> : null}
+                  </div>
+                  <div className="subject">{s.subject}</div>
+                  <pre className="body">{files.length || read.size ? text : s.body}</pre>
+                  <Attachments mailId={s.id} files={files} read={read} />
+                </div>
+              );
+            })()}
             {s.k === "said" && <div className={`said${s.system ? " system" : ""}`}><strong>{s.who}</strong> {s.text}</div>}
             {s.k === "nudge" && <div className="said system"><strong>System</strong> {s.text}</div>}
             {s.k === "tool" && <ToolStep s={s} />}

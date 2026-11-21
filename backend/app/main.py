@@ -100,8 +100,23 @@ def deal(deal_id: str) -> dict:
         raise HTTPException(404)
     root = r["data"]["root"]
     s = store.get(f"session-{root}")
-    return {**r, "mails": store.thread(root), "events": store.events(run_id=deal_id), "usage": store.usage(deal_id),
+    return {**r, "mails": store.thread(root), "carrier_mails": store.carrier_mails(deal_id),
+            "events": store.events(run_id=deal_id), "usage": store.usage(deal_id),
             "session": {"status": s["status"], "items": s["data"].get("items", [])} if s else None}
+
+
+@app.get("/api/mails/{mail_id}/attachments/{attachment_id}")
+def attachment(mail_id: int, attachment_id: int) -> Response:
+    """The original file, as it came (a PDF, a Word letter, a voice message, a scan): from 5U, through us."""
+    m = store.mail(mail_id)
+    a = next((x for x in (m or {}).get("attachments") or [] if str(x.get("id")) == str(attachment_id)), None)
+    if not a:
+        raise HTTPException(404)
+    from .fiveu import FiveU
+    api = forwarder.api if forwarder else FiveU()
+    name = (a.get("filename") or "attachment").replace('"', "")
+    return Response(api.attachment(mail_id, attachment_id), media_type=a.get("content_type") or "application/octet-stream",
+                    headers={"Content-Disposition": f'inline; filename="{name}"'})
 
 
 @app.get("/api/sessions")
