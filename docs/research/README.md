@@ -1,26 +1,25 @@
 # Branch `research/pricing`: what it did and what to take
 
-For Mattia and his assistant. Sam's research chat works here, never on main. Branched from main `ddfb03e`.
-See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 21 passed.
+For Mattia and his assistant. Sam's research chat works here, never on main.
+**Main's forwarder agent (`010166b`) is merged in (`e9053f8`), so the branch merges into main without conflicts.**
+See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 23 passed.
 
-Written after the 15:35 talk: the forwarder moves from a workflow to **one agent per order** with tools, a
-register that tells the truth, and the **price engine as a tool**. So this branch keeps its findings where they
-survive that change: in `pricing.py` (pure functions, no workflow state) and as rules for the agent's tools.
+## What changes in the agent's engine
 
-## Take as is: price engine (`backend/app/pricing.py`, `config.py`)
-
-| Commit | Function | What it settles |
+| Where | Change | Default |
 | --- | --- | --- |
-| `d077f79` | `quote(..., pickup_rule, balance, unspecified)`, `balanced(offers, rule)` | Which trucker goes into the all-in total is undocumented; the candidates differ by 88.80 EUR in zone 60. Three `.env` switches (`PICKUP_RULE`, `BALANCE_RULE`, `UNSPECIFIED_RULE`), defaults = behaviour so far |
-| `7daaaf6` | `breaks_to_try(cw)` | For a carrier with unknown breaks: the breaks above the chargeable weight that can still be cheaper (280 kg: 300; 230 kg: 250 and 300) |
-| `9a7f28e` | `to_eur(amount, currency, fx, rates)` | Exchange rate per currency; a price with no known rate is dropped, never guessed |
+| `forwarder.options()` + `pickup_variants()` | Which trucker an option carries follows `PICKUP_RULE`: `asked` (cheapest, and the fastest as option `A1f`), `cheapest` (one option per airline, cheapest trucker), `balanced` (one option per airline, the 50/50 trucker). `recommended` follows it, so the agent quotes it | `asked` = main today |
+| `forwarder.options()` | A request without a preference gets `UNSPECIFIED_RULE` (`balanced`, `cheapest`, `fastest`) as `recommended`; the 50/50 formula is `BALANCE_RULE` (`ratio`, `minmax`) | `balanced`, `ratio` = main today |
+| `forwarder._ask_everyone()` | An airline with no sheet and not on the portal is also asked at the next break up (`pricing.breaks_to_try`) | new: 1 or 2 more mails on 5 destinations |
+| `forwarder.waiting_for()` | `get_offers` waits per request mail, not per sender (a carrier asked at two weights answers twice) | same result when every carrier is asked once |
+| `forwarder.eur()` -> `pricing.to_eur()` | Exchange rate per currency; a rate stated in a bid mail is read (`fx_eur_per_unit` in the bid form and `prompts/bid.md`) | EUR prices unchanged |
+| `pricing.balanced()`, `pricing.quote(..., pickup_rule, balance, unspecified)` | The rules as pure functions, with tests on the live zone-60 trucker bids | unchanged |
 
-`7daaaf6` and `86205fb` also patch `forwarder.py` (`start_rfq`, `ready`, `eur`) and the bid form. If the
-workflow is being replaced, skip those hunks and keep the rules below.
+Why: `docs/research/pricing.md` (evidence and numbers). The one open rule is which trucker 5U puts into the
+best price: the candidates differ by 88.80 EUR in zone 60, 9 % on a 1000 EUR shipment. Until the board shows
+it, my estimate is `PICKUP_RULE=cheapest` in `.env` (one line, restart).
 
-Evidence and numbers: `docs/research/pricing.md`.
-
-## Rules the agent's tools have to keep (today they live in `forwarder.py`)
+## Rules the engine keeps (all in `forwarder.py`, under `get_offers`)
 
 1. **Which weight to ask.** Sheet airline: its sheet's cheapest billed weight (`sheet_price` returns it).
    Portal: actual weight, plus the next break when `next_break / chargeable < 1.5`. Airline with no sheet and not
@@ -45,10 +44,13 @@ status mails and tariff sheets count too.
 
 | Per accepted quote | `gpt-6-luna` cost | Cost points |
 | --- | --- | --- |
-| Workflow today (measured by Mattia, about 0.0008 USD) | 0.0008 | 39.7 |
-| Agent, 10 turns x 8k context, nothing cached, 2k out | 0.0090 | 36.4 |
+| Agent as built: about 3 turns (get_offers, send_mail, journal line), about 10k input, 0.5k output | about 0.001 | 39.6 |
+| 10 turns x 8k context, nothing cached, 2k out | 0.0090 | 36.4 |
 | Same, 80 % of the input cached | 0.0032 | 38.7 |
-| Agent, 25 turns x 15k context, nothing cached, 5k out | 0.0400 | 24.0 |
+| 25 turns x 15k context, nothing cached, 5k out | 0.0400 | 24.0 |
+
+The first row is my estimate from the prompt and tool sizes, not a measurement: read the real number from
+`cost_usd` in the events of the first live deals.
 
 `gpt-6-luna`: 0.10 USD per million input tokens, 0.01 cached, 0.50 output. `gpt-5-nano`: 0.05 / 0.005 / 0.40.
 Cached input costs a tenth, so the order of the prompt decides: what never changes first (system prompt, tool
@@ -57,10 +59,13 @@ passes OpenAI's prompt caching through (check `usage.prompt_tokens_details.cache
 
 ## Tracking (5U at the booth, `origin/jan:docs/news.md`; not built here)
 
-The status comes from the carrier by mail, and only our first answer to a tracking question counts. So the
-answer has to wait for the carrier's reply (about 30 s) unless a fresh status is already in the register.
-Answering at once from `booked_at + transit_days`, as `on_tracking` does today, risks the +10 per shipment.
-Jan's steps 3a to 3c in `origin/jan:docs/flow.md` describe the flow.
+5U: the shipment status comes from the carrier, by mail, and only our first answer to a tracking question
+counts. `prompts/tasks/tracking.md` tells the agent to answer from the CRM. The CRM holds the booking and an
+estimated arrival (`booked_at + transit_days`), no carrier status. The agent already has what it needs to ask:
+`mail_carrier`, then `get_offers` with shipment null waits for the reply, which lands in `carrier_messages`.
+Two gaps: the task prompt does not say that the airline knows the status, and `crm` returns the airline's name
+but not its address (`mail_carrier` needs the address from the carrier list). Proposal, not built: one sentence
+in `tasks/tracking.md`, and `airline_email` in `tools._summary`. Worth 10 points per booked shipment.
 
 ## Open: decided by the first scored rounds, not by us
 
