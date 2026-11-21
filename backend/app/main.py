@@ -137,4 +137,10 @@ def mails(limit: int = 200) -> list[dict]:
 
 @app.get("/api/board")
 def board() -> dict:
-    return json.loads(store.kv_get("board_me") or "{}")
+    """Ours (verdict and points per request) and the public board (every team), as last fetched."""
+    return {"me": json.loads(store.kv_get("board_me") or "{}"), "public": json.loads(store.kv_get("board") or "{}")}
+
+
+@app.get("/api/board/history")
+def board_history(limit: int = 200) -> list[dict]:
+    return [r["data"] for r in store.records("board", limit=limit)]

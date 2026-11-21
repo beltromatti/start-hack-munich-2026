@@ -114,6 +114,12 @@ class FiveU:
             body = {"detail": r.text[:300]}
         return r.status_code, body
 
+    def board(self) -> dict:
+        """The public leaderboard: every team's rank, totals, accepted, bookings, the last rounds."""
+        r = self._req("GET", "/v1/board")
+        r.raise_for_status()
+        return r.json()
+
     def board_me(self) -> dict:
         r = self._req("GET", "/v1/board/me")
         r.raise_for_status()
