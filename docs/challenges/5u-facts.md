@@ -176,3 +176,10 @@ restart, which kept the forwarder from starting for 45 s; startup now carries on
 **Mailbox poll limit (Sat 20:30):** `GET /v1/mailbox/messages` answers `429 one poll per 5 seconds` (retry_after 1).
 The limit is per team key: anything else polling our mailbox with it takes from the same budget. The client keeps
 to the gap it learns from the 429; bids now arrive up to 5 s later, quotes still well inside 2 minutes.
+
+**Booking price above the quoted rate (Sat from 20:47, rounds 48-50):** `POST /v1/portal/bookings` with the quoted
+`rate_id`, inside its validity, answers `price` 10 % above the rate (5655.55 -> 6221.11, 3699.20 -> 4069.12,
+709.52 -> 780.47), and the airline's confirmation mail states the same. Round 48 then shows `adjustment: -22.5` with
+no reason (we had confirmed without the price and corrected it after the airline's mail); round 42 shows
+`adjustment: +120` (5U's correction of the excluded-airline verdict). Since 20:55 `book` recomputes the all-in total
+from the airline's price and returns `price_changed`; round 50 said it in the confirmation.
