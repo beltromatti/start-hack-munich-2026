@@ -2,6 +2,19 @@
 
 Newest on top. Source in brackets.
 
+- **Sat ~15:15 Tracking status comes from the carrier, by mail.** In transit, not yet, departed: that status has to
+  live in our CRM, and the agent reads it with tool calls. There is no API for it. We get it by **mailing the
+  carrier and asking where the shipment is**. Carriers don't mind repeated asks ("you are the customer, they answer
+  you"). Replies can name a position or a disruption (Jan's examples: Malacca/Singapore Strait, Strait of Hormuz).
+  Build: a direct line CRM <-> carrier. The booking record keeps the airline's address and thread, a status request
+  goes out, the reply is parsed (LLM) into status, location and ETA on the booking, and the customer's tracking
+  question is answered from that record (Jan asked 5U at the booth).
+- **Sat ~15:15 Margin is not what we optimise.** Question: carrier says €50, we quote €55, the customer says "only
+  for €40". 5U: that can happen at some point, but margin is not important. **The main job is finding the truly
+  cheapest option once every criterion is counted** (chargeable weight, next weight break, surcharges, pickup
+  trucking, cheapest vs fastest as asked). That matters more than the price we add on top, and we are not scored
+  against the other teams' quotes. Whatever profit there is comes from buying cheaper. Consistent with 14:00: margin
+  shows in the CRM as insight, the quote stays at our best cost (Jan asked 5U at the booth).
 - **Sat 14:37** Only models through the 5U gateway count (list in Swagger). Other models / local GPUs: cost can't be
   measured, those quotes get zero points ("on time", likely meant cost). 5U is working on more models (taci).
 - **Sat 14:13** Tracking bonus is **per shipment**: every booked shipment can get a tracking question later, each

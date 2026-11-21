@@ -14,6 +14,10 @@ The 10 rate sheets as one checked table (158 lanes, EUR per kg, minimum, surchar
 Read it instead of the raw pdf/xlsx/jpg files. Pricing: also price the next weight break up and take the cheaper
 (299 kg cost more than 300 kg on the portal, see `5u-facts.md`).
 The team key never goes into the repo. It lives only in each person's `.env`.
+Test data: 31 synthetic 5U mails (every mail kind, DE/IT/ES/FR/EN, the hard cases) in `backend/synthetic/mails.py`,
+their answer key with computed prices (sheets plus 34 live portal rates) in `backend/synthetic/expected.json`.
+Feed a mail into the local 5U with `FakeFiveU.customer(m["frm"], m["subject"], m["body"])` and compare the quote with
+the key. Forwarder vocabulary for the parse prompt: `backend/app/prompts/glossary.md`.
 
 ## Architecture (keep it this simple)
 

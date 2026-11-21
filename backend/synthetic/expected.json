@@ -1,0 +1,1092 @@
+{
+ "m01": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "ORD",
+  "pieces": 3,
+  "actual_kg": "420",
+  "volume_cbm": "2.4",
+  "preference": "cheapest",
+  "action": "quote",
+  "chargeable_kg": "420",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 4,
+    "billed_kg": "420",
+    "rate_eur_per_kg": "1.82",
+    "total_eur": "1087.80"
+   },
+   {
+    "source": "sheet",
+    "airline": "Orion Cargo Air",
+    "transit_days": 2,
+    "billed_kg": "500",
+    "rate_eur_per_kg": "1.47",
+    "total_eur": "1285.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Borealis Freight Airways",
+    "airline_code": "BX",
+    "billed_kg": "420",
+    "total_eur": "1537.20",
+    "transit_days": 1,
+    "portal_total": "1537.20",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "420",
+     "volume_cbm": "2.4"
+    }
+   }
+  ],
+  "expected_quote": {
+   "airline": "Yellowtail Air Freight",
+   "source": "sheet",
+   "total_eur": "1087.80",
+   "currency": "EUR",
+   "transit_days": 4,
+   "note": null
+  }
+ },
+ "m02": {
+  "kind": "rfq",
+  "origin": "MUC",
+  "destination": "JNB",
+  "pieces": 2,
+  "actual_kg": "180",
+  "volume_cbm": "0.9",
+  "preference": "fastest",
+  "action": "quote",
+  "chargeable_kg": "180",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Danube Wings Cargo",
+    "transit_days": 7,
+    "billed_kg": "180",
+    "rate_eur_per_kg": "2.19",
+    "total_eur": "590.40"
+   },
+   {
+    "source": "portal",
+    "airline": "Polaris Air Logistics",
+    "airline_code": "PL",
+    "billed_kg": "180",
+    "total_eur": "662.40",
+    "transit_days": 6,
+    "portal_total": "662.40",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "180",
+     "volume_cbm": "0.9"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 4,
+    "billed_kg": "180",
+    "rate_eur_per_kg": "2.54",
+    "total_eur": "667.80"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Yellowtail Air Freight",
+   "source": "sheet",
+   "total_eur": "667.80",
+   "currency": "EUR",
+   "transit_days": 4,
+   "note": null
+  }
+ },
+ "m03": {
+  "kind": "rfq",
+  "origin": "CGN",
+  "destination": "LOS",
+  "pieces": 6,
+  "actual_kg": "650",
+  "volume_cbm": "3.1",
+  "preference": "cheapest",
+  "action": "quote",
+  "chargeable_kg": "650",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Helix Air Freight",
+    "transit_days": 4,
+    "billed_kg": "650",
+    "rate_eur_per_kg": "1.93",
+    "total_eur": "2008.50"
+   },
+   {
+    "source": "sheet",
+    "airline": "Elbflug Air Freight",
+    "transit_days": 5,
+    "billed_kg": "650",
+    "rate_eur_per_kg": "1.94",
+    "total_eur": "2112.50"
+   },
+   {
+    "source": "sheet",
+    "airline": "Quetzal Air Freight",
+    "transit_days": 4,
+    "billed_kg": "650",
+    "rate_eur_per_kg": "2.13",
+    "total_eur": "2281.50"
+   },
+   {
+    "source": "sheet",
+    "airline": "Vega Skyfreight",
+    "transit_days": 3,
+    "billed_kg": "650",
+    "rate_eur_per_kg": "2.42",
+    "total_eur": "2496.00"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Helix Air Freight",
+   "source": "sheet",
+   "total_eur": "2008.50",
+   "currency": "EUR",
+   "transit_days": 4,
+   "note": null
+  }
+ },
+ "m04": {
+  "kind": "rfq",
+  "origin": "CGN",
+  "destination": "DEL",
+  "pieces": 1,
+  "actual_kg": "299",
+  "volume_cbm": "1.2",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "next_break_cheaper"
+  ],
+  "chargeable_kg": "299",
+  "offers": [
+   {
+    "source": "portal",
+    "airline": "Juniper Cargo Lines",
+    "airline_code": "JP",
+    "billed_kg": "300",
+    "total_eur": "1026.00",
+    "transit_days": 5,
+    "portal_total": "1026.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "300"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Ultraviolet Air Freight",
+    "airline_code": "UV",
+    "billed_kg": "300",
+    "total_eur": "1068.00",
+    "transit_days": 4,
+    "portal_total": "1068.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "300"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Wayzata Air Cargo",
+    "transit_days": 2,
+    "billed_kg": "300",
+    "rate_eur_per_kg": "2.38",
+    "total_eur": "1137.00"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Juniper Cargo Lines",
+   "source": "portal",
+   "total_eur": "1026.00",
+   "currency": "EUR",
+   "transit_days": 5,
+   "note": null
+  }
+ },
+ "m05": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "NBO",
+  "pieces": 4,
+  "actual_kg": "120",
+  "volume_cbm": "1.8",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "volume_decides"
+  ],
+  "chargeable_kg": "300.6",
+  "offers": [
+   {
+    "source": "portal",
+    "airline": "Ultraviolet Air Freight",
+    "airline_code": "UV",
+    "billed_kg": "300.6",
+    "total_eur": "874.74",
+    "transit_days": 6,
+    "portal_total": "874.74",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "120",
+     "volume_cbm": "1.8"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Juniper Cargo Lines",
+    "airline_code": "JP",
+    "billed_kg": "300.6",
+    "total_eur": "922.84",
+    "transit_days": 7,
+    "portal_total": "922.84",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "120",
+     "volume_cbm": "1.8"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 7,
+    "billed_kg": "300.6",
+    "rate_eur_per_kg": "2.18",
+    "total_eur": "985.97"
+   },
+   {
+    "source": "sheet",
+    "airline": "Orion Cargo Air",
+    "transit_days": 4,
+    "billed_kg": "300.6",
+    "rate_eur_per_kg": "2.37",
+    "total_eur": "1064.12"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Ultraviolet Air Freight",
+   "source": "portal",
+   "total_eur": "874.74",
+   "currency": "EUR",
+   "transit_days": 6,
+   "note": null
+  }
+ },
+ "m06": {
+  "kind": "rfq",
+  "origin": "DUS",
+  "destination": "JFK",
+  "pieces": 4,
+  "actual_kg": "380",
+  "volume_cbm": "3.84",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "dims_given"
+  ],
+  "chargeable_kg": "641.28",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Cobalt Skylift",
+    "transit_days": 4,
+    "billed_kg": "641.28",
+    "rate_eur_per_kg": "1.36",
+    "total_eur": "1532.66"
+   },
+   {
+    "source": "portal",
+    "airline": "Fjordline Air Cargo",
+    "airline_code": "FQ",
+    "billed_kg": "641.28",
+    "total_eur": "1635.27",
+    "transit_days": 3,
+    "portal_total": "1635.27",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "380",
+     "volume_cbm": "3.84"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Ultraviolet Air Freight",
+    "airline_code": "UV",
+    "billed_kg": "641.28",
+    "total_eur": "1680.15",
+    "transit_days": 6,
+    "portal_total": "1680.15",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "380",
+     "volume_cbm": "3.84"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 5,
+    "billed_kg": "641.28",
+    "rate_eur_per_kg": "1.83",
+    "total_eur": "1955.90"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Cobalt Skylift",
+   "source": "sheet",
+   "total_eur": "1532.66",
+   "currency": "EUR",
+   "transit_days": 4,
+   "note": null
+  }
+ },
+ "m07": {
+  "kind": "rfq",
+  "origin": "HAM",
+  "destination": "HKG",
+  "pieces": 2,
+  "actual_kg": "498.95",
+  "volume_cbm": "2.0",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "lbs_given",
+   "next_break_cheaper"
+  ],
+  "chargeable_kg": "498.95",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Kestrel Airways",
+    "transit_days": 4,
+    "billed_kg": "500",
+    "rate_eur_per_kg": "1.66",
+    "total_eur": "1220.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Tamarind Airways",
+    "airline_code": "TM",
+    "billed_kg": "500",
+    "total_eur": "1315.00",
+    "transit_days": 3,
+    "portal_total": "1315.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "500"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Wayzata Air Cargo",
+    "transit_days": 4,
+    "billed_kg": "500",
+    "rate_eur_per_kg": "1.70",
+    "total_eur": "1520.00"
+   },
+   {
+    "source": "sheet",
+    "airline": "Helix Air Freight",
+    "transit_days": 2,
+    "billed_kg": "500",
+    "rate_eur_per_kg": "1.90",
+    "total_eur": "1720.00"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Kestrel Airways",
+   "source": "sheet",
+   "total_eur": "1220.00",
+   "currency": "EUR",
+   "transit_days": 4,
+   "note": null
+  }
+ },
+ "m08": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "DXB",
+  "pickup_postcode": "63065",
+  "pieces": 3,
+  "actual_kg": "240",
+  "volume_cbm": "1.0",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "door_to_port"
+  ],
+  "pickup_zone": "63",
+  "pickup_airport": "FRA",
+  "truckers_to_ask": [
+   "domblick-kurierdienst@hackloop.mail",
+   "westfalenroute@hackloop.mail"
+  ],
+  "chargeable_kg": "240",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Elbflug Air Freight",
+    "transit_days": 3,
+    "billed_kg": "240",
+    "rate_eur_per_kg": "1.93",
+    "total_eur": "729.60"
+   },
+   {
+    "source": "sheet",
+    "airline": "Danube Wings Cargo",
+    "transit_days": 2,
+    "billed_kg": "240",
+    "rate_eur_per_kg": "2.05",
+    "total_eur": "813.60"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Elbflug Air Freight",
+   "source": "sheet",
+   "total_eur": "729.60",
+   "currency": "EUR",
+   "transit_days": 3,
+   "note": "airport to airport; add the cheapest trucker bid"
+  }
+ },
+ "m09": {
+  "kind": "rfq",
+  "origin": "MUC",
+  "destination": "HKG",
+  "pickup_postcode": "80802",
+  "pieces": 1,
+  "actual_kg": "75",
+  "volume_cbm": "0.4",
+  "preference": "fastest",
+  "action": "quote",
+  "flags": [
+   "door_to_port"
+  ],
+  "pickup_zone": "80",
+  "pickup_airport": "MUC",
+  "truckers_to_ask": [
+   "bodenseefracht@hackloop.mail",
+   "isarwelle-spedition@hackloop.mail",
+   "neckarstrom-kurier@hackloop.mail",
+   "nordlicht-haulage@hackloop.mail",
+   "ruhrpott-express@hackloop.mail"
+  ],
+  "chargeable_kg": "75",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Helix Air Freight",
+    "transit_days": 5,
+    "billed_kg": "75",
+    "rate_eur_per_kg": "2.94",
+    "total_eur": "299.25"
+   },
+   {
+    "source": "sheet",
+    "airline": "Orion Cargo Air",
+    "transit_days": 3,
+    "billed_kg": "75",
+    "rate_eur_per_kg": "3.84",
+    "total_eur": "377.25"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Orion Cargo Air",
+   "source": "sheet",
+   "total_eur": "377.25",
+   "currency": "EUR",
+   "transit_days": 3,
+   "note": "airport to airport; add the cheapest trucker bid"
+  }
+ },
+ "m10": {
+  "kind": "rfq",
+  "origin": "STR",
+  "destination": "YYZ",
+  "pickup_postcode": "70191",
+  "pieces": 8,
+  "actual_kg": "360",
+  "volume_cbm": "2.2",
+  "preference": "fastest",
+  "action": "quote",
+  "flags": [
+   "door_to_port",
+   "per_piece_weight"
+  ],
+  "pickup_zone": "70",
+  "pickup_airport": "STR",
+  "truckers_to_ask": [
+   "isarwelle-spedition@hackloop.mail",
+   "nordlicht-haulage@hackloop.mail",
+   "rheinufer-spedition@hackloop.mail",
+   "spessart-spedition@hackloop.mail"
+  ],
+  "chargeable_kg": "367.4",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Cobalt Skylift",
+    "transit_days": 4,
+    "billed_kg": "367.4",
+    "rate_eur_per_kg": "1.46",
+    "total_eur": "859.72"
+   },
+   {
+    "source": "sheet",
+    "airline": "Vega Skyfreight",
+    "transit_days": 5,
+    "billed_kg": "367.4",
+    "rate_eur_per_kg": "1.77",
+    "total_eur": "1153.64"
+   },
+   {
+    "source": "portal",
+    "airline": "Tamarind Airways",
+    "airline_code": "TM",
+    "billed_kg": "367.4",
+    "total_eur": "1183.03",
+    "transit_days": 6,
+    "portal_total": "1183.03",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "360",
+     "volume_cbm": "2.2"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Ibisair Cargo",
+    "airline_code": "IB",
+    "billed_kg": "367.4",
+    "total_eur": "1344.69",
+    "transit_days": 3,
+    "portal_total": "1344.69",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "360",
+     "volume_cbm": "2.2"
+    }
+   }
+  ],
+  "expected_quote": {
+   "airline": "Ibisair Cargo",
+   "source": "portal",
+   "total_eur": "1344.69",
+   "currency": "EUR",
+   "transit_days": 3,
+   "note": "airport to airport; add the cheapest trucker bid"
+  }
+ },
+ "m11": {
+  "kind": "rfq",
+  "origin": "CGN",
+  "destination": "SYD",
+  "preference": null,
+  "action": "ask_customer",
+  "missing": [
+   "actual_kg",
+   "volume_cbm",
+   "pieces"
+  ]
+ },
+ "m12": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": null,
+  "pieces": null,
+  "actual_kg": "210",
+  "volume_cbm": "1.1",
+  "preference": "cheapest",
+  "action": "ask_customer",
+  "missing": [
+   "destination"
+  ],
+  "flags": [
+   "country_not_airport"
+  ]
+ },
+ "m13": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "KTM",
+  "pieces": null,
+  "actual_kg": "150",
+  "volume_cbm": "0.8",
+  "preference": "cheapest",
+  "action": "email_airline",
+  "flags": [
+   "email_only_destination"
+  ],
+  "airlines_to_email": [
+   "himalaya-bridge-air@hackloop.mail",
+   "pampero-air-cargo@hackloop.mail",
+   "zephyr-steppe-cargo@hackloop.mail"
+  ]
+ },
+ "m14": {
+  "kind": "rfq",
+  "origin": "MUC",
+  "destination": "JNB",
+  "pieces": 1,
+  "actual_kg": "900",
+  "volume_cbm": null,
+  "preference": null,
+  "action": "decline",
+  "flags": [
+   "live_animal",
+   "oversize"
+  ]
+ },
+ "m15": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "LIM",
+  "pieces": 2,
+  "actual_kg": "310",
+  "volume_cbm": "1.5",
+  "preference": "cheapest",
+  "action": "ask_customer",
+  "flags": [
+   "dangerous_goods"
+  ],
+  "missing": [
+   "dg_declaration"
+  ]
+ },
+ "m16": {
+  "kind": "attack",
+  "action": "ignore",
+  "flags": [
+   "prompt_injection",
+   "not_from_5u"
+  ]
+ },
+ "m17": {
+  "kind": "rfq",
+  "origin": "HAM",
+  "destination": "MEX",
+  "pieces": 5,
+  "actual_kg": "350",
+  "volume_cbm": "1.6",
+  "preference": "fastest",
+  "action": "quote",
+  "flags": [
+   "forward_chain",
+   "newest_value_wins"
+  ],
+  "chargeable_kg": "350",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 3,
+    "billed_kg": "350",
+    "rate_eur_per_kg": "1.67",
+    "total_eur": "896.00"
+   },
+   {
+    "source": "sheet",
+    "airline": "Elbflug Air Freight",
+    "transit_days": 3,
+    "billed_kg": "350",
+    "rate_eur_per_kg": "1.43",
+    "total_eur": "1057.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Riverbend Airlines Cargo",
+    "airline_code": "RV",
+    "billed_kg": "350",
+    "total_eur": "1162.00",
+    "transit_days": 1,
+    "portal_total": "1162.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "350",
+     "volume_cbm": "1.6"
+    }
+   }
+  ],
+  "expected_quote": {
+   "airline": "Riverbend Airlines Cargo",
+   "source": "portal",
+   "total_eur": "1162.00",
+   "currency": "EUR",
+   "transit_days": 1,
+   "note": null
+  }
+ },
+ "m18": {
+  "kind": "rfq",
+  "origin": "HAM",
+  "destination": "BOG",
+  "pieces": 2,
+  "actual_kg": "210",
+  "volume_cbm": "1.0",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "numbers_in_signature"
+  ],
+  "chargeable_kg": "210",
+  "offers": [
+   {
+    "source": "portal",
+    "airline": "Riverbend Airlines Cargo",
+    "airline_code": "RV",
+    "billed_kg": "210",
+    "total_eur": "735.00",
+    "transit_days": 4,
+    "portal_total": "735.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "210",
+     "volume_cbm": "1.0"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Cobalt Skylift",
+    "transit_days": 3,
+    "billed_kg": "210",
+    "rate_eur_per_kg": "3.03",
+    "total_eur": "907.20"
+   },
+   {
+    "source": "portal",
+    "airline": "Solace Air Cargo",
+    "airline_code": "SL",
+    "billed_kg": "210",
+    "total_eur": "1022.70",
+    "transit_days": 3,
+    "portal_total": "1022.70",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "210",
+     "volume_cbm": "1.0"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 2,
+    "billed_kg": "210",
+    "rate_eur_per_kg": "3.53",
+    "total_eur": "1089.90"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Riverbend Airlines Cargo",
+   "source": "portal",
+   "total_eur": "735.00",
+   "currency": "EUR",
+   "transit_days": 4,
+   "note": null
+  }
+ },
+ "m19": {
+  "kind": "rfq",
+  "origin": "MUC",
+  "destination": "LAX",
+  "pieces": 10,
+  "actual_kg": "1200",
+  "volume_cbm": "5.5",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "tonnes_given",
+   "asks_both_quote_one"
+  ],
+  "chargeable_kg": "1200",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 5,
+    "billed_kg": "1200",
+    "rate_eur_per_kg": "0.98",
+    "total_eur": "2748.00"
+   },
+   {
+    "source": "sheet",
+    "airline": "Kestrel Airways",
+    "transit_days": 6,
+    "billed_kg": "1200",
+    "rate_eur_per_kg": "1.28",
+    "total_eur": "3108.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Fjordline Air Cargo",
+    "airline_code": "FQ",
+    "billed_kg": "1200",
+    "total_eur": "3336.00",
+    "transit_days": 3,
+    "portal_total": "3336.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "1200",
+     "volume_cbm": "5.5"
+    }
+   }
+  ],
+  "expected_quote": {
+   "airline": "Yellowtail Air Freight",
+   "source": "sheet",
+   "total_eur": "2748.00",
+   "currency": "EUR",
+   "transit_days": 5,
+   "note": null
+  }
+ },
+ "m20": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "LIM",
+  "pieces": 5,
+  "actual_kg": "190",
+  "volume_cbm": "0.9",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "per_piece_weight"
+  ],
+  "chargeable_kg": "190",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Quetzal Air Freight",
+    "transit_days": 5,
+    "billed_kg": "190",
+    "rate_eur_per_kg": "2.88",
+    "total_eur": "820.80"
+   },
+   {
+    "source": "sheet",
+    "airline": "Yellowtail Air Freight",
+    "transit_days": 5,
+    "billed_kg": "190",
+    "rate_eur_per_kg": "3.63",
+    "total_eur": "934.80"
+   },
+   {
+    "source": "portal",
+    "airline": "Aurelia Air Cargo",
+    "airline_code": "AU",
+    "billed_kg": "190",
+    "total_eur": "995.60",
+    "transit_days": 3,
+    "portal_total": "995.60",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "190",
+     "volume_cbm": "0.9"
+    }
+   }
+  ],
+  "expected_quote": {
+   "airline": "Quetzal Air Freight",
+   "source": "sheet",
+   "total_eur": "820.80",
+   "currency": "EUR",
+   "transit_days": 5,
+   "note": null
+  }
+ },
+ "m21": {
+  "kind": "rfq",
+  "origin": "MUC",
+  "destination": "GRU",
+  "pieces": 3,
+  "actual_kg": "95",
+  "volume_cbm": "0.5",
+  "preference": "cheapest",
+  "action": "quote",
+  "chargeable_kg": "95",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Kestrel Airways",
+    "transit_days": 5,
+    "billed_kg": "100",
+    "rate_eur_per_kg": "2.92",
+    "total_eur": "372.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Solace Air Cargo",
+    "airline_code": "SL",
+    "billed_kg": "100",
+    "total_eur": "396.00",
+    "transit_days": 2,
+    "portal_total": "396.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "100"
+    }
+   },
+   {
+    "source": "sheet",
+    "airline": "Orion Cargo Air",
+    "transit_days": 4,
+    "billed_kg": "100",
+    "rate_eur_per_kg": "3.58",
+    "total_eur": "471.00"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Kestrel Airways",
+   "source": "sheet",
+   "total_eur": "372.00",
+   "currency": "EUR",
+   "transit_days": 5,
+   "note": null
+  }
+ },
+ "m22": {
+  "kind": "rfq",
+  "origin": "HAM",
+  "destination": "PEK",
+  "pieces": 12,
+  "actual_kg": "1450",
+  "volume_cbm": "6",
+  "preference": "fastest",
+  "action": "quote",
+  "flags": [
+   "thousands_dot"
+  ],
+  "chargeable_kg": "1450",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Vega Skyfreight",
+    "transit_days": 4,
+    "billed_kg": "1450",
+    "rate_eur_per_kg": "1.65",
+    "total_eur": "3842.50"
+   },
+   {
+    "source": "sheet",
+    "airline": "Kestrel Airways",
+    "transit_days": 3,
+    "billed_kg": "1450",
+    "rate_eur_per_kg": "1.75",
+    "total_eur": "4234.00"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Kestrel Airways",
+   "source": "sheet",
+   "total_eur": "4234.00",
+   "currency": "EUR",
+   "transit_days": 3,
+   "note": null
+  }
+ },
+ "m23": {
+  "kind": "rfq",
+  "origin": "FRA",
+  "destination": "BOM",
+  "pieces": null,
+  "actual_kg": "460",
+  "volume_cbm": "2",
+  "preference": "cheapest",
+  "action": "quote",
+  "flags": [
+   "terse",
+   "asap_but_cheapest"
+  ],
+  "chargeable_kg": "460",
+  "offers": [
+   {
+    "source": "sheet",
+    "airline": "Quetzal Air Freight",
+    "transit_days": 3,
+    "billed_kg": "460",
+    "rate_eur_per_kg": "1.98",
+    "total_eur": "1219.00"
+   },
+   {
+    "source": "sheet",
+    "airline": "Kestrel Airways",
+    "transit_days": 2,
+    "billed_kg": "500",
+    "rate_eur_per_kg": "1.93",
+    "total_eur": "1435.00"
+   }
+  ],
+  "expected_quote": {
+   "airline": "Quetzal Air Freight",
+   "source": "sheet",
+   "total_eur": "1219.00",
+   "currency": "EUR",
+   "transit_days": 3,
+   "note": null
+  }
+ },
+ "m24": {
+  "kind": "accept",
+  "action": "book",
+  "flags": [
+   "rate_id_expires_15_min"
+  ]
+ },
+ "m25": {
+  "kind": "negotiation",
+  "action": "requote_or_decline",
+  "flags": [
+   "carriers_not_negotiable"
+  ]
+ },
+ "m26": {
+  "kind": "tracking",
+  "action": "answer_from_crm"
+ },
+ "m27": {
+  "kind": "carrier_bid",
+  "action": "store_bid",
+  "origin": "FRA",
+  "destination": "BOM",
+  "airline": "Kestrel Airways",
+  "rate_eur_per_kg": "2.34",
+  "fuel_eur_per_kg": "0.81",
+  "security_eur_per_kg": "0.13",
+  "transit_days": 2
+ },
+ "m28": {
+  "kind": "trucker_bid",
+  "action": "store_bid",
+  "pickup_zone": "63",
+  "flat_eur": "85.00"
+ },
+ "m29": {
+  "kind": "portal_reply",
+  "action": "store_rate",
+  "origin": "CGN",
+  "destination": "DEL",
+  "total_eur": "1026.00",
+  "rate_id": "r_8f2c1a"
+ },
+ "m30": {
+  "kind": "tariff_sheet",
+  "action": "ingest_tariff",
+  "flags": [
+   "valid_from_2026-12-01"
+  ]
+ },
+ "m31": {
+  "kind": "noise",
+  "action": "ignore",
+  "flags": [
+   "auto_reply"
+  ]
+ }
+}
