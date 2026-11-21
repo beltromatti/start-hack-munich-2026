@@ -666,7 +666,10 @@ def normalise(s: dict, w: kit.World) -> dict:
     return {"origin": origin, "destination": dest, "weight_kg": str(kg) if kg else None,
             "volume_cbm": str(cbm.quantize(Decimal("0.001"))) if cbm else None,
             "chargeable_kg": str(cw) if cw else None, "pieces": pieces, "pickup_zone": zone,
-            "pickup_postcode": pickup.get("postcode"), "ready_date": (s.get("cargo") or {}).get("ready_date"),
+            # the ready date as a date, however the customer wrote it (round 65: "24 November 2026" reached the
+            # schedule as text, the dates fell back to today, and the agent told the customer to check the timing)
+            "pickup_postcode": pickup.get("postcode"),
+            "ready_date": _day((s.get("cargo") or {}).get("ready_date")) or (s.get("cargo") or {}).get("ready_date"),
             "commodity": (s.get("cargo") or {}).get("commodity"), "missing": missing}
 
 

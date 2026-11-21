@@ -576,3 +576,13 @@ def test_a_carrier_price_in_an_attachment_is_read():
     assert "Total: 165.70 EUR" in body and "[audio attachment voice-message.mp3: not read as text]" in body
     assert docs.text("blob.bin", bytes(range(256)) * 50).startswith("[binary attachment")
     assert f.with_attachments({**m, "attachments": []}) == {**m, "attachments": []}
+
+
+def test_the_ready_date_is_a_date_however_it_was_written():
+    """Round 65: 'ready on 24 November 2026' reached the schedule as text; it fell back to today and the quote
+    said the departure was before the ready date."""
+    from app.forwarder import normalise
+    kit.load(FakeFiveU())
+    s = {"origin_airport": "FRA", "destination_airport": "ORD", "lots": [{"pieces": 1, "weight": {"value": 100, "unit": "kg"}}]}
+    for written in ("24 November 2026", "2026-11-24", "24.11.2026", "Nov 24, 2026"):
+        assert normalise({**s, "cargo": {"ready_date": written}}, kit.world())["ready_date"] == "2026-11-24"
