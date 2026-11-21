@@ -40,7 +40,7 @@ def test_pick_cheapest_fastest_balanced():
 def test_quote_adds_pickup_and_keeps_one_offer_per_carrier():
     air = [Offer("air", "A", D(900), D(3), "sheet"), Offer("air", "A", D(900), D(3), "email", "R-1")]
     pick = [Offer("pickup", "T1", D("177.40"), D("0.125"), "email"), Offer("pickup", "T2", D(150), D("0.2"), "email")]
-    q = pricing.quote(air, pick, "cheapest", True)
+    q = pricing.quote(air, pick, "cheapest", True, pickup_rule="cheapest")
     assert q["total"] == "1050.00" and q["air"]["rate_id"] == "R-1" and q["pickup"]["carrier"] == "T2"
     assert pricing.quote(air, [], "cheapest", True) is None
 
@@ -92,9 +92,12 @@ def test_minmax_with_two_offers_takes_the_cheaper():
 def test_pickup_rule_decides_the_all_in_total():
     air = [Offer("air", "Slow", D(700), D(5), "sheet"), Offer("air", "Fast", D(900), D(2), "sheet")]
     q = lambda pref, **kw: pricing.quote(air, zone_60(), pref, True, **kw)
-    # defaults (behaviour so far): the trucker follows what the customer asked for
-    assert q("cheapest")["total"] == "788.60" and q("cheapest")["pickup"]["carrier"] == "Bodenseefracht"
-    assert q("fastest")["total"] == "1077.40" and q("fastest")["pickup"]["carrier"] == "Taunusfracht"
+    # asked: the trucker follows what the customer asked for
+    a = lambda pref: q(pref, pickup_rule="asked")
+    assert a("cheapest")["total"] == "788.60" and a("cheapest")["pickup"]["carrier"] == "Bodenseefracht"
+    assert a("fastest")["total"] == "1077.40" and a("fastest")["pickup"]["carrier"] == "Taunusfracht"
+    # default since round 2: the 50/50 trucker, whatever the customer asked for
+    assert q("cheapest")["pickup"]["carrier"] == q("fastest")["pickup"]["carrier"] == "Taunusfracht"
     # the fastest trucker costs 88.80 more than the cheapest: 9.0 % on this total, outside the 5 % band
     assert q("fastest", pickup_rule="cheapest")["total"] == "988.60"
     assert q("fastest", pickup_rule="balanced", balance="minmax")["total"] == "996.80"
@@ -126,3 +129,23 @@ def test_prices_in_other_currencies_convert_with_their_own_rate():
     assert pricing.to_eur(D("100"), "GBP", "1.15", rates) == D("115.00")    # a GBP price brings its own rate
     assert pricing.to_eur(D("100"), "usd", None, rates) == D("92.00")       # and the USD rate is still the USD rate
     assert pricing.to_eur(D("100"), "USD", "n/a", rates) == D("92.00")      # an unreadable rate changes nothing
+
+
+def test_the_trucker_in_5us_best_price_is_the_ratio_balanced_one():
+    """Live rounds 1 and 2 (Sat 16:00, 16:07), both "fastest" with pickup. Round 1: our quote with Westfalenroute
+    got full accuracy (45). Round 2: our quote with the fastest trucker (Hansekogge) got 34.14 = 45 x (1 - 2.41 % /
+    10 %), which is exactly the distance to a best price with Bodenseefracht. Only `ratio` picks both."""
+    def bids(rows):
+        return [Offer("pickup", n, D(p), (D(h) / 24).quantize(D("0.001")), "email") for n, p, h in rows]
+    r1 = bids([("Maintal Transport Logistik", "222.36", 13), ("Elbkante Logistik", "134.69", 29),
+               ("Westfalenroute", "220.03", 11), ("Bodenseefracht", "269.71", 12)])
+    r2 = bids([("Hansekogge Trucking", "245.02", 23), ("Bodenseefracht", "119.01", 30), ("Spessart Spedition", "299.03", 25),
+               ("Westfalenroute", "266.03", 23), ("Nordlicht Haulage", "152.01", 30)])
+    assert pricing.balanced(r1, "ratio").carrier == "Westfalenroute"
+    assert pricing.balanced(r2, "ratio").carrier == "Bodenseefracht"
+    assert pricing.pick(r1, "cheapest").carrier == "Elbkante Logistik"       # not it in round 1
+    assert pricing.pick(r2, "fastest").carrier == "Hansekogge Trucking"      # not it in round 2 (what we quoted)
+    assert pricing.balanced(r2, "minmax").carrier == "Hansekogge Trucking"   # not it in round 2
+    air = [Offer("air", "Solace Air Cargo", D("5100.00"), D(2), "portal", "R-1")]
+    assert pricing.quote(air, r2, "fastest", True)["total"] == "5219.01"     # 5U's best price; we quoted 5345.02
+    assert round(45 * (1 - (D("5345.02") / D("5219.01") - 1) / D("0.10")), 2) == D("34.14")

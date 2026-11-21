@@ -10,7 +10,7 @@ Sam approved the tone of the three example mails in `prompts/forwarder.md` (Sat 
 
 | Where | Change | Default |
 | --- | --- | --- |
-| `forwarder.options()` + `pickup_variants()` | Which trucker an option carries follows `PICKUP_RULE`: `asked` (cheapest, and the fastest as option `A1f`), `cheapest` (one option per airline, cheapest trucker), `balanced` (one option per airline, the 50/50 trucker). `recommended` follows it, so the agent quotes it | `asked` = main today |
+| `forwarder.options()` + `pickup_variants()` | Which trucker an option carries follows `PICKUP_RULE`: `asked` (cheapest, and the fastest as option `A1f`), `cheapest` (one option per airline, cheapest trucker), `balanced` (one option per airline, the 50/50 trucker). `recommended` follows it, so the agent quotes it | **`balanced`** since round 2 (main today: `asked`) |
 | `forwarder.options()` | A request without a preference gets `UNSPECIFIED_RULE` (`balanced`, `cheapest`, `fastest`) as `recommended`; the 50/50 formula is `BALANCE_RULE` (`ratio`, `minmax`) | `balanced`, `ratio` = main today |
 | `forwarder._ask_everyone()` | An airline with no sheet and not on the portal is also asked at the next break up (`pricing.breaks_to_try`) | new: 1 or 2 more mails on 5 destinations |
 | `forwarder.waiting_for()` | `get_offers` waits per request mail, not per sender (a carrier asked at two weights answers twice) | same result when every carrier is asked once |
@@ -18,10 +18,11 @@ Sam approved the tone of the three example mails in `prompts/forwarder.md` (Sat 
 | `pricing.balanced()`, `pricing.quote(..., pickup_rule, balance, unspecified)` | The rules as pure functions, with tests on the live zone-60 trucker bids | unchanged |
 | `prompts/forwarder.md` "How you write", `options()` rows carry `billed_kg` | Writing criteria from the humanizer checklist and three example mails: answer first, no thanks-for-your-request opener (27 of 35 carrier mails have one), one forwarder detail, a close that changes | prompt text only |
 
-Why: `docs/research/pricing.md` (evidence and numbers). **Round 1 (Sat 16:00, `docs/research/round-log.md`)
-settled half of the open rule: a "fastest" request is scored with the fastest trucker (or the 50/50 pick), not
-the cheapest. Leave `PICKUP_RULE` at its default `asked`.** Before the round I estimated `cheapest`; that was
-wrong and would have cost accuracy points.
+**Rounds 1 and 2 settled the open rule (`docs/research/round-log.md`): 5U's best price carries the 50/50
+trucker, price and pickup time each relative to the best on offer, whatever the customer asked for.** Main takes
+the fastest trucker for "fastest": right in round 1 by coincidence, 10.86 of 60 points lost in round 2.
+`PICKUP_RULE=balanced` with `BALANCE_RULE=ratio` is now the default on this branch and picks the scored trucker in
+both rounds. Merging the branch is enough; nothing to set in `.env`.
 
 ## Stress test with the real model (`docs/research/stress.md`, commits `c57080b`, `82bfa62`)
 
@@ -89,8 +90,7 @@ Tests: `test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status`,
 
 ## Open: decided by the first scored rounds, not by us
 
-- "Cheapest" with pickup: cheapest trucker or the 50/50 pick. And the 50/50 formula. Round 1 only showed that
-  "fastest" does not take the cheapest trucker.
+- "Cheapest" with pickup: expected to use the same 50/50 trucker; no such round yet.
 - Whether a quote below the best price is accepted.
 
 `backend/research/rounds.py` (read-only: GET on board and mailbox, no mail, no portal, no gateway) lists per

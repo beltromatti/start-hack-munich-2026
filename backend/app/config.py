@@ -34,10 +34,10 @@ class Settings:
     poll_seconds: float = float(os.getenv("POLL_SECONDS", "1.5"))
     # How long get_offers waits for carrier and trucker replies by default (the agent may ask for less or more).
     bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "85"))
-    # How 5U scores the pick is only half documented ("price and speed weigh 50/50"). These three switches let
-    # production follow what /v1/board/me shows, with a restart instead of new code. Defaults = behaviour so far.
-    # See docs/research/pricing.md.
-    pickup_rule: str = os.getenv("PICKUP_RULE", "asked")              # asked | cheapest | balanced
+    # Which trucker goes into the all-in total. Rounds 1 and 2 (docs/research/round-log.md): 5U's best price
+    # carries the 50/50 trucker, price and pickup time each relative to the best on offer (`ratio`), whatever the
+    # customer asked for. Switches, so production can follow the board with a restart instead of new code.
+    pickup_rule: str = os.getenv("PICKUP_RULE", "balanced")           # balanced | asked | cheapest
     balance_rule: str = os.getenv("BALANCE_RULE", "ratio")            # ratio | minmax
     unspecified_rule: str = os.getenv("UNSPECIFIED_RULE", "balanced")  # balanced | cheapest | fastest
     persona: str = os.getenv("PERSONA_NAME", "Giulia")

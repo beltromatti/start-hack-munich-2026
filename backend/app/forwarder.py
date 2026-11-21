@@ -504,18 +504,19 @@ def waiting_for(d: dict) -> list[str]:
 
 
 def pickup_variants(pickups: list[Offer], preference: str = "cheapest") -> list[tuple[str, Offer | None]]:
-    """The one trucker an option carries, by PICKUP_RULE (docs/research/pricing.md, round-log.md).
-    asked: the fastest when the customer asked for fastest (round 1: full accuracy), else the cheapest.
-    cheapest: always the cheapest. balanced: always the 50/50 pick (BALANCE_RULE).
+    """The one trucker an option carries, by PICKUP_RULE (docs/research/round-log.md).
+    balanced (default): the 50/50 pick of price and pickup time (BALANCE_RULE), whatever the customer asked for.
+        It is the trucker in 5U's best price in rounds 1 and 2; the fastest trucker cost 10.86 points in round 2.
+    asked: the fastest when the customer asked for fastest, else the cheapest. cheapest: always the cheapest.
     One variant only: with two on the table the agent took the fast trucker for a "cheapest" request because the
-    goods were "ready tomorrow 9:00" (stress test m08, 10.9 % over the best price)."""
+    goods were "ready tomorrow 9:00" (stress test m08)."""
     if not pickups:
         return [("", None)]
-    if settings.pickup_rule == "balanced":
-        return [("", pricing.balanced(pickups, settings.balance_rule))]
-    if settings.pickup_rule == "asked" and preference == "fastest":
-        return [("", pricing.pick(pickups, "fastest"))]
-    return [("", pricing.pick(pickups, "cheapest"))]
+    if settings.pickup_rule == "asked":
+        return [("", pricing.pick(pickups, "fastest" if preference == "fastest" else "cheapest"))]
+    if settings.pickup_rule == "cheapest":
+        return [("", pricing.pick(pickups, "cheapest"))]
+    return [("", pricing.balanced(pickups, settings.balance_rule))]
 
 
 def normalise(s: dict, w: kit.World) -> dict:

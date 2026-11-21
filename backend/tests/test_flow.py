@@ -157,8 +157,11 @@ def test_pickup_rule_decides_which_trucker_the_recommended_option_carries(monkey
         row = next(o for o in out["options"] if o["option"] == out["recommended"])
         return row["airline"], row["pickup"]["trucker"], row["total"]
 
-    # default (behaviour so far): the trucker follows the customer's preference
-    assert recommended("cheapest") == ("Slow", "Bodenseefracht", "788.60 EUR")
+    # asked: the trucker follows the customer's preference
+    assert recommended("cheapest", pickup_rule="asked") == ("Slow", "Bodenseefracht", "788.60 EUR")
+    assert recommended("fastest", pickup_rule="asked") == ("Fast", "Taunusfracht", "1077.40 EUR")
+    # default since round 2: the 50/50 trucker (ratio) for every preference
+    assert recommended("cheapest") == ("Slow", "Taunusfracht", "877.40 EUR")
     assert recommended("fastest") == ("Fast", "Taunusfracht", "1077.40 EUR")
     # the fastest trucker is 88.80 EUR more: 9 % on this shipment, outside the 5 % band if 5U expects another
     assert recommended("fastest", pickup_rule="cheapest") == ("Fast", "Bodenseefracht", "988.60 EUR")

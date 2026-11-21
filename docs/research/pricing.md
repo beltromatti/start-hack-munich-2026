@@ -78,13 +78,10 @@ Hint that the 50/50 rule is about truckers (a reading, not proof): the brief say
 Counted in `carrier-list.csv`: truckers per zone are exactly 2 to 5 (4 zones with 2, 7 with 3, 11 with 4,
 10 with 5). Email-only airlines per destination are 1 to 7.
 
-**Update after round 1 (Sat 16:00): keep `PICKUP_RULE=asked`.** A "fastest" quote with the fastest trucker got
-full accuracy; with the cheapest trucker in 5U's best price it could not have (`docs/research/round-log.md`).
-The estimate below, written before the round, was wrong:
-
-~~Recommendation until the board shows the rule (my estimate, not data): run `PICKUP_RULE=cheapest`.~~
-The cheapest trucker is at most 8.20 EUR from the `minmax` pick in zone 60 (inside 5 % from 165 EUR up),
-so it is accepted under two of the three readings. The fastest trucker is accepted under one.
+**Settled by rounds 1 and 2 (Sat 16:00 and 16:07, `docs/research/round-log.md`): the trucker in 5U's best price
+is the 50/50 pick with the `ratio` formula, whatever the customer asked for.** `PICKUP_RULE=balanced` is the
+default on this branch. My estimate before the rounds (`cheapest`) was wrong, and so is main's "fastest trucker for
+fastest".
 
 How we find the real rule: the first door-to-port round. `research.rounds` prints, per request, the trucker
 each rule would take. Compare with the verdict and the accuracy points on `/v1/board/me`.
