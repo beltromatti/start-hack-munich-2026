@@ -15,6 +15,7 @@ import time
 import traceback
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
@@ -244,7 +245,9 @@ class Forwarder:
                 # answers that change the picture: a carrier we had a price for says no, or a carrier asks back
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
-                                           if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
+                                           if c.get("had_sheet_price") or c.get("declined") is False][-5:],
+                # what the last deals saw that this thread cannot (empty on a quiet market, so it costs nothing)
+                **({"market": m} if (m := market(deal_id, req, air)) else {})}
 
     def ask_airline(self, deal_id: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
                     req: dict) -> int:
@@ -514,6 +517,57 @@ class Forwarder:
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
+
+MARKET_WINDOW_S = 3 * 3600   # the market as the last three hours saw it (5U changes the setup about hourly)
+DRIFT = Decimal("0.05")      # a carrier's live prices this far from its sheet: the sheet no longer tells the market
+GOOD = {"accepted", "open", "pending"}
+
+
+def market(deal_id: str, req: dict, air: list[Offer]) -> dict:
+    """A desk's memory across threads, for the agent: each session sees only its own thread, a real forwarder
+    knows what the last deals saw. Code only, no model call. Keys appear only when something stands out.
+    - live_vs_sheet: carriers on this deal whose live prices (portal, mail) moved away from their sheet
+    - declined_this_destination: carriers that said no for this destination in other deals
+    - notes_from_other_deals: what the agent marked as `market` elsewhere (a strike a customer mentioned)
+    - our_recent_losses: rounds 5U scored other than accepted, with its reason"""
+    since, names = time.time() - MARKET_WINDOW_S, {o.carrier for o in air}
+    drift: dict[str, list[Decimal]] = {}
+    declined: set[str] = set()
+    notes = []
+    for r in store.records("deal", limit=200):
+        if r["id"] == deal_id or r["updated_at"] < since:
+            continue
+        d, rq = r["data"], r["data"].get("request") or {}
+        offers = [Offer.of(x) for x in d.get("offers", [])]
+        sheet = {o.carrier: o.total for o in offers if o.leg == "air" and o.source == "sheet" and o.total}
+        for o in offers:
+            if o.leg == "air" and o.source != "sheet" and o.carrier in names and sheet.get(o.carrier):
+                drift.setdefault(o.carrier, []).append(o.total / sheet[o.carrier])
+        if rq.get("destination") and rq.get("destination") == req.get("destination"):
+            declined |= set(d.get("declined", []))
+        notes += [{"at": n["at"], "route": f"{rq.get('origin')}-{rq.get('destination')}", "text": n["text"]}
+                  for n in d.get("notes", []) if n.get("flag") == "market"]
+    out: dict[str, Any] = {}
+    moved = []
+    for c, xs in sorted(drift.items()):
+        mid = sorted(xs)[len(xs) // 2]
+        if abs(mid - 1) >= DRIFT:
+            moved.append({"carrier": c, "live_price_vs_its_sheet": f"{float(mid):.2f}x", "deals": len(xs)})
+    if moved:
+        out["live_vs_sheet"] = moved
+    if declined:
+        out["declined_this_destination"] = sorted(declined)
+    if notes:
+        out["notes_from_other_deals"] = [{k: n[k] for k in ("route", "text")}
+                                         for n in sorted(notes, key=lambda n: n["at"])[-5:]]
+    me = json.loads(store.kv_get("board_me") or "null") or {}
+    after = datetime.fromtimestamp(since, timezone.utc).isoformat()
+    lost = [{"round": r.get("round_no"), "verdict": r.get("verdict"), "reason": r.get("reason")}
+            for r in me.get("requests", [])
+            if r.get("verdict") and r.get("verdict") not in GOOD and (r.get("sent_at") or "") >= after][:3]
+    if lost:
+        out["our_recent_losses"] = lost
+    return out
 
 def waiting_for(d: dict) -> list[str]:
     """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""

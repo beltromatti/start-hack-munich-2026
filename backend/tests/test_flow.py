@@ -274,3 +274,36 @@ def test_a_bid_quoted_per_kg_gets_its_total_from_code():
     m = {"id": 42, "in_reply_to": 41, "sender": "yellowtail-air-freight@hackloop.mail"}
     off = f.offer(o, m, kit.world().carrier_by_email(m["sender"]))
     assert str(off.total) == "982.00"  # 300 x 2.42 + 300 x 0.77 + 25
+
+
+# ---- market memory: what other deals saw reaches this one (Jan, Sat 21 Nov: customer replies, rising prices) ----
+
+def test_market_is_empty_on_a_quiet_market_and_carries_what_other_deals_saw():
+    import json
+    from datetime import datetime, timezone
+    from decimal import Decimal as D
+    from app import forwarder, tools
+    from app.pricing import Offer
+    req = {"origin": "FRA", "destination": "MXP", "chargeable_kg": "300"}
+    air = [Offer("air", "Aurelia", D(1000), D(2), "sheet")]
+    assert forwarder.market("deal-new", req, air) == {}  # quiet: nothing to read, no tokens
+
+    # another deal: Aurelia's portal price 20 % over its sheet, Helix said no to MXP, a customer told of a strike
+    other = [Offer("air", "Aurelia", D(500), D(2), "sheet"), Offer("air", "Aurelia", D(600), D(2), "portal")]
+    store.put("deal-old", "deal", "quoted", {"root": 9, "request": req, "declined": ["Helix"],
+                                              "offers": [o.as_dict() for o in other]})
+    ctx = tools.Ctx(None, "session-9", "deal-old", 9, "customer", None)
+    tools.note(ctx, "customer says the MXP handlers strike from Monday", "market")
+    assert store.get("deal-old")["data"].get("flag") is None  # market news does not flag the deal for a person
+    now = datetime.now(timezone.utc).isoformat()
+    store.kv_set("board_me", json.dumps({"requests": [
+        {"round_no": 7, "sent_at": now, "verdict": "rejected", "reason": "price_above_market"},
+        {"round_no": 6, "sent_at": now, "verdict": "accepted"}]}))
+
+    m = forwarder.market("deal-new", req, air)
+    assert m["live_vs_sheet"] == [{"carrier": "Aurelia", "live_price_vs_its_sheet": "1.20x", "deals": 1}]
+    assert m["declined_this_destination"] == ["Helix"]
+    assert m["notes_from_other_deals"] == [{"route": "FRA-MXP", "text": "customer says the MXP handlers strike from Monday"}]
+    assert m["our_recent_losses"] == [{"round": 7, "verdict": "rejected", "reason": "price_above_market"}]
+    # a carrier this deal does not use is not its news
+    assert "live_vs_sheet" not in forwarder.market("deal-new", req, [Offer("air", "Fjordline", D(1), D(1), "sheet")])

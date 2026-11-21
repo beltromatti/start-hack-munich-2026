@@ -100,8 +100,9 @@ TOOLS = [
        {"deal_id": {"type": "string"}, "question": S, "wait_seconds": {"type": "number"}}),
     fn("note",
        "Write a note on the deal for the team (what you noticed, what you decided and why). flag: yellow when a "
-       "person should look at it, red when something is wrong or risky; none otherwise.",
-       {"text": {"type": "string"}, "flag": {"type": "string", "enum": ["none", "yellow", "red"]}}),
+       "person should look at it, red when something is wrong or risky, market when the next deals should know it "
+       "too (a customer or carrier tells of a strike, a closed airport, rising prices, a shortage); none otherwise.",
+       {"text": {"type": "string"}, "flag": {"type": "string", "enum": ["none", "yellow", "red", "market"]}}),
     fn("no_reply",
        "Nothing needs to be sent for the mail you are handling (for example a thank-you after the booking). Say why.",
        {"reason": {"type": "string"}}),
@@ -294,7 +295,7 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
 def note(ctx: Ctx, text: str, flag: str) -> dict:
     _ensure_deal(ctx)
     store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "notes": r["data"].get("notes", []) + [
-        {"at": time.time(), "text": text, "flag": flag}], "flag": flag if flag != "none" else r["data"].get("flag")}))
+        {"at": time.time(), "text": text, "flag": flag}], "flag": flag if flag in ("yellow", "red") else r["data"].get("flag")}))
     store.log("forwarder", "decision", f"note [{flag}] {text[:160]}", run_id=ctx.deal_id)
     return {"ok": True}
 
