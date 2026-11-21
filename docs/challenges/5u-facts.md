@@ -221,3 +221,10 @@ all are `booked: true`. Since 23:57 the volume is kept exact and weights to carr
 `rounds` a `factor: null`, both at the same snapshot, neither described in the live openapi. Most likely a
 multiplier for rounds few teams get right (round 76: 2 of 13 accepted). Nothing to change: a hard round answered
 right is worth more, which is what we already aim for. Watch for the first non-null factor.
+At 00:25 it was set: `few_winners: {"factors": ["5", "3", "2"], "from_round": 84}`. Read: from round 84, a round
+that only 1 / 2 / 3 teams get right multiplies its points by 5 / 3 / 2 (to be confirmed by the first non-null
+`factor`). A round like 76 (2 of 13) is now worth three times as much.
+
+**The trucker is the 50/50 pick also for "cheapest" (checked Sun 00:27):** rounds 66, 71 and 80 asked for the
+cheapest with a pickup; we quoted the 50/50 trucker, 7.3 %, 6.3 % and 12.0 % above the same flight with the
+cheapest trucker, and all three got accuracy 45. 5U's best price uses the same trucker rule.
