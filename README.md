@@ -2,8 +2,8 @@
 
 Team: Sam Sonntag, Jan Köberle, Mattia Beltrami. 21–22 Nov 2026, TUM Audimax.
 
-Challenge preference: **1. Lio** (procurement / supply chain), **2. 5U AI** (freight forwarding), **3. revel8**
-(social engineering). Allocation is announced at 12:55. This repo is the shared foundation that works for any of
+**Our challenge: 5U AI, "Build the Forwarder"** (allocated Sat 21 Nov; we ranked Lio, 5U AI, revel8).
+See `docs/challenges/5u.md`. This repo is the shared foundation that works for any of
 the three: agents that read a mailbox, call tools, write to a small CRM and show every step live.
 
 ## Key times

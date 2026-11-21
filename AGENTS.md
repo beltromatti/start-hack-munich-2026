@@ -5,8 +5,8 @@ Ship a working, demoable agent system. Speed and a clean demo beat completeness.
 
 ## The challenge
 
-Not final until 12:55 on Saturday. Read the matching file in `docs/challenges/` before building anything
-challenge-specific: `lio.md` (1st choice), `5u.md` (2nd), `revel8.md` (3rd).
+**Allocated: 5U AI, "Build the Forwarder"** (confirmed in the Hack League app, Sat 21 Nov).
+Read `docs/challenges/5u.md` before building anything. The other challenge files are background only.
 
 ## Architecture (keep it this simple)
 
