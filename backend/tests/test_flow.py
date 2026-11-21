@@ -1313,3 +1313,14 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     assert any("declined_out_of_scope" in s for s in out)
     assert any("points of 1 earlier results moved: round 40 accuracy 45.0 -> 40.5" in s for s in out)
     assert any("round 41 answered in 44 s took 9.5 of 25" in s and "round 40" not in s for s in out)
+    # Sun 00:27: from round 84 a round few teams get right pays a multiple; a multiplied round we lost stands out
+    r84 = {"round_no": 84, "verdict": "rejected", "reason": "too_high", "points": {}, "multiplier": 3}
+    r85 = {"round_no": 85, "verdict": "accepted", "reason": None, "points": {}, "multiplier": 1}
+    board = {"rules": {**rules, "time_points": 25}, "frozen_at": "2026-11-22T09:00:00+00:00",
+             "rounds": [{"round_no": 84, "accepted": 2, "multiplier": 3}, {"round_no": 85, "accepted": 9, "multiplier": 1}]}
+    f.watch_scoring({"requests": [r85, r84, r41, r40b]}, board)
+    f.watch_scoring({"requests": [r85, r84, r41, r40b]}, board)
+    more = [s for s in said() if s not in out]
+    assert len(more) == 3   # the multiplied round, the new fields, the reason code not seen before
+    assert any("round 84 pays a multiple (3), 2 teams accepted; ours: rejected too_high" in s for s in more)
+    assert any("new field on the board" in s and "requests.multiplier" in s and "rounds.multiplier" in s for s in more)
