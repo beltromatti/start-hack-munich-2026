@@ -592,9 +592,7 @@ def pickup_variants(pickups: list[Offer], preference: str = "cheapest") -> list[
 
 def normalise(s: dict, w: kit.World) -> dict:
     """From the shipment as the agent passes it (the customer's words and units) to the facts code prices with."""
-    pieces = s.get("pieces")
-    kg = language.weight_kg(s.get("weight") or {}, pieces)
-    cbm = language.volume_cbm(s.get("volume") or {}, s.get("dimensions") or [], pieces)
+    pieces, kg, cbm = _goods(s)
     pickup = s.get("pickup") or {}
     zone = None
     postcode = re.sub(r"\D", "", pickup.get("postcode") or "")
@@ -625,6 +623,28 @@ def normalise(s: dict, w: kit.World) -> dict:
             "chargeable_kg": str(cw) if cw else None, "pieces": pieces, "pickup_zone": zone,
             "pickup_postcode": pickup.get("postcode"), "ready_date": (s.get("cargo") or {}).get("ready_date"),
             "commodity": (s.get("cargo") or {}).get("commodity"), "missing": missing}
+
+
+def _goods(s: dict) -> tuple[int | None, Decimal | None, Decimal | None]:
+    """Pieces, gross kg and cbm of the whole consignment, added up in code from the lots as written (a total
+    weight for one lot, a weight per piece for another, dimensions per piece for a third)."""
+    lots = s.get("lots")
+    if not lots:  # a shipment written flat (older sessions, tests)
+        lots = [{"pieces": s.get("pieces"), "weight": s.get("weight"), "volume": s.get("volume"),
+                 "dimensions": None, "_dims": s.get("dimensions") or []}]
+    pieces, kg, cbm, unknown = 0, Decimal(0), Decimal(0), False
+    for lot in lots:
+        n = lot.get("pieces")
+        w = language.weight_kg(lot.get("weight") or {}, n)
+        if w is None:
+            unknown = True
+        else:
+            kg += w
+        dims = lot.get("_dims") or ([{**lot["dimensions"], "count": n or 1}] if lot.get("dimensions") else [])
+        v = language.volume_cbm(lot.get("volume") or {}, dims, n)
+        cbm += v or 0
+        pieces += n or 0
+    return pieces or None, (None if unknown or not kg else kg), (cbm or None)
 
 
 def _day(text: Any) -> str | None:

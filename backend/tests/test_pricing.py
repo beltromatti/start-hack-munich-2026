@@ -156,3 +156,20 @@ def test_timeline_starts_when_the_goods_are_ready():
     t = tools.timeline(b)
     assert t["ready_date"] == "Wed 25 Nov 2026" and t["estimated_arrival"] == "Thu 26 Nov 2026"
     assert t["expected_stage_now"].startswith("booked") if _t.time() < datetime(2026, 11, 25, 9, tzinfo=timezone.utc).timestamp() else True
+
+
+def test_a_consignment_of_lots_is_added_up_in_code():
+    """Live round 9 (Sat 16:49): three lots, a total weight, weights per piece, dimensions per piece, net beside gross."""
+    from app.forwarder import normalise
+    q = lambda v, u, pp: {"value": v, "unit": u, "per_piece": pp}
+    none = q(None, None, False)
+    s = {"origin_airport": None, "pickup": {"postcode": "36627", "city": "Fulda"}, "destination_airport": "LOS",
+         "cargo": {"commodity": "automotive sensors", "ready_date": "2026-11-29", "notes": None},
+         "lots": [{"pieces": 4, "weight": q(730, "kg", False), "volume": q(1.68, "cbm", False), "dimensions": None},
+                  {"pieces": 4, "weight": q(48, "kg", True), "volume": none,
+                   "dimensions": {"length": 110, "width": 110, "height": 52, "unit": "cm"}},
+                  {"pieces": 5, "weight": q(206, "kg", True), "volume": none,
+                   "dimensions": {"length": 120, "width": 100, "height": 8, "unit": "cm"}}]}
+    r = normalise(s, kit.world())
+    assert r["pieces"] == 13 and D(r["weight_kg"]) == 1952 and r["volume_cbm"] == "4.677"
+    assert r["origin"] == "FRA" and r["pickup_zone"] == "36" and not r["missing"]
