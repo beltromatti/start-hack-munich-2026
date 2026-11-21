@@ -3,6 +3,10 @@
 We are three people at a 24-hour hackathon (START Hack Munich, 21–22 Nov 2026). Hard deadline Sunday 12:45.
 Ship a working, demoable agent system. Speed and a clean demo beat completeness.
 
+**Read `docs/how-we-build.md` first:** how we think about this system (the model decides, the system guarantees;
+one agent per deal; intelligence in the agent, guarantees in tools), with Saturday's real examples of what
+worked and what we removed. It explains the reasons behind everything below.
+
 ## The challenge
 
 **Allocated: 5U AI, "Build the Forwarder"** (confirmed in the Hack League app, Sat 21 Nov).
@@ -66,22 +70,12 @@ mail in -> register (SQLite) -> router (code, by sender/thread)
 5. Small, working steps. `make test` stays green. Add a test for anything that touches money or sending.
 6. Prefer deleting over adding layers. No new framework without asking the team.
 
-## Before you change anything (read this if you are an AI assistant)
+## Before you change anything
 
-The design is Mattia's agent harness (`reference/siever-mail/README.md`). Changes that fight it were removed
-on Sat 16:30 (a regex pre-sort, a second pricing engine, a separate dashboard, a rule-based watcher), so:
-
-- **Intelligence goes to the agent, guarantees go to tools.** A new capability is a tool (or a field a tool
-  returns), described in its own words, that the agent chooses to use. Not a pipeline step, not a classifier in
-  front of the agent, not if-then rules on mail text.
-- **No hard checks on what the model writes.** Teach with the prompt (criteria and the reason), measure with
-  diagnostics. The only hard rules live inside tools: money computed in `pricing.py`, who may be mailed, IDs.
-- **One implementation per thing.** Prices only in `pricing.py`, model calls only in `llm.py`, state only in the
-  register (`store.py`). Never a parallel copy "for tests" or "for the UI".
-- **Flexibility by the data model, not by examples.** When a round fails, ask what kind of change it was
-  (`docs/likely-changes.md`) and make the system handle that kind, not that mail.
-- **Prompts are soft:** goals, criteria, why. No procedures, no word lists, no word limits.
-- **Work on a short branch from `main`**, run `make test` and `make sim`, and let Mattia merge. Never `make live`.
+The reasoning is in `docs/how-we-build.md`. In short: a new capability is a tool or a field a tool returns, not a
+step in front of the agent; no hard checks on what the model writes (teach with the prompt, measure with
+diagnostics); one implementation per thing; fix the kind of change, not the one mail; prompts give goals and
+reasons. Work on a short branch from `main`, `make test` and `make sim`, let Mattia merge, never `make live`.
 
 ## Commands
 

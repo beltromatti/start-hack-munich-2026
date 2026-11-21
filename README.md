@@ -7,6 +7,8 @@ See `docs/challenges/5u.md`. A digital air forwarder: it reads the 5U mailbox, p
 portal, the rate sheets and carrier bids, replies in human words and books, all night, on its own.
 The model reads and writes language; every number is computed in code.
 
+**New here (or an AI assistant)? Read `docs/how-we-build.md` first, then `AGENTS.md`.**
+
 ## Key times
 
 | When | What |
