@@ -132,7 +132,7 @@ class Forwarder:
     def on_customer(self, m: dict) -> None:
         rid = f"rfq-{m['root']}"
         rec = store.get(rid)
-        parsed = language.read_customer(thread_text(m["root"]), run_id=rid)
+        parsed = language.read_customer(thread_text(m["root"], self.api), run_id=rid)
         store.log("rfq", "info", f"intent {parsed['intent']}", parsed, run_id=rid)
         status = rec["status"] if rec else None
         if status in ("quoted", "booking", "booked", "lost"):
@@ -396,7 +396,7 @@ class Forwarder:
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
-        days = Decimal(str(o["pickup_hours"])) / 24 if trucker and o.get("pickup_hours") is not None else \
+        days = (Decimal(str(o["pickup_hours"])) / 24).quantize(Decimal("0.001")) if trucker and o.get("pickup_hours") is not None else \
             Decimal(str(o.get("transit_days") or 0))
         # a carrier answering for itself is named as in the carrier list (so its mail bid and its sheet price
         # are recognised as the same carrier); the rate desk names the airlines it lists
@@ -537,12 +537,20 @@ def normalise(p: dict, w: kit.World) -> dict:
             "missing": sorted(set(missing))}
 
 
-def thread_text(root: int) -> str:
+def thread_text(root: int, api: Any = None) -> str:
+    """The whole thread as the model reads it, attachments included (a packing list, a spec sheet)."""
     out = []
     for x in store.thread(root):
         who = "US (the forwarder)" if x["direction"] == "out" else x["sender"]
-        out.append(f"--- mail {x['id']} from {who} at {x['received_at'] or ''}\nSubject: {x['subject']}\n\n{x['body']}")
-    return "\n\n".join(out)[-12000:]
+        text = f"--- mail {x['id']} from {who} at {x['received_at'] or ''}\nSubject: {x['subject']}\n\n{x['body']}"
+        for a in (x.get("attachments") or []) if api is not None and x["direction"] == "in" else []:
+            try:
+                text += f"\n\n[attachment {a.get('filename')}]\n" + docs.text(a.get("filename", ""), api.attachment(
+                    x["id"], a.get("id")))[:6000]
+            except Exception as e:
+                store.log("rfq", "error", f"attachment {a.get('filename')}: {e!r}")
+        out.append(text)
+    return "\n\n".join(out)[-16000:]
 
 
 def _body(m: dict | None) -> str:
