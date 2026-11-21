@@ -261,7 +261,8 @@ Then:
   first at +10 %, and we told the customer in a correction after a confirmation without the price. To ask 5U what
   it is for and what they expect when the booking price is not the quoted one.
 - **Mailbox 429s:** 12 between 20:00 and 21:00 although we poll every 5.5 s. From 21:00 a failed poll is never
-  retried early, so a 429 now means another client polls with the team key. Each costs a few seconds, not a mail.
+  retried early, and 429s still came (21:01, 21:03): another client polls with the team key. Each costs a few
+  seconds, not a mail; whoever reads the mailbox besides production should stop or use the UI.
 - No replay engine yet over the real threads before a prompt change (planned; meanwhile, walk the change through
   the threads by hand and replay key mails in the sim).
 - Cancellations and changes asked by a customer have no tool of their own: the agent can write to the airline
