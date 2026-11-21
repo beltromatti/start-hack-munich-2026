@@ -130,3 +130,13 @@ def test_breaks_to_try_for_a_carrier_without_known_breaks():
     assert pricing.breaks_to_try(D(230)) == [D(250), D(300)]   # third break is 250 or 300, depending on the airline
     assert pricing.breaks_to_try(D(120)) == []                 # 250 is more than 1.35x away: cannot be cheaper
     assert pricing.breaks_to_try(D(2500)) == []
+
+
+def test_prices_in_other_currencies_convert_with_their_own_rate():
+    rates: dict = {}
+    assert pricing.to_eur(D("100"), "EUR", None, rates) == D("100.00")
+    assert pricing.to_eur(D("100"), "USD", None, rates) is None             # no rate seen: dropped, never guessed
+    assert pricing.to_eur(D("100"), "USD", "0.92", rates) == D("92.00")
+    assert pricing.to_eur(D("100"), "GBP", "1.15", rates) == D("115.00")    # a GBP price brings its own rate
+    assert pricing.to_eur(D("100"), "usd", None, rates) == D("92.00")       # and the USD rate is still the USD rate
+    assert pricing.to_eur(D("100"), "USD", "n/a", rates) == D("92.00")      # an unreadable rate changes nothing

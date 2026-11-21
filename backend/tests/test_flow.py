@@ -119,12 +119,3 @@ def test_a_sheet_airline_is_asked_once():
     to_yellowtail = [m["subject"] for m in api.outbox if m["to"] == "yellowtail-air-freight@hackloop.mail"]
     assert to_yellowtail == ["Rate request FRA-ORD 250 kg"]  # its sheet says 250 kg is the cheaper billing
 
-
-def test_prices_in_other_currencies_convert_with_their_own_rate():
-    from decimal import Decimal as D
-    f = Sync(FakeFiveU())
-    assert f.eur(D("100"), "EUR", None) == D("100.00")
-    assert f.eur(D("100"), "USD", None) is None             # no rate seen: dropped, never guessed
-    assert f.eur(D("100"), "USD", "0.92") == D("92.00")
-    assert f.eur(D("100"), "GBP", "1.15") == D("115.00")    # a GBP price brings its own rate in the same field
-    assert f.eur(D("100"), "USD", None) == D("92.00")       # and the USD rate is still the USD rate

@@ -434,23 +434,10 @@ class Forwarder:
                     "offers": r["data"]["offers"] + [o.as_dict() for o in offers]}))
 
     def eur(self, amount: Decimal, currency: str, fx: Any) -> Decimal | None:
-        """Any price in EUR. A rate stated with a price (portal `fx_eur_per_usd`: EUR per 1 unit of the price's
-        currency, whatever that currency is) is remembered per currency and stands in when a later price in
-        that currency states none."""
-        cur = (currency or "EUR").upper()
-        if cur == "EUR":
-            return pricing.money(amount)
-        try:
-            rate = Decimal(str(fx)) if fx else None
-        except ArithmeticError:
-            rate = None
-        if rate and rate > 0:
-            self.fx[cur] = rate
-        rate = self.fx.get(cur)
-        if rate:
-            return pricing.money(amount * rate)
-        store.log("bids", "error", f"cannot convert {amount} {cur} to EUR: no exchange rate seen for {cur}")
-        return None
+        total = pricing.to_eur(amount, currency, fx, self.fx)
+        if total is None:
+            store.log("bids", "error", f"cannot convert {amount} {currency} to EUR: no exchange rate seen")
+        return total
 
     # ---- tracking ------------------------------------------------------------------------------------------
 

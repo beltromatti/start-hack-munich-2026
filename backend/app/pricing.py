@@ -25,6 +25,24 @@ def fmt(amount: Decimal, currency: str = "EUR") -> str:
     return f"{money(amount):.2f} {currency}"
 
 
+def to_eur(amount: Any, currency: str | None, fx: Any, rates: dict[str, Decimal]) -> Decimal | None:
+    """Any price in EUR, or None when it cannot be converted (never guessed).
+    `fx` is the rate stated with this price: EUR per 1 unit of its currency (the portal's `fx_eur_per_usd` field
+    carries it for whatever currency the price is in). `rates` remembers the last stated rate per currency and
+    stands in when a later price in that currency states none."""
+    cur = (currency or "EUR").upper()
+    if cur == "EUR":
+        return money(amount)
+    try:
+        rate = Decimal(str(fx)) if fx else None
+    except ArithmeticError:
+        rate = None
+    if rate and rate > 0:
+        rates[cur] = rate
+    rate = rates.get(cur)
+    return money(Decimal(str(amount)) * rate) if rate else None
+
+
 def chargeable(weight_kg: Decimal, volume_cbm: Decimal | None) -> Decimal:
     vol = (volume_cbm or Decimal(0)) * KG_PER_CBM
     return max(Decimal(weight_kg), vol)
