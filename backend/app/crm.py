@@ -6,9 +6,9 @@ Where a deal record exists (the live machine) its facts win. On a machine with o
 the 5U backup) the facts come from the mails, and what neither holds stays None. Totals shown here are the totals
 our quote mail carried, never a new computation.
 
-Points per round: 5U shows only our running total (`scores_revealed` false). Between two board snapshots the total
-moves when a round gets its verdict (accuracy + speed at once) or when cost, humanity and tracking points arrive in
-batches. A delta with exactly one new verdict in it is that round's points. Every other delta is a batch.
+Points per round: `/v1/board/me` gives every request its points per kind (accuracy, time, cost, tracking, humanity,
+booking). Those are the round's points. Board deltas (a delta with exactly one new verdict) are the fallback for a
+snapshot without them, and the series over time feeds the race chart.
 """
 import json
 import re
@@ -19,6 +19,8 @@ from typing import Any
 from . import kit, store
 
 TEAM = "start-milan"
+# Full marks per kind (brief: accuracy 45, cost 40, time 15, humanity 10, tracking 10). Booking pays 0 so far.
+MAX = {"accuracy": 45.0, "time": 15.0, "cost": 40.0, "tracking": 10.0, "humanity": 10.0}
 FINAL = {"accepted", "rejected", "no answer", "voided"}
 RATEDESK, TRACKING = "ratedesk@hackloop.mail", "tracking@hackloop.mail"
 IATA = re.compile(r"\b([A-Z]{3})\b")
@@ -35,6 +37,17 @@ CLOSING = re.compile(r"^((kind|best|warm|many|viele|beste|liebe|freundliche)\s+)
 QUOTED = re.compile(r"^-{3,}\s*original message|^on .+ wrote:$|^am .+ schrieb", re.I | re.M)
 LANE = re.compile(r"Rate request ([A-Z]{3})-([A-Z]{3}) (\d+(?:\.\d+)?) kg")
 ZONE = re.compile(r"Pickup quote (?:zone )?(\d+)")
+# What makes a request harder than a plain one, for the people reading the CRM (5U adds one kind every few rounds).
+# A diagnostic shown to the team only: the agent never sees it and nothing decides on it.
+TRAITS = {
+    "lots": re.compile(r"^\s*Lot \d", re.I | re.M),
+    "attachment": re.compile(r"attach", re.I),
+    "dangerous goods": re.compile(r"dangerous|\bDG\b|\bUN\s?\d{4}\b", re.I),
+    "import": re.compile(r"\bimport", re.I),
+    "own delivery": re.compile(r"no pickup|deliver the goods|we.ll deliver", re.I),
+    "forwarded chain": re.compile(r"original message|^(RE|FW|AW|WG):", re.I | re.M),
+    "earliest arrival": re.compile(r"earliest", re.I),
+}
 TRANSIT = re.compile(r"(\d+(?:\.\d+)?)\s*(day|days|hour|hours|h)\b", re.I)
 REF = re.compile(r"\b((?:R|TRK)-[A-Za-z0-9-]+)")
 
@@ -157,6 +170,16 @@ def _is_rfq(m: dict) -> bool:
             and not re.match(r"^booking\s+\S+\s+confirmed", m["subject"] or "", re.I))
 
 
+def traits(subject: str, body: str) -> list[str]:
+    """The harder parts of a request: what TRAITS finds, plus a pickup with no postcode in the customer's own text."""
+    text = f"{subject}\n{body}"
+    own = QUOTED.split(body)[0]
+    out = [k for k, r in TRAITS.items() if r.search(text)]
+    if re.search(r"pickup|truck", own, re.I) and "own delivery" not in out and not POSTCODE.search(own):
+        out.append("no postcode")
+    return out
+
+
 def cases() -> list[dict]:
     """One row per customer request (a 5U round): the request, what we did, what 5U said. Newest first.
     Shaped like the dashboard's Case (frontend/src/crm), so its views run on real data.
@@ -247,7 +270,9 @@ def cases() -> list[dict]:
             "firstReplyAt": first_at, "askedBack": asked_back,
             "firstReply": first["body"] if asked_back else None, "quoteText": quote["body"] if quote else None,
             "costUsd": store.usage(deal["id"])["cost_usd"] if deal else None,
-            "verdict": verdict, "booked": rnd.get("booked"), "points": pts.get(rnd.get("round_no")),
+            "verdict": verdict, "booked": rnd.get("booked"),
+            "points": round(sum(rnd["points"].values()), 2) if rnd.get("points") else pts.get(rnd.get("round_no")),
+            "pointsBy": rnd.get("points") or {}, "traits": traits(m["subject"] or "", m["body"] or ""),
             "tracking": track_rows,
             "mails": [{"id": x["id"], "t": round((_ts(x["received_at"]) or start) - start), "direction": x["direction"],
                        "from": x["sender"], "to": x["recipient"], "subject": x["subject"], "body": x["body"]}
@@ -306,8 +331,16 @@ def losses(cs: list[dict] | None = None) -> dict:
     tl = points_timeline()
     _, pub = _latest_board()
     us = next((r for r in pub.get("ranking", []) if r.get("name") == TEAM), {})
-    scored = [c["points"] for c in cs if c["points"] is not None]
-    best = max(scored) if scored else None
+    acc = [c for c in cs if c["verdict"] == "accepted" and c["pointsBy"]]
+    # A kind counts as settled once 5U has paid it for any later round: humanity and tracking come in batches, cost
+    # hourly. Before that, a missing kind is pending, not lost.
+    last = {k: max((c["round"] or 0 for c in acc if k in c["pointsBy"]), default=0) for k in MAX}
+    by_kind = {k: {"lost": round(sum(MAX[k] - c["pointsBy"].get(k, 0.0) for c in acc if (c["round"] or 0) <= last[k]
+                                     and (k != "tracking" or c["booked"])), 2),
+                   "rounds": [c["round"] for c in acc if (c["round"] or 0) <= last[k] and c["pointsBy"].get(k, 0.0) < MAX[k]
+                              and (k != "tracking" or c["booked"])]}
+               for k in MAX}
+    full = sum(MAX.values())
     return {
         "total": us.get("total"), "rank": us.get("rank"), "answered": us.get("answered"),
         "accepted": us.get("accepted"), "human": us.get("human"), "bookings": us.get("bookings"),
@@ -317,7 +350,7 @@ def losses(cs: list[dict] | None = None) -> dict:
         "slow": [{"round": c["round"], "quoteAt": c["quoteAt"]} for c in cs if (c["quoteAt"] or 0) > 120],
         "tracking_asked": sum(len(c["tracking"]) for c in cs),
         "tracking_unanswered": sum(1 for c in cs for t in c["tracking"] if t["answered_s"] is None),
-        "per_round_points": {str(k): v for k, v in sorted(tl["per_round"].items())},
-        "best_round_points": best, "below_best": round(sum(best - p for p in scored), 2) if best else None,
+        "per_round_points": {str(c["round"]): c["points"] for c in cs if c["points"] is not None},
+        "by_kind": by_kind, "round_max": full, "missed_lost": round(full * len([c for c in cs if c["verdict"] == "no answer"]), 2),
         "batches": tl["batches"],
     }

@@ -53,3 +53,9 @@ def test_a_customer_request_becomes_one_case_with_our_quote_and_the_carriers_ans
     assert c[0]["customer"] == "Alpenwerk GmbH" and c[0]["contact"] == "Lena Huber"
     assert c[0]["quoteTotal"] == 1234.5 and c[0]["quoteAt"] == 40 and not c[0]["askedBack"]
     assert crm.customers(c)[0]["n"] == 1
+
+
+def test_traits_name_what_makes_a_request_harder():
+    body = "Please quote to GRU. Pickup at our warehouse.\nLot 1: 4 drums\nI attached the packing list.\n\nKlaus"
+    assert crm.traits("Air freight quote", body) == ["lots", "attachment", "no postcode"]
+    assert crm.traits("Quote", "Pickup at 61391 Bad Homburg, earliest arrival?") == ["earliest arrival"]
