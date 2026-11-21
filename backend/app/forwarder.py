@@ -192,10 +192,10 @@ class Forwarder:
             if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
                 weights += pricing.breaks_to_try(cw)
             for wt in weights:
-                asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
+                self._ask(asked, deal_id, c, self.ask_airline, deal_id, c, o, d, wt, cbm, req)
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
-                asked[str(self.ask_trucker(deal_id, c, req))] = c.email
+                self._ask(asked, deal_id, c, self.ask_trucker, deal_id, c, req)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "not_asked": not_asked}))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
@@ -208,11 +208,20 @@ class Forwarder:
                 above = ([nb] if nb is not None and nb / cw < Decimal("1.5") else []) if breaks \
                     else pricing.breaks_to_try(cw)
                 for wt in [cw] + above:
-                    asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
+                    self._ask(asked, deal_id, c, self.ask_airline, deal_id, c, o, d, wt, cbm, req)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
         store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",
                   run_id=deal_id)
+
+    @staticmethod
+    def _ask(asked: dict, deal_id: str, c: kit.Carrier, ask, *args) -> None:
+        """One carrier asked; a mail that cannot go out (5U's limit, a 5xx) is logged and the others, the portal
+        included, are still asked: one failed send must not cost the whole price collection."""
+        try:
+            asked[str(ask(*args))] = c.email
+        except Exception as e:
+            store.log("bids", "error", f"could not ask {c.name}: {e!r}"[:300], run_id=deal_id)
 
     def options(self, deal_id: str, preference: str) -> dict:
         """The priced options as the agent sees them. Every number here is computed by code."""

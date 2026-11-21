@@ -43,8 +43,11 @@ _fake_turn: Callable[..., list] | None = None
 def client() -> OpenAI:
     global _client
     if _client is None:
-        _client = OpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key or "missing", timeout=120,
-                         max_retries=2)
+        # a hung gateway costs 45 s a try (the slowest call on Sat night, a rate sheet, took 14 s), one quiet retry
+        # for a passing 429 or 5xx, and after two attempts _call goes to OpenAI direct: three minutes at most
+        # before the request is answered anyway (it was 120 s x 3 per attempt, twelve minutes)
+        _client = OpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key or "missing", timeout=45,
+                         max_retries=1)
     return _client
 
 

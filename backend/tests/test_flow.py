@@ -719,3 +719,26 @@ def test_a_scanned_pdf_page_is_read_and_the_text_pages_are_kept():
     w.write(both)
     out = docs.text("offer.pdf", both.getvalue())
     assert "165.70 EUR" in out and "[page 2, scanned, as read]" in out and "could not read" not in out
+
+
+def test_a_mail_that_cannot_go_out_does_not_stop_the_price_collection():
+    """Sam's F2: a send refused by 5U (its limit, a 5xx) raised out of the collection, and the carriers after it and
+    the portal were never asked. Now that one carrier is logged and the rest are asked."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    real = api.send
+    first = {}
+
+    def refuse_one(to, *a, **k):
+        if not first:
+            first["to"] = to
+            raise RuntimeError("send to x failed: 503")
+        return real(to, *a, **k)
+    api.send = refuse_one
+    rfq = api.customer("ana@ana.example", "Quote", "320 kg, 1.5 cbm, FRA to ORD, cheapest please")
+    run(f)
+    d = store.get(f"deal-{rfq['id']}")["data"]
+    assert first and d.get("asked") and first["to"] not in d["asked"].values()
+    assert any(o["source"] == "portal" for o in d["offers"])
+    assert any("could not ask" in e["summary"] for e in store.events() if e["kind"] == "error")
