@@ -85,7 +85,11 @@ function ToolStep({ s }: { s: Extract<Step, { k: "tool" }> }) {
   let title = name, detail: JSX.Element | null = null;
   if (name === "get_offers") {
     const sh = args.shipment;
-    title = sh ? `Priced ${sh.origin_airport ?? (sh.pickup?.postcode ? `pickup ${sh.pickup.postcode}` : "?")} → ${sh.destination_airport ?? "?"}, ${sh.weight?.value ?? "?"} ${sh.weight?.unit ?? ""} · ${args.preference}`
+    const goods = sh?.lots?.length > 1 ? `${sh.lots.length} lots`
+      : sh?.lots?.[0]?.weight?.value != null ? `${sh.lots[0].weight.value} ${sh.lots[0].weight.unit ?? ""}`
+      : sh?.weight?.value != null ? `${sh.weight.value} ${sh.weight.unit ?? ""}` : "?";
+    const kg = out?.shipment?.chargeable_kg ? ` (${Math.round(Number(out.shipment.chargeable_kg))} kg chargeable)` : "";
+    title = sh ? `Priced ${sh.origin_airport ?? (sh.pickup?.postcode ? `pickup ${sh.pickup.postcode}` : "?")} → ${sh.destination_airport ?? "?"}, ${goods}${kg} · ${args.preference}`
       : "Waited for the remaining carriers";
     if (out) {
       const n = (out.options ?? []).length;

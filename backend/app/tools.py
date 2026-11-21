@@ -38,11 +38,18 @@ SHIPMENT = obj({
     "destination_airport": {**S, "description": "IATA code of the destination airport. A city is its airport in "
                                                 "our network: " + ", ".join(
                                                     f"{c} {n}" for c, n in kit.DESTINATIONS.items())},
-    "pieces": I,
-    "weight": {**QUANTITY, "description": "as written: value, unit (kg, lb, t), per piece or total"},
-    "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or total; null values if unknown"},
-    "dimensions": {"type": "array", "items": obj({"count": I, "length": N, "width": N, "height": N, "unit": S}),
-                   "description": "one entry per group of identical pieces, as written"},
+    "lots": {"type": "array", "description": (
+        "the goods as the customer lists them, one entry per group of pieces (a simple shipment is one lot). "
+        "Copy numbers and units as written; our code adds the lots up and converts units"),
+        "items": obj({
+            "pieces": I,
+            "weight": {**QUANTITY, "description": "gross weight as written (never net): value, unit (kg, lb, t), "
+                                                  "per_piece true if it is the weight of one piece"},
+            "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or for the lot; "
+                                                  "null values if not given"},
+            "dimensions": nullable(obj({"length": N, "width": N, "height": N, "unit": S},
+                                       "size of ONE piece of this lot, as written")),
+        })},
     "cargo": obj({"commodity": S, "ready_date": S, "notes": S}),
 })
 
