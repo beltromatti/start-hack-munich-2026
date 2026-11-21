@@ -471,11 +471,11 @@ class Forwarder:
             store.put(f"board-{int(time.time())}", "board", "snapshot", {"me": me, "public": public, "at": time.time()})
         seen = set((store.kv_get("board_seen") or "").split(","))
         for r in me.get("requests", []):
-            key = f"{r.get('round')}:{r.get('verdict')}"
+            rnd = r.get("round_no", r.get("round"))
+            key = f"{rnd}:{r.get('verdict')}"
             if key not in seen and r.get("verdict") not in ("open", "pending"):
                 seen.add(key)
-                store.log("watcher", "info", f"round {r.get('round')}: {r.get('verdict')} {r.get('reason') or ''}"[:300],
-                          r)
+                store.log("watcher", "info", f"round {rnd}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
         anomaly.check()  # a market change, seen before failed quotes pile up (app/anomaly.py)
 
