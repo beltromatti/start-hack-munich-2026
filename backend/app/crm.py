@@ -12,6 +12,7 @@ snapshot without them, and the series over time feeds the race chart.
 """
 import json
 import re
+import time
 from datetime import datetime
 from statistics import median
 from typing import Any
@@ -263,6 +264,7 @@ def cases() -> list[dict]:
             "origin": req.get("origin") or (lane_m.group(1) if lane_m else None),
             "destination": dest, "weightKg": kg, "volumeCbm": cbm,
             "chargeableKg": _f(req.get("chargeable_kg")) or (float(lane_m.group(3)) if lane_m else None),
+            "pieces": req.get("pieces"), "commodity": req.get("commodity"), "readyDate": req.get("ready_date"),
             "wants": d.get("preference") or ("fastest" if re.search(r"fastest|schnell|urgent|express|veloce", text, re.I)
                                              else "cheapest"),
             "pickupZone": zone_m.group(1) if zone_m else None,
@@ -279,6 +281,34 @@ def cases() -> list[dict]:
                       for x in sorted(lane.values(), key=lambda x: x["id"])],
         })
     return sorted(out, key=lambda c: c["start"], reverse=True)
+
+
+def rows(cs: list[dict] | None = None) -> list[dict]:
+    """One flat row per request with every variable we hold, oldest first: the table for correlations (Jan,
+    15:42: "a long list of every order ... so that after 24 hours we can do correlation analysis"). Only facts and
+    counts from cases(); nothing here is a judgement."""
+    out, seen = [], {}
+    for c in sorted(cs if cs is not None else cases(), key=lambda c: c["start"]):
+        seen[c["email"]] = seen.get(c["email"], 0) + 1
+        priced = [b["total"] for b in c["bids"] if b["total"] is not None and b["kind"] != "trucker"]
+        ready = _ts(c.get("readyDate")) if c.get("readyDate") else None
+        out.append({
+            "round": c["round"], "received_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(c["start"])),
+            "hour_utc": time.gmtime(c["start"]).tm_hour, "customer": c["customer"], "email": c["email"],
+            "nth_request_of_customer": seen[c["email"]], "origin": c["origin"], "destination": c["destination"],
+            "door_to_port": c["pickupZone"] is not None, "pickup_zone": c["pickupZone"], "weight_kg": c["weightKg"],
+            "volume_cbm": c["volumeCbm"], "chargeable_kg": c["chargeableKg"], "pieces": c.get("pieces"),
+            "commodity": c.get("commodity"), "ready_in_days": round((ready - c["start"]) / 86400, 1) if ready else None,
+            "wants": c["wants"], "traits": "; ".join(c["traits"]), "carriers_answered": len(c["bids"]),
+            "carriers_declined": sum(b["declined"] for b in c["bids"]),
+            "cheapest_air_bid": min(priced) if priced else None, "quote_total": c["quoteTotal"],
+            "first_reply_s": c["firstReplyAt"], "quote_s": c["quoteAt"], "asked_back": c["askedBack"],
+            "model_cost_usd": c["costUsd"], "verdict": c["verdict"], "reason": c["reason"], "booked": c["booked"],
+            "points": c["points"], **{f"points_{k}": v for k, v in (c.get("pointsBy") or {}).items()},
+            "tracking_asked": len(c["tracking"]),
+            "tracking_answered": sum(t["answered_s"] is not None for t in c["tracking"]),
+        })
+    return out
 
 
 def customers(cs: list[dict] | None = None) -> list[dict]:

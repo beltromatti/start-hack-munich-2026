@@ -178,6 +178,24 @@ def crm_all() -> dict:
             "points": crm.points_timeline()}
 
 
+@app.get("/api/crm/rows")
+def crm_rows(format: str = "json"):
+    """Every request as one flat row with all its variables; ?format=csv for a spreadsheet or pandas."""
+    rs = crm.rows()
+    if format != "csv":
+        return rs
+    import csv
+    import io
+    from fastapi.responses import PlainTextResponse
+    keys = list(dict.fromkeys(k for r in rs for k in r))
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=keys)
+    w.writeheader()
+    w.writerows(rs)
+    return PlainTextResponse(buf.getvalue(), media_type="text/csv",
+                             headers={"Content-Disposition": "attachment; filename=5u-requests.csv"})
+
+
 @app.get("/api/crm/cases")
 def crm_cases() -> list[dict]:
     return crm.cases()

@@ -59,3 +59,19 @@ def test_traits_name_what_makes_a_request_harder():
     body = "Please quote to GRU. Pickup at our warehouse.\nLot 1: 4 drums\nI attached the packing list.\n\nKlaus"
     assert crm.traits("Air freight quote", body) == ["lots", "attachment", "no postcode"]
     assert crm.traits("Quote", "Pickup at 61391 Bad Homburg, earliest arrival?") == ["earliest arrival"]
+
+
+def test_rows_give_one_flat_row_per_request_for_correlations():
+    from app import crm
+    cs = [{"start": 1795273200.0 + i * 360, "round": i + 1, "customer": "Weidner", "email": "w@x", "origin": "FRA",
+           "destination": "SGN", "pickupZone": "60" if i else None, "weightKg": 300.0, "volumeCbm": 1.0,
+           "chargeableKg": 300.0, "pieces": 2, "commodity": "toys", "readyDate": "2026-11-23", "wants": "cheapest",
+           "traits": ["lots"], "bids": [{"total": 900.0, "kind": "airline", "declined": False},
+                                        {"total": 120.0, "kind": "trucker", "declined": False}],
+           "quoteTotal": 1020.0, "firstReplyAt": 30, "quoteAt": 30, "askedBack": False, "costUsd": 0.001,
+           "verdict": "accepted", "reason": None, "booked": "BK-1", "points": 60.0, "pointsBy": {"cost": 39.0},
+           "tracking": []} for i in range(2)]
+    rs = crm.rows(cs)
+    assert [r["nth_request_of_customer"] for r in rs] == [1, 2]
+    assert rs[1]["door_to_port"] and rs[0]["cheapest_air_bid"] == 900.0 and rs[0]["points_cost"] == 39.0
+    assert rs[0]["hour_utc"] == 15 and rs[0]["ready_in_days"] == 1.3
