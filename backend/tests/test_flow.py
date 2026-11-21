@@ -349,3 +349,15 @@ def test_no_options_says_why_with_what_the_carriers_wrote():
     out = f.options("deal-1", "cheapest")
     assert out["options"] == [] and out["no_options_because"] == "no trucker has priced the pickup"
     assert "pickup postcode" in out["carriers_without_price"][0]["says"]
+
+
+def test_a_town_without_postcode_asks_the_truckers_with_its_postcode():
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    req = {"origin": "MUC", "destination": "RUH", "weight_kg": "970", "volume_cbm": "9.060", "chargeable_kg": "1513",
+           "pieces": 7, "pickup_zone": "86", "pickup_postcode": None, "ready_date": "2026-11-27"}
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req})
+    trucker = next(c for c in kit.world().carriers if c.kind == "trucker" and "86" in c.serves)
+    f.ask_trucker("deal-1", trucker, req)
+    assert "86150 Augsburg" in api.outbox[-1]["body"]

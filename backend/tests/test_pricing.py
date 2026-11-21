@@ -54,19 +54,15 @@ def test_units():
     assert language.volume_cbm({"value": None, "unit": None, "per_piece": False}, dims, 2) == D("1.92")
 
 
-def test_pickup_city_maps_to_zone_and_asks_for_the_postcode():
+def test_pickup_town_is_its_zone_and_no_place_is_missing():
     from app.forwarder import normalise
     p = {"pieces": 1, "weight": {"value": 100, "unit": "kg", "per_piece": False}, "volume": None, "dimensions": [],
          "pickup": {"postcode": None, "city": "Darmstadt"}, "origin_airport": None, "destination_airport": "JFK",
          "cargo": {"commodity": None, "ready_date": None, "notes": None}}
     r = normalise(p, kit.world())
-    assert r["pickup_zone"] == "64" and r["origin"] == "FRA"
-    assert r["missing"] and "postcode" in r["missing"][0]  # truckers price by postcode (live round 15)
-    p["pickup"] = {"postcode": "64283", "city": "Darmstadt"}
-    assert not normalise(p, kit.world())["missing"]
-    p["pickup"] = {"postcode": None, "city": None}  # "from our warehouse", no place given: ask for the postcode
-    assert normalise(p, kit.world())["missing"] == [normalise(
-        {**p, "pickup": {"postcode": None, "city": "Darmstadt"}}, kit.world())["missing"][0]]
+    assert r["pickup_zone"] == "64" and r["origin"] == "FRA" and not r["missing"]  # round 20: a town is enough
+    p["pickup"] = {"postcode": None, "city": None}  # "from our warehouse", no place given (rounds 15-18)
+    assert normalise(p, kit.world())["missing"] == ["where to collect: the pickup postcode, or at least the town"]
 
 
 def test_live_bid_beats_stale_sheet():
@@ -188,3 +184,11 @@ def test_durations_are_converted_by_code():
     t = lambda rows: [Offer("pickup", n, D(p), language.days(h, "hours"), "email") for n, p, h in rows]
     r9 = t([("Vogelsberg Haulage", "194.64", 29), ("Domblick Kurierdienst", "361.24", 8), ("Bodenseefracht", "429.80", 6)])
     assert pricing.balanced(r9, "ratio").carrier == "Domblick Kurierdienst"
+
+
+def test_every_pickup_zone_has_a_postcode_of_its_own_town():
+    """Truckers answer only a request with a 5-digit postcode (live probe Sat 18:14); a town the customer names is
+    asked with its zone's postcode."""
+    zones = kit.world().zones
+    assert set(kit.ZONE_POSTCODE) == set(zones)
+    assert all(len(p) == 5 and p.startswith(z) for z, p in kit.ZONE_POSTCODE.items())

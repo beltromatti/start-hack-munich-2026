@@ -128,3 +128,27 @@ For door-to-port the best price uses one trucker; only the **50/50 ratio rule** 
 (220.03 EUR, 11 h) over Elbkante (134.69, 29 h); round 2 Bodenseefracht (119.01, 30 h) over Hansekogge (245.02, 23 h).
 "Cheapest" misses round 1, "fastest" and min-max miss round 2. The airline follows the customer's preference.
 Regression test: `tests/test_pricing.py::test_balanced_ratio_trucker_matches_the_scored_rounds`.
+
+## Points per round, and what 5U told us (Sat 21 Nov, 18:15)
+
+`/v1/board/me` gives `points` per kind for every request (accuracy and time stay hidden while
+`scores_revealed` is false), plus `total` and `cost_pending`:
+- **cost**: one value per hour for every accepted quote of that hour: 39.05 for rounds 1-10, 38.54 for 12-19. It is
+  `40 x (1 - spend / 0.10 USD)`, spend = all gateway spend of the hour / accepted quotes of the hour. Our own
+  register gives the same number (16-17 UTC: 0.0293 USD / 8 accepted = 0.0037 USD). A lost round still spends and
+  divides by fewer quotes, so it lowers everyone's cost points that hour.
+- **tracking**: 10 per booked shipment asked about (once 5, round 7).
+- **humanity**: 10 on rounds 1, 4, 5, 8 (the jury's pick, per round).
+- **booking**: 0.0 on every booked round. Not in the brief: ask 5U what earns it.
+
+**Round 11 (DG declared in the attachment, the mail said non-DG), explained by 5U in person:** the job runs on speed.
+When a document and the mail disagree, ask the customer to send the document again and confirm it (one question
+that moves the deal), not to "check which is right" (that sends them away). A question can be the accepted
+answer (round 10 was). The prompt line on dangerous goods says this since 17:10.
+
+**Pickup place (rounds 15-20):** when the customer wants a pickup and does not say where, ask: the town in the
+signature is where they write from (round 15: signature Regensburg, warehouse Munich 80287). A town they name for
+the pickup is enough (round 20: "All I have is Augsburg"; insisting on a postcode lost the round). Truckers price by
+zone but answer only a request with a 5-digit postcode (probe 18:14: "Augsburg" -> asked for the postcode,
+"area 86" -> declined, "86150 Augsburg" -> 261.43 EUR "from Augsburg"), so a named town is asked with its zone's
+postcode (`kit.ZONE_POSTCODE`).
