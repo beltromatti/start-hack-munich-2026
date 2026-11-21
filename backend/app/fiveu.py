@@ -44,12 +44,12 @@ class FiveU:
 
     # ---- mailbox -------------------------------------------------------------------------------------------
 
-    poll_gap = 0.0      # seconds between mailbox polls, learned from 5U's 429 ("one poll per 5 seconds", Sat 20:30)
+    poll_gap = 5.0      # seconds between mailbox polls: 5U's limit ("one poll per 5 seconds", Sat 20:30), raised by a 429
     _last_poll = 0.0
 
     def poll(self, since_id: int) -> tuple[list[dict], int]:
         """New mail since since_id. Keeps to 5U's poll limit: never polls sooner than it allows, and a 429 is a
-        'not yet' (it sets the gap from 5U's own words and waits), not an error."""
+        'not yet' (it sets the gap from 5U's own words and waits) and an alert, never a crash."""
         if time.time() - self._last_poll < self.poll_gap:
             return [], since_id
         self._last_poll = time.time()
@@ -62,6 +62,10 @@ class FiveU:
             m = re.search(r"per\s+(\d+(?:\.\d+)?)\s*second", str(d.get("detail", "")))
             self.poll_gap = max(self.poll_gap, float(m.group(1)) if m else 5.0)
             self._last_poll = time.time()  # the next poll waits a full gap from now
+            # we keep to the limit, so a 429 means someone else polls with our team key, or 5U tightened it:
+            # an error, so the team hears of it (it costs us time on every reply)
+            store.log("router", "error", f"mailbox 429 '{d.get('detail', '')}': another client polling with our key, "
+                      f"or a new limit; polling every {self.poll_gap:g}s")
             return [], since_id
         r.raise_for_status()
         d = r.json()
