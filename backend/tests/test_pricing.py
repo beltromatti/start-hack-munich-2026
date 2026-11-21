@@ -173,3 +173,12 @@ def test_a_consignment_of_lots_is_added_up_in_code():
     r = normalise(s, kit.world())
     assert r["pieces"] == 13 and D(r["weight_kg"]) == 1952 and r["volume_cbm"] == "4.677"
     assert r["origin"] == "FRA" and r["pickup_zone"] == "36" and not r["missing"]
+
+
+def test_durations_are_converted_by_code():
+    """Live round 9: "Pickup time: 8 hours" was stored as 8 days by the reader, and the 50/50 pick went wrong."""
+    assert language.days(8, "hours") == D("0.333") and language.days(4, "days") == 4 and language.days(29, "Hours") == D("1.208")
+    # with the right hours, the 50/50 ratio rule picks 5U's trucker in round 9 too (Domblick, 361.24 EUR, 8 h)
+    t = lambda rows: [Offer("pickup", n, D(p), language.days(h, "hours"), "email") for n, p, h in rows]
+    r9 = t([("Vogelsberg Haulage", "194.64", 29), ("Domblick Kurierdienst", "361.24", 8), ("Bodenseefracht", "429.80", 6)])
+    assert pricing.balanced(r9, "ratio").carrier == "Domblick Kurierdienst"

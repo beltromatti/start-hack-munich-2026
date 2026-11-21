@@ -11,7 +11,8 @@ list every offer in it as JSON. Copy numbers exactly as written; never compute o
   adds them up. Several surcharges per kg: their sum in surcharges_per_kg; several fixed fees: their sum.
 - fx_eur_per_unit: only when the price is not in EUR and the mail states an exchange rate: EUR per 1 unit of that
   currency, exactly as written (e.g. "1 USD = 0.92 EUR" -> 0.92). Otherwise null. Never convert the total yourself.
-- transit_days for airlines; pickup_hours for truckers (convert "same day", "next morning" only if a number is given).
+- time_value and time_unit: how long it takes, exactly as written, the number and its unit ("Transit time: 4 days"
+  -> 4, "days"; "Pickup time: 8 hours" -> 8, "hours"). Never convert hours to days or back: our code does it.
 - reference: the rate_id / offer reference / booking reference exactly as written (e.g. R-abc123, TRK-49).
 - valid_until: as written.
 - note: anything else that changes the price or the service (conditions, surcharges, restrictions).
