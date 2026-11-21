@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import agent, store
+from . import agent, crm, store
 from .config import settings
 
 forwarder = None
@@ -166,6 +166,36 @@ def board() -> dict:
 @app.get("/api/board/history")
 def board_history(limit: int = 200) -> list[dict]:
     return [r["data"] for r in store.records("board", limit=limit)]
+
+
+# ---- CRM: a read-only projection of the register (app/crm.py), for the CRM pages (/crm.html) ------------------
+
+@app.get("/api/crm")
+def crm_all() -> dict:
+    """Everything the CRM pages show, from one pass over the register."""
+    cs = crm.cases()
+    return {"cases": cs, "customers": crm.customers(cs), "carriers": crm.carriers(cs), "losses": crm.losses(cs),
+            "points": crm.points_timeline()}
+
+
+@app.get("/api/crm/cases")
+def crm_cases() -> list[dict]:
+    return crm.cases()
+
+
+@app.get("/api/crm/customers")
+def crm_customers() -> list[dict]:
+    return crm.customers()
+
+
+@app.get("/api/crm/carriers")
+def crm_carriers() -> list[dict]:
+    return crm.carriers()
+
+
+@app.get("/api/crm/losses")
+def crm_losses() -> dict:
+    return crm.losses()
 
 
 
