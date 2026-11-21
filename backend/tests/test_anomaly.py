@@ -33,7 +33,7 @@ def test_each_change_raises_its_signal():
                           {"round_no": 8, "verdict": "accepted", "sent_at": "2026-11-21T16:00:00+00:00",
                            "answered_at": "2026-11-21T16:02:30+00:00"}]}
     got = keys([ASK, slow, usd, ask, sheet], events, board)
-    assert got == {f"slow:{AIR}", "currency:USD", f"askback:{AIR}", f"tariff:{AIR}", f"validity:{AIR}",
+    assert got == {"slow", "currency:USD", "askback", f"tariff:{AIR}", f"validity:{AIR}",
                    "http:503:bids", "gateway-down", "board:price-above-market", "late-answer"}
 
 

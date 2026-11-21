@@ -102,15 +102,15 @@ def signals(mails: list[dict], events: list[dict], board: dict | None, deals: li
         asked = by_id.get(m.get("in_reply_to") or -1)
         t_in, t_out = _ts(m.get("received_at")), _ts(asked.get("received_at")) if asked else None
         if t_in and t_out and t_in - t_out > SLOW_S:
-            hit(f"slow:{m['sender']}", "8", f"{carrier.name} answered {t_in - t_out:.0f} s after our request",
+            hit("slow", "8", f"carriers answer later than {SLOW_S} s after our request",
                 {**ev, "delay_s": round(t_in - t_out)})
         currencies = {a[1] or a[2] for a in AMOUNT.findall(body)} - {"EUR", ""}
         for cur in currencies:
             hit(f"currency:{cur}", "7", f"carrier prices in {cur}", ev)
         if re.search(r"we need|please provide|missing|to quote", body, re.I) and not AMOUNT.search(body):
-            hit(f"askback:{m['sender']}", "9", f"{carrier.name} asks back instead of quoting", ev)
+            hit("askback", "9", "carriers ask back instead of quoting", ev)
         elif re.search(r"per kg|/kg|per kilo", body, re.I) and asked:
-            hit(f"perkg:{m['sender']}", "10", f"{carrier.name} quotes per kg", ev)
+            hit("perkg", "10", "carriers quote per kg", ev)
         if m.get("attachments") and not m.get("in_reply_to"):
             hit(f"tariff:{m['sender']}", "1", f"{carrier.name} sent a file nobody asked for (tariff?)",
                 {**ev, "files": [a.get("filename") if isinstance(a, dict) else a for a in m["attachments"]]})
