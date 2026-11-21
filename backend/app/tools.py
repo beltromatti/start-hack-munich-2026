@@ -201,7 +201,7 @@ def _offer_document(ctx: Ctx, option_id: str | None) -> dict | str:
     opt = (d.get("options") or {}).get(option_id or "")
     if not opt:
         return f"offer_pdf needs the option_id of an option of this deal ({option_id!r} is none)"
-    req, air, pick = d.get("request") or {}, opt["air"], opt.get("pickup")
+    req, air, pick = opt.get("request") or d.get("request") or {}, opt["air"], opt.get("pickup")
     ref = f"SM-{d.get('root', ctx.root)}"
     ready, leaves, arrives = pricing.schedule(req.get("ready_date"), float(pick["days"]) * 24 if pick else 0, air["days"])
     def plain(x):  # 2.000 -> 2, 656.310 -> 656.31: a number as a person writes it
@@ -422,6 +422,14 @@ def _summary(rec: dict, b: dict | None) -> dict:
     d = rec["data"]
     bd = (b or {}).get("data") or d.get("booking")
     return {"deal_id": rec["id"], "status": rec["status"], "customer": d.get("customer"), "subject": d.get("subject"),
+            # what changed after the booking lives in the notes (round 88: the customer cancelled; the airline's
+            # quote desk cannot): a tracking answer must see it next to the airline's word
+            "notes": [n["text"] for n in d.get("notes", [])][-4:] or None,
+            # a deal that booked more than one shipment: each one, as its own record holds it now
+            "all_bookings": [{k: (store.get(f"booking-{x['team_reference'][3:]}") or {"data": x})["data"].get(k)
+                              for k in ("booking_reference", "team_reference", "airline", "route", "weight_kg",
+                                        "ready_date", "status")} for x in d.get("bookings") or []]
+            if len(d.get("bookings") or []) > 1 else None,
             "shipment": d.get("request"), "quote": {k: (d.get("quote") or {}).get(k) for k in ("amount", "option")}
             if d.get("quote") else None,
             "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",

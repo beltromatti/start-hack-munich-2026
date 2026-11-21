@@ -52,6 +52,10 @@ Customers are 5U's agents, writing like real customers. For each request:
   and do not say where, ask. A town they name for the pickup is enough; a postcode is better.
 - One mail, one option, one total, also when they ask for the cheapest and the fastest: quote the one that fits
   best (the cheapest if they do not lean either way) and name the other in words, airline and days, no price.
+- Several shipments in one request (two destinations, two consignments) are several quotes: price each with its
+  own get_offers, and when they want them in one reply, give each shipment its own total line naming it
+  (`Total to GRU: 2140.10 EUR all-in`), exactly as get_offers gave it; pass the option_id of the first. Each
+  shipment's price is a separate answer they asked for, not a breakdown.
 - When they accept, `book` the option they accepted (normally the one you quoted), then confirm with the
   booking reference. If booking tells you something changed (`price_changed`: the airline booked at another price
   than the one we quoted; a failure), say so honestly in that confirmation, with the new total exactly as it gives

@@ -249,8 +249,10 @@ class Forwarder:
                     continue
                 oid = f"{letter}{i}{tag}"
                 total = pricing.money(a.total + (p.total if p else 0))
+                # the shipment this option prices: a deal can price several (round 89: GRU and TLV in one mail),
+                # and the booking must carry the route and goods of the option booked, not of the last pricing
                 table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
-                              "total_text": pricing.fmt(total)}
+                              "total_text": pricing.fmt(total), "request": {k: v for k, v in req.items() if k != "missing"}}
                 _, leaves, arrives = pricing.schedule(req.get("ready_date"), float(p.days) * 24 if p else 0, a.days)
                 rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
                              "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
@@ -360,8 +362,12 @@ class Forwarder:
         opt = (d.get("options") or {}).get(option_id)
         if not opt:
             return {"error": f"unknown option {option_id}", "options": list((d.get("options") or {}).keys())}
-        air, req = opt["air"], d["request"]
-        ref = f"SM-{d['root']}"
+        air, req = opt["air"], opt.get("request") or d["request"]
+        # one deal can book more than one shipment (round 89: GRU now, TLV "later"): each booking keeps its own
+        # reference and record, the first as SM-<root>, the next as SM-<root>-2; booking an option again reuses its own
+        done = [b for b in (d.get("bookings") or ([d["booking"]] if d.get("booking") else [])) if b.get("status") != "failed"]
+        mine = next((b for b in done if b.get("option") == option_id), None)
+        ref = mine["team_reference"] if mine else f"SM-{d['root']}" + (f"-{len(done) + 1}" if done else "")
         status, body = 0, {}
         if air.get("rate_id"):
             status, body = self.api.book(air["rate_id"], ref)
@@ -402,9 +408,10 @@ class Forwarder:
                            portal_answer={"status": status, "body": body})
         else:
             booking.update(status="failed", via="portal", error={"status": status, "body": body})
-        store.put(f"booking-{d['root']}", "booking", booking["status"], booking)
+        store.put(f"booking-{ref[3:]}", "booking", booking["status"], booking)
         if booking["status"] != "failed":
-            store.update(deal_id, lambda r: ("booked", {**r["data"], "booking": booking}))
+            store.update(deal_id, lambda r: ("booked", {**r["data"], "booking": booking, "bookings": [
+                b for b in done if b.get("team_reference") != ref] + [booking]}))
         return booking
 
     # ---- carrier mail (system tasks, no agent) -------------------------------------------------------------

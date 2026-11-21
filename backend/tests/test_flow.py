@@ -843,3 +843,31 @@ def test_an_option_id_names_one_option_for_the_life_of_the_deal():
     assert opts[a["option"]]["total_text"] == a["total"]  # the first quote's option is still the one it was
     again = tools.get_offers(ctx, None, "cheapest", 0)  # waiting again does not start a new set
     assert all(o["option"].startswith("B") for o in again["options"])
+
+
+def test_two_shipments_of_one_deal_are_two_bookings():
+    """Round 89: GRU and TLV priced in one thread, GRU booked "now", TLV "later". The booking took the route and
+    weight of the last pricing (TLV) and a second booking would have overwritten the first record."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("ana@ana.example", "Two shipments", "320 kg FRA to ORD, and 900 kg FRA to ORD, fastest")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = lambda kg: {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+                       "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+                       "lots": [{"pieces": 1, "weight": q(kg, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}]}
+    a = tools.get_offers(ctx, ship(320), "fastest", 5)["options"][0]["option"]
+    b = tools.get_offers(ctx, ship(900), "fastest", 5)["options"][0]["option"]
+    first = tools.book(ctx, a)
+    assert first["weight_kg"] == "320" and first["team_reference"] == f"SM-{rfq['id']}"
+    second = tools.book(ctx, b)
+    assert second["weight_kg"] == "900" and second["team_reference"] == f"SM-{rfq['id']}-2"
+    assert store.get(f"booking-{rfq['id']}")["data"]["weight_kg"] == "320"  # the first record is still the first
+    assert store.get(f"booking-{rfq['id']}-2")["data"]["weight_kg"] == "900"
+    found = tools.crm(ctx, "ORD")["matches"][0]
+    assert {x["weight_kg"] for x in found["all_bookings"]} == {"320", "900"}
+    assert tools.book(ctx, a)["team_reference"] == f"SM-{rfq['id']}"  # booking an option again keeps its own
