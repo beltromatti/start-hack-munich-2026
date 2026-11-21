@@ -47,6 +47,34 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
         return f"[could not read {filename}: {e!r}]"
 
 
+def pdf(title: str, lines: list[str]) -> bytes:
+    """A one-page pdf of plain text lines (a title in bold, then the lines), written by hand: no library for it.
+    Western text (cp1252, as Helvetica holds it); a character outside it becomes '?'."""
+    def esc(s: str) -> str:
+        b = s.encode("cp1252", "replace").decode("latin-1")
+        return b.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    ops = ["BT", "/F2 15 Tf", "56 790 Td", f"({esc(title)}) Tj", "/F1 10.5 Tf", "15 TL", "0 -10 Td"]
+    ops += [f"T* ({esc(line)}) Tj" for line in lines[:46]]
+    ops.append("ET")
+    stream = "\n".join(ops).encode("latin-1")
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R "
+            b"/Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>",
+            b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"]
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % x for x in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return bytes(out)
+
+
 def _pdf(filename: str, raw: bytes, run_id: str | None) -> str:
     """A pdf's text; a page without text (a scan) is read from its pictures, like a photo."""
     from pypdf import PdfReader

@@ -81,7 +81,11 @@ TOOLS = [
        {"kind": {"type": "string", "enum": ["quote", "question", "reply", "booking_confirmation", "tracking_answer",
                                             "decline", "other"]},
         "body": {"type": "string", "description": "the whole mail body, plain text"},
-        "option_id": S, "to": S, "done": DONE}),
+        "option_id": S, "to": S, "done": DONE,
+        "offer_pdf": {"type": "boolean", "description": "true attaches our offer for option_id as a pdf (made by "
+                      "code from the option: route, airline, transit, pickup, goods, estimated dates, the one total), "
+                      "for a customer who wants the offer as a document (for their purchasing or files). false "
+                      "otherwise."}}),
     fn("book",
        "Book an option of this deal with the carrier: by its rate reference on the portal (a fresh rate if it "
        "expired), otherwise by mail to the airline. Returns the booking with its reference and status.",
@@ -150,7 +154,14 @@ def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: f
     return out
 
 
-def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | None, done: bool = False) -> dict:
+def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | None, done: bool = False,
+              offer_pdf: bool = False) -> dict:
+    attachments = None
+    if offer_pdf:
+        doc = _offer_document(ctx, option_id)
+        if isinstance(doc, str):
+            return {"error": doc}
+        attachments = [doc]
     ctx.done = ctx.done or bool(done)
     m = ctx.mail or _last_inbound(ctx.root)
     if m is None:
@@ -164,7 +175,7 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
                   m)
     subject = parent["subject"] or "Your shipment"
     subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
-    sent = ctx.fw.api.send(to, subject, body, in_reply_to=parent["id"])
+    sent = ctx.fw.api.send(to, subject, body, in_reply_to=parent["id"], attachments=attachments)
     store.save_mail(sent, "out", kind, handled=True)
     ctx.outcome.append(kind)
     store.log("forwarder", "mail_out", f"{kind} to {to}: {body[:140]}", {"mail": sent["id"], "body": body,
@@ -176,6 +187,47 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
     if kind == "quote":
         result.update(_record_quote(ctx, option_id, body, sent))
     return result
+
+
+def _offer_document(ctx: Ctx, option_id: str | None) -> dict | str:
+    """Our offer for one option as a pdf attachment, every fact and the one total from the deal's record (code, like
+    every price): what the mail says, on paper for the customer's files. A str when there is no such option."""
+    import base64
+    from datetime import datetime, timezone
+    from . import docs
+    d = (store.get(ctx.deal_id) or {}).get("data") or {}
+    opt = (d.get("options") or {}).get(option_id or "")
+    if not opt:
+        return f"offer_pdf needs the option_id of an option of this deal ({option_id!r} is none)"
+    req, air, pick = d.get("request") or {}, opt["air"], opt.get("pickup")
+    ref = f"SM-{d.get('root', ctx.root)}"
+    ready, leaves, arrives = pricing.schedule(req.get("ready_date"), float(pick["days"]) * 24 if pick else 0, air["days"])
+    days = air["days"]
+    goods = ", ".join(x for x in (f"{req['pieces']} pieces" if req.get("pieces") else "",
+                                  f"{req['weight_kg']} kg" if req.get("weight_kg") else "",
+                                  f"{req['volume_cbm']} cbm" if req.get("volume_cbm") else "",
+                                  req.get("commodity") or "") if x)
+    lines = [f"{settings.company}, {datetime.now(timezone.utc).strftime('%d %b %Y')}",
+             f"For: {d.get('customer') or ''}",
+             f"Your request: {d.get('subject') or ''}", "",
+             (f"Pickup: {pick['carrier']} collects at postcode {req.get('pickup_postcode') or req.get('pickup_zone')} "
+              f"and brings the goods to {req.get('origin')} airport" if pick else
+              f"Airport to airport: {req.get('origin')} to {req.get('destination')}"),
+             f"Air freight: {air['carrier']}, {req.get('origin')} to {req.get('destination')}, "
+             f"{days} day{'' if str(days) in ('1', '1.0') else 's'} in transit",
+             f"Goods: {goods}" if goods else "",
+             f"Chargeable weight: {air.get('billed_kg') or req.get('chargeable_kg')} kg",
+             f"Goods ready: {ready.strftime(pricing.DATE)}",
+             f"Estimated departure: {leaves.strftime(pricing.DATE)}",
+             f"Estimated arrival: {arrives.strftime(pricing.DATE)}", "",
+             f"Total all-in: {opt['total_text']}", "",
+             "The total includes the air freight with its surcharges" + (" and the pickup." if pick else "."),
+             "Dates are estimates from the ready date, the pickup time and the airline's transit time.",
+             "To book, a short yes to our mail is enough.", "",
+             f"{settings.persona}, {settings.company}"]
+    raw = docs.pdf(f"Air freight offer {ref}", [x for x in lines if x is not None])
+    return {"filename": f"offer-{ref}.pdf", "content_type": "application/pdf",
+            "content_base64": base64.b64encode(raw).decode()}
 
 
 MONEY = re.compile(r"(?:€|\$|£|\b(?:EUR|USD|GBP|CHF)\b)\s*\d[\d.,']*|\d[\d.,']*\s*(?:€|\$|£|\b(?:EUR|USD|GBP|CHF|euros?|dollars?)\b)",

@@ -33,6 +33,8 @@ Customers are 5U's agents, writing like real customers. For each request:
 - In the quote, write the option's total exactly as get_offers gives it (for example `917.40 EUR`), once, as the
   one all-in price, and pass its option_id. One total, no breakdown and no other amounts: customers and 5U read
   one price.
+- When they want the offer as a document (a PDF for their purchasing or their files), attach it to the quote
+  with `offer_pdf`: it carries the same total, and a quote without the document they asked for can lose the deal.
 - Each option also carries its estimated departure and arrival, worked out from the ready date, the pickup and the
   transit time. When they ask when it leaves or arrives, give that date as an estimate: people plan with a date,
   and a date you work out yourself may not match what we tell them later about the same shipment.

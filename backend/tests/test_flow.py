@@ -665,3 +665,36 @@ def test_a_ready_date_said_relative_to_today_is_the_next_such_day():
     assert _day("Monday") == monday.isoformat() and _day("next Monday") == monday.isoformat()
     assert _day("tomorrow") == (today + timedelta(days=1)).isoformat()
     assert _day("2026-11-24") == "2026-11-24" and _day("whenever") is None
+
+
+def test_an_offer_asked_as_a_pdf_is_attached_with_the_options_total():
+    """Round 76: 'attach your offer as a PDF, our purchasing needs it'. 5U takes attachments on outbound mail; the
+    pdf is made by code from the option, so it says what the quote says, one total."""
+    import base64
+    from app import docs, tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("deniz@rheintal.example", "Air freight quote to DFW", "65 kg from 53345 Bonn to DFW, PDF please")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    opt = {"air": {"carrier": "Lumen Air Cargo", "days": "1", "billed_kg": "65", "total": "279.50"},
+           "pickup": {"carrier": "Sternmeile Logistik", "days": "0.458", "total": "129.05"},
+           "total": "408.55", "total_text": "408.55 EUR"}
+    store.put(ctx.deal_id, "deal", "pricing", {
+        "root": rfq["id"], "received_at": None, "customer": "deniz@rheintal.example", "subject": rfq["subject"],
+        "request": {"origin": "CGN", "destination": "DFW", "weight_kg": "65", "volume_cbm": "0.370", "pieces": 5,
+                    "pickup_postcode": "53345", "ready_date": "2026-11-28", "commodity": "automotive sensors"},
+        "options": {"A3": opt}})
+    assert "error" in tools.send_mail(ctx, "quote", "x", "A9", None, offer_pdf=True)
+    assert not to(api, "deniz@rheintal.example")  # nothing sent without the document asked for
+    out = tools.send_mail(ctx, "quote", "Hello Deniz,\n\nTotal: 408.55 EUR all-in\n\nGiulia", "A3", None,
+                          offer_pdf=True)
+    assert out["recorded_quote"] == "408.55 EUR"
+    (mail,) = to(api, "deniz@rheintal.example")
+    (att,) = mail["attachments"]
+    assert att["filename"].endswith(".pdf") and att["content_type"] == "application/pdf"
+    text = docs.text(att["filename"], base64.b64decode(att["content_base64"]))
+    assert text.count("408.55 EUR") == 1 and "279.50" not in text and "129.05" not in text
+    assert "Lumen Air Cargo" in text and "Sternmeile Logistik" in text and "Sun 29 Nov 2026" in text

@@ -82,7 +82,8 @@ class FiveU:
         d = r.json()
         return d["messages"], d["next_since_id"]
 
-    def send(self, to: str, subject: str, body: str, in_reply_to: int | None = None) -> dict:
+    def send(self, to: str, subject: str, body: str, in_reply_to: int | None = None,
+             attachments: list[dict] | None = None) -> dict:
         with self._send_lock:
             now = time.time()
             q = self._sent[to]
@@ -94,6 +95,8 @@ class FiveU:
         payload: dict[str, Any] = {"to": to, "subject": subject, "body": body}
         if in_reply_to is not None:
             payload["in_reply_to"] = in_reply_to
+        if attachments:  # [{filename, content_type, content_base64}]: pdf, xlsx, xls, csv, txt, png, jpg, docx
+            payload["attachments"] = attachments
         r = self._req("POST", "/v1/mailbox/messages", json=payload)
         if r.status_code >= 400:
             raise RuntimeError(f"send to {to} failed: {r.status_code} {r.text[:300]}")

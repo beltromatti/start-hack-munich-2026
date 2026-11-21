@@ -198,6 +198,9 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   (`llm.look`), voice messages transcribed with a call of our own (the gateway takes no audio; 5U said to do so),
   prices said aloud accepted by the amount check. Units are read however written and never guessed: an unknown
   one goes back to the agent by name. A trucker's time is the time until it collects, however it is put.
+  Our own documents go out the same way: an offer the customer wants as a PDF is made by code from the option
+  (`send_mail` with `offer_pdf`), so it says what the quote says, one total (round 76: a customer asked for the
+  offer as a PDF for its purchasing and walked away from a quote without one; 5U's API takes attachments).
 - **A mail to the customer without a price is a decline** (round 63, `declined_in_scope`): when a carrier has
   not priced yet, wait for it or ask it; the customer cannot help.
 - **Prices can move between the quote and the booking** (rounds 48-50): the customer hears it from us, in the

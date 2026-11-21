@@ -63,8 +63,9 @@ class FakeFiveU:
             msgs = [m for m in self.inbox if m["id"] > since_id]
         return msgs, (msgs[-1]["id"] if msgs else since_id)
 
-    def send(self, to: str, subject: str, body: str, in_reply_to: int | None = None) -> dict:
-        m = self._deliver(self.mailbox, to, subject, body, in_reply_to)
+    def send(self, to: str, subject: str, body: str, in_reply_to: int | None = None,
+             attachments: list | None = None) -> dict:
+        m = self._deliver(self.mailbox, to, subject, body, in_reply_to, attachments)
         reply = self._carrier_reply(m)
         if reply:
             (self._deliver(**reply) if self.reply_now else self.pending.append(reply))
