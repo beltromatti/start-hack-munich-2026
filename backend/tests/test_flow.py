@@ -1117,3 +1117,39 @@ def test_a_bid_without_a_readable_time_is_marked_and_cannot_be_the_fast_one():
     unread = f.offer(read, {"id": 5, "sender": trucker.email, "body": "Our total is 176.71 EUR, we collect once the driver is back."}, trucker)
     stated = f.offer(read, {"id": 6, "sender": trucker.email, "body": "Our total is 176.71 EUR. Pickup time: 3 hours."}, trucker)
     assert unread.extra.get("time_unknown") is True and "time_unknown" not in stated.extra and stated.days > 0
+
+
+def test_a_file_is_read_for_what_it_is_not_for_its_name():
+    """5U said the files get stranger, and since round 84 a round few teams can read pays a multiple. The reader went
+    by the name's ending alone: a pdf called offer.dat, a workbook with no ending, a tiff from a scanner, an old Word
+    file all came back as "binary attachment"."""
+    import io
+    import zipfile
+    from pathlib import Path
+    from PIL import Image
+    from app import docs, llm
+    data = Path(__file__).parent / "data"
+    xls, doc = (data / "packing-list.xls").read_bytes(), (data / "request.doc").read_bytes()
+    assert docs.kind("list.dat", xls) == ".xls" and "Total gross weight kg\t356" in docs.text("list", xls)
+    word = docs.text("request.doc", doc)
+    assert "total gross weight 486 kg, from Stuttgart to São Paulo (GRU)" in word and "Jürgen Weiß" in word
+    assert "binary attachment" not in docs.text("anfrage", doc)                      # the same file without an ending
+    rtf = rb"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\f0\fs24 Total weight: 320 kg\par Gr\'f6\'dfe 120x80x95 cm\par}"
+    assert docs.text("offer.txt", rtf) == "Total weight: 320 kg\nGröße 120x80x95 cm"
+    deck = io.BytesIO()
+    with zipfile.ZipFile(deck, "w") as z:
+        z.writestr("ppt/presentation.xml", "<p/>")
+        z.writestr("ppt/slides/slide1.xml", "<a:p><a:r><a:t>Rate FRA-ORD 2.59 EUR/kg</a:t></a:r></a:p><a:p><a:r><a:t>Minimum 95 &amp; fuel 0.80</a:t></a:r></a:p>")
+    assert docs.text("rates.bin", deck.getvalue()) == "Rate FRA-ORD 2.59 EUR/kg\nMinimum 95 & fuel 0.80"
+    assert docs.kind("BMW.txt", b"BMW parts, 3 crates") == ".txt" and docs.kind("a.csv", b"kg;cbm\n320;1,5") == ".csv"
+    seen, real = [], llm.look
+    llm.look = lambda mime, raw, run_id=None: seen.append((mime, raw[:4])) or "Our total is 340.60 EUR"
+    try:
+        for fmt, name in (("TIFF", "scan.tif"), ("BMP", "offer.bmp"), ("PNG", "photo.jpeg"), ("JPEG", "no-ending"), ("PNG", "rates.txt")):
+            b = io.BytesIO()
+            Image.new("RGB", (40, 20), (200, 30, 30)).save(b, fmt)
+            assert "340.60 EUR" in docs.text(name, b.getvalue()), name
+    finally:
+        llm.look = real
+    assert [m for m, _ in seen] == ["image/png", "image/png", "image/png", "image/jpeg", "image/png"]
+    assert all(head in (b"\x89PNG", b"\xff\xd8\xff\xe0") for _, head in seen)       # tiff and bmp reach the model as png
