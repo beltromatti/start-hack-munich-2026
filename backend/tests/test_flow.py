@@ -711,6 +711,16 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     f.watch_scoring({"requests": [r86, r85, r84, r41, r40b]}, board)
     again = said()
     assert sum("round 84 pays a multiple" in s for s in again) == 2 and len(again) == len(out) + len(more) + 1
+    # the board as it really is (read Sun 00:52): the multiple is `factor` on the public round, a string, null without
+    store.kv_set("board_scoring", "null")
+    real = {"rules": {**rules, "few_winners": {"factors": ["5", "3", "2"], "from_round": 84}}, "frozen_at": None,
+            "rounds": [{"round_no": 90, "status": "closed", "answered": 13, "accepted": 2, "factor": "3"},
+                       {"round_no": 89, "status": "closed", "answered": 12, "accepted": 12, "factor": None}]}
+    r90 = {"round_no": 90, "verdict": "rejected", "reason": "no_pdf_offer", "points": {}, "closed": True}
+    r89 = {"round_no": 89, "verdict": "accepted", "reason": None, "points": {"time": 15.0, "accuracy": 45.0}, "closed": True}
+    before = len(said())
+    f.watch_scoring({"requests": [r90, r89]}, real)
+    assert [s for s in said()][before:] == ["scoring: round 90 pays a multiple (3), 2 teams accepted; ours: rejected no_pdf_offer"]
     # a board in a shape nobody foresaw is compared as far as it goes and never raises into the watcher
     f.watch_scoring({"requests": ["row", r84], "frozen_at": None}, {"rules": "changed", "rounds": {"84": {}}, "ranking": None})
 
