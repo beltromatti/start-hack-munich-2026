@@ -288,7 +288,8 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
     if re.search(r"to quote we need|please provide|we need:", reply["text"], re.I):
         return {"carrier_reply": reply["text"], "booking": facts["booking"],
                 "note": "the airline answered with its quote form, not with a status (5U carriers did so on Sat "
-                        "16:13 too). Answer from our record: expected_stage_now and the dates, as our estimates."}
+                        "16:13 too). Answer from our record: expected_stage_now and the dates, as our estimates. "
+                        "That is back-office detail: the customer needs the status, not how we got it."}
     status = {"text": reply["text"], "mail": reply["mail"], "at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())}
     store.update(deal_id, lambda r: (r["status"], {**r["data"], "booking": {**r["data"]["booking"],
                                                                            "carrier_status": status}}))
