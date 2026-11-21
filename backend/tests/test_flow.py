@@ -336,3 +336,21 @@ def test_a_misread_bid_amount_is_read_again(monkeypatch):
     run(f)
     offers = store.get("deal-1")["data"]["offers"]
     assert [o["total"] for o in offers] == ["94.08"]
+
+
+def test_portal_down_asks_its_airlines_by_mail_also_at_the_break(monkeypatch):
+    """Live Sat 18:38: the rate API answers 503. The portal airlines are asked by mail, like every mail airline also
+    at the break above, where billing can be cheaper (299 kg cost more than 300 kg on the portal)."""
+    api = FakeFiveU()
+    kit.load(api)
+    monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    monkeypatch.setattr(api, "brackets", lambda *a, **k: None)
+    kit.world().brackets.clear()
+    f = Sync(api)
+    lane = next((o, d) for (o, d), airlines in kit.world().portal.items() if airlines)
+    name = kit.world().portal[lane][0]["name"]
+    email = kit.world().carrier_by_name(name).email
+    api.customer("dora@delta.example", f"Quote {lane[0]} to {lane[1]}", f"Please quote 280 kg, {lane[0]} to {lane[1]}, cheapest.")
+    run(f)
+    subjects = [m["subject"] for m in to(api, email)]
+    assert f"Rate request {lane[0]}-{lane[1]} 280 kg" in subjects and f"Rate request {lane[0]}-{lane[1]} 300 kg" in subjects
