@@ -1153,3 +1153,18 @@ def test_a_file_is_read_for_what_it_is_not_for_its_name():
         llm.look = real
     assert [m for m, _ in seen] == ["image/png", "image/png", "image/png", "image/jpeg", "image/png"]
     assert all(head in (b"\x89PNG", b"\xff\xd8\xff\xe0") for _, head in seen)       # tiff and bmp reach the model as png
+
+
+def test_a_tariffs_validity_without_a_year_is_the_nearest_such_day():
+    """333de15 made a day without a year the next such day. For a ready date that is right; a tariff "valid from
+    1 November" read on 22 November then started in 2027 and never priced a shipment."""
+    from datetime import date, timedelta
+    from app.forwarder import _day
+    today = date.today()
+    began = today - timedelta(days=21)
+    said = f"{began.day} {began.strftime('%B')}"
+    assert _day(said, nearest=True) == began.isoformat()                    # three weeks ago, not next year
+    assert _day(said) == began.replace(year=began.year + 1).isoformat()     # a ready date still lies ahead
+    ends = today + timedelta(days=9)
+    assert _day(f"{ends.day} {ends.strftime('%B')}", nearest=True) == ends.isoformat()
+    assert _day("2026-12-01", nearest=True) == "2026-12-01" and _day("whenever", nearest=True) is None

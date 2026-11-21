@@ -729,7 +729,10 @@ class Forwarder:
                           "breaks_kg": [int(b) for b in l["breaks_kg"]], "rates_eur_per_kg": rates,
                           "fuel_eur_per_kg": fixed[1], "security_eur_per_kg": fixed[2]})
         if lanes and (out.get("currency") or "EUR").upper() == "EUR":
-            kit.add_sheet(airline, lanes, f"mail {m['id']}", _day(out.get("valid_from")), _day(out.get("valid_to")))
+            # since 333de15 a day without a year is "the next such day": right for a ready date, but a tariff "valid
+            # from 1 November" mailed on 22 November then began next year and never priced anything
+            kit.add_sheet(airline, lanes, f"mail {m['id']}", _day(out.get("valid_from"), nearest=True),
+                          _day(out.get("valid_to"), nearest=True))
         store.log("tariff", "info", f"{airline}: {len(lanes)} lanes ingested", {"notes": out.get("notes")},
                   run_id=f"tariff-{m['id']}")
 
@@ -915,8 +918,10 @@ def _goods(s: dict) -> tuple[int | None, Decimal | None, Decimal | None]:
     return pieces or None, (None if unknown or not kg else kg), (cbm or None)
 
 
-def _day(text: Any) -> str | None:
-    """'2026-12-01', '01.12.2026', '1 Dec 2026' -> '2026-12-01'; anything else -> None."""
+def _day(text: Any, nearest: bool = False) -> str | None:
+    """'2026-12-01', '01.12.2026', '1 Dec 2026' -> '2026-12-01'; anything else -> None.
+    A day without a year is the next such day (a ready date lies ahead), or with `nearest` the closest one, behind
+    or ahead (a tariff's validity: "valid from 1 November" read on 22 November began three weeks ago)."""
     from datetime import datetime
     t = str(text or "").strip()
     for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d %b %Y", "%d %B %Y", "%B %d, %Y", "%b %d, %Y"):
@@ -942,6 +947,9 @@ def _day(text: Any) -> str | None:
     for fmt in ("%d %B", "%d %b", "%B %d", "%b %d", "%d.%m."):
         try:
             d = datetime.strptime(t, fmt).date().replace(year=today.year)
+            if nearest:
+                return min((d.replace(year=today.year + k) for k in (-1, 0, 1)),
+                           key=lambda x: abs((x - today).days)).isoformat()
             return (d if d >= today else d.replace(year=today.year + 1)).isoformat()
         except ValueError:
             continue
