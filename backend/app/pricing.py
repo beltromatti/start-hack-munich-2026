@@ -7,6 +7,7 @@ Rules (start kit, same on every sheet; the portal behaves the same, see docs/cha
 - the minimum applies to the freight before surcharges; fuel and security are per kg of billed weight.
 """
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -18,6 +19,23 @@ CENT = Decimal("0.01")
 
 def money(x: Any) -> Decimal:
     return Decimal(str(x)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+DATE = "%a %d %b %Y"
+
+
+def schedule(ready_date: Any, pickup_hours: Any, transit_days: Any, booked_at: datetime | None = None):
+    """When a shipment leaves and arrives, estimated from our dates: it leaves when the goods are ready (09:00 on the
+    ready date, or now if that is later) plus the pickup time, and arrives transit days after. The one place for
+    every date a customer reads, so the quote, the booking and the tracking answer agree."""
+    booked = booked_at or datetime.now(timezone.utc)
+    ready = booked
+    try:
+        ready = max(booked, datetime.fromisoformat(str(ready_date)[:10]).replace(hour=9, tzinfo=timezone.utc))
+    except ValueError:
+        pass
+    departure = ready + timedelta(hours=float(pickup_hours or 0))
+    return ready, departure, departure + timedelta(days=float(transit_days))
 
 
 def fmt(amount: Decimal, currency: str = "EUR") -> str:

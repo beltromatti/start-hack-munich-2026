@@ -204,3 +204,16 @@ def test_an_amount_read_from_a_mail_must_be_in_the_mail():
     assert read_in_mail({"available": False, "total": None}, "we do not serve this lane")
     assert read_in_mail({"available": True, "total": None, "rate_per_kg": 3.71}, "rate EUR 3,71/kg")
     assert D("1234.50") in amounts_in("total EUR 1 234,50 all-in")
+
+
+def test_one_schedule_for_quote_and_tracking():
+    """Ready 28 Nov (09:00), pickup 19 h, 3 days in the air: leaves Sun 29 Nov, arrives Wed 2 Dec. The quote's option
+    and the tracking timeline use the same function, so they tell the customer the same dates."""
+    from datetime import datetime, timezone
+    booked = datetime(2026, 11, 21, 17, 0, tzinfo=timezone.utc)
+    _, leaves, arrives = pricing.schedule("2026-11-28", 19, D(3), booked)
+    assert leaves.strftime(pricing.DATE) == "Sun 29 Nov 2026" and arrives.strftime(pricing.DATE) == "Wed 02 Dec 2026"
+    from app.tools import timeline
+    t = timeline({"booked_at": booked.timestamp(), "ready_date": "2026-11-28", "transit_days": "3",
+                  "pickup": {"days": str(D(19) / 24)}})
+    assert (t["estimated_departure"], t["estimated_arrival"]) == ("Sun 29 Nov 2026", "Wed 02 Dec 2026")
