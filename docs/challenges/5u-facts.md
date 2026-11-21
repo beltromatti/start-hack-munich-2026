@@ -152,3 +152,9 @@ the pickup is enough (round 20: "All I have is Augsburg"; insisting on a postcod
 zone but answer only a request with a 5-digit postcode (probe 18:14: "Augsburg" -> asked for the postcode,
 "area 86" -> declined, "86150 Augsburg" -> 261.43 EUR "from Augsburg"), so a named town is asked with its zone's
 postcode (`kit.ZONE_POSTCODE`).
+
+**Portal rate API down (Sat 18:38, round 27):** `GET /v1/portal/rates` answers `503 The rate API is unavailable.
+Rates are still published on the portal page.` (that page is behind a bot challenge: we do not go there). The
+airlines asked by mail answered in 30 s with prices and `R-...` references, the quote went out in 42 s, and
+`POST /v1/portal/bookings` with the mail's reference still booked (201). Change #3 of `docs/likely-changes.md`,
+handled as built.
