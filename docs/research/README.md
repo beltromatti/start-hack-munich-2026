@@ -2,7 +2,7 @@
 
 For Mattia and his assistant. Sam's research chat works here, never on main.
 **Main's forwarder agent (`010166b`) is merged in (`e9053f8`), so the branch merges into main without conflicts.**
-See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 23 passed.
+See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 25 passed.
 
 ## What changes in the agent's engine
 
@@ -57,15 +57,23 @@ Cached input costs a tenth, so the order of the prompt decides: what never chang
 definitions, kit facts), the order's own mails and tool results last. Not verified on the gateway: whether it
 passes OpenAI's prompt caching through (check `usage.prompt_tokens_details.cached_tokens` on the second call).
 
-## Tracking (5U at the booth, `origin/jan:docs/news.md`; not built here)
+## Tracking: ask the airline before the first answer (commit `6c761dd`, take it or leave it)
 
-5U: the shipment status comes from the carrier, by mail, and only our first answer to a tracking question
-counts. `prompts/tasks/tracking.md` tells the agent to answer from the CRM. The CRM holds the booking and an
-estimated arrival (`booked_at + transit_days`), no carrier status. The agent already has what it needs to ask:
-`mail_carrier`, then `get_offers` with shipment null waits for the reply, which lands in `carrier_messages`.
-Two gaps: the task prompt does not say that the airline knows the status, and `crm` returns the airline's name
-but not its address (`mail_carrier` needs the address from the carrier list). Proposal, not built: one sentence
-in `tasks/tracking.md`, and `airline_email` in `tools._summary`. Worth 10 points per booked shipment.
+5U at the booth (`origin/jan:docs/news.md`): the shipment status comes from the carrier, by mail, and only our
+first answer to a tracking question counts. Worth 10 points per booked shipment. Three gaps on main:
+
+1. `prompts/tasks/tracking.md` says to answer from the CRM. The CRM holds the booking and an estimated arrival
+   (`booked_at + transit_days`), no carrier status.
+2. A tracking thread has nothing to price, so `get_offers` with shipment null returned
+   `no shipment yet` and the agent could not wait for a carrier's reply.
+3. `crm` returned the airline's name, not its address, and `mail_carrier` needs the address.
+
+The commit closes all three: `collect_offers` waits and returns `carrier_messages` when there is nothing to
+price, `crm` returns `airline_email`, the task prompt says the airline knows the status. Costs about 35 s and
+two or three more turns per tracking question. Not verified live: what a 5U carrier answers to a status
+question (the fake's wording is assumed), and whether 5U times the tracking answer.
+Tests: `test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status`,
+`test_crm_gives_the_airlines_address_for_a_status_question`.
 
 ## Open: decided by the first scored rounds, not by us
 
