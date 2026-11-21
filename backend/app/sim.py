@@ -3,6 +3,7 @@
     LLM_TARGET=openai DB_PATH=:memory: uv run python -m app.sim
 LLM_TARGET=openai calls OpenAI directly with OPENAI_API_KEY: never counts as scored gateway spend.
 """
+import os
 import sqlite3
 import sys
 import time
@@ -36,7 +37,7 @@ def wait_idle(f: Forwarder, seconds: float) -> None:
 
 
 def main() -> None:
-    store.use_connection(sqlite3.connect(":memory:", check_same_thread=False))
+    store.use_connection(sqlite3.connect(os.getenv("SIM_DB", ":memory:"), check_same_thread=False))
     api = FakeFiveU()
     kit.load(api)
     f = Forwarder(api)

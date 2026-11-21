@@ -105,6 +105,10 @@ class FakeFiveU:
         self.bookings[rate_id] = b
         return 201, b
 
+    def board(self) -> dict:
+        return {"frozen_at": None, "overview": {"rounds_sent": 0, "teams": 1, "accepted": 0, "bookings": 0},
+                "ranking": [], "bookings": [], "rounds": []}
+
     def board_me(self) -> dict:
         return {"team": "start-milan", "requests": [], "bookings": list(self.bookings.values())}
 
@@ -120,9 +124,9 @@ class FakeFiveU:
             return {**base, "body": f"Hello,\n\nOur total for the pickup is 177.40 EUR. Pickup time: 3 hours.\n\n"
                                     f"Your offer reference is TRK-{m['id']}. No booking is required.\n\n"
                                     f"Best regards,\n{c.name}"}
-        if re.search(r"\bstatus\b|where is", f"{m['subject']} {m['body']}", re.I):  # wording assumed: no live one seen
-            return {**base, "body": f"Hello,\n\nthe shipment departed on schedule and is in transit, currently at "
-                                    f"the transfer hub. No delay expected.\n\nBest regards\n{c.name}"}
+        if m["subject"].lower().startswith("shipment status"):
+            return {**base, "body": "Hello,\n\nyour shipment departed on schedule and is in transit over the "
+                                    "Atlantic. Expected arrival: 25 Nov 2026, 14:00 local time.\n\n" + c.name}
         if m["subject"].lower().startswith("booking"):
             return {**base, "body": f"Booking confirmed. Booking reference BK-MAIL-{m['id']}.\n\n{c.name}"}
         lane = re.search(r"Route: ([A-Z]{3}) to ([A-Z]{3})", m["body"])

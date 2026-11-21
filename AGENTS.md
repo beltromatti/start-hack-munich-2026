@@ -26,7 +26,7 @@ One forwarder agent (SIEVER Mail harness, `reference/siever-mail/`): the model d
 ```
 mail in -> register (SQLite) -> router (code, by sender/thread)
   customer / tracking -> the forwarder agent, ONE SESSION PER THREAD, resumed by every new mail in it
-                         tools: get_offers, send_mail, book, crm, deal, mail_carrier, note, no_reply
+                         tools: get_offers, send_mail, book, crm, deal, mail_carrier, carrier_status, note, no_reply
   carrier / rate desk -> read into offers on the deal (small model); wakes nobody, except a booking confirmation
   tariff              -> pricing module (txt, xlsx, docx, pdf, scanned images)
 ```
@@ -50,7 +50,11 @@ mail in -> register (SQLite) -> router (code, by sender/thread)
   `/api/bookings`, `/api/board`.
 - **Only one machine runs `make live`** (it polls and answers the real mailbox). Everyone else: `make sim`,
   `make test`, the fake 5U. The portal rate limit (10/min) is shared by the whole team key.
-- `frontend/` Vite + React + TypeScript. Plain CSS in `src/styles.css`, light and dark.
+- `frontend/` the sessions UI (Vite + React + TS, plain CSS tokens in `src/styles.css`, light and dark): deals (the
+  CRM), each deal's live agent session (mails, steps, priced options, booking, airline status), a composer to tell
+  the agent something or reply yourself, the leaderboard and our verdicts. Built into `frontend/dist`, it is served
+  by the backend on :8000 (`npm run build`); `make web` for development.
+- Server: `Dockerfile` + `docker-compose.yml`, one container, register on a volume (`docs/deploy.md`).
 - `personal/` is gitignored, for each person's private notes.
 
 ## Rules

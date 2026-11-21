@@ -91,6 +91,13 @@ TOOLS = [
        "to ask for something, to book by mail. Their answer comes back into this deal (get_offers with shipment "
        "null waits for it). in_reply_to: the id of their mail you answer, if any.",
        {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}, "in_reply_to": I}),
+    fn("carrier_status",
+       "Ask the airline of a booked shipment where it is now: there is no status API, the airline answers by mail "
+       "(a position, a delay, a disruption, an arrival time). The question goes in the airline's thread with our "
+       "references; it waits for the answer (they reply in 15-60 s), keeps it on the booking as the latest status "
+       "and returns it with the booking's facts. deal_id: the shipment's deal (from crm). question: your own wording, "
+       "or null for a standard status request.",
+       {"deal_id": {"type": "string"}, "question": S, "wait_seconds": {"type": "number"}}),
     fn("note",
        "Write a note on the deal for the team (what you noticed, what you decided and why). flag: yellow when a "
        "person should look at it, red when something is wrong or risky; none otherwise.",
@@ -114,7 +121,8 @@ class Ctx:
 
 def run(ctx: Ctx, name: str, args: dict) -> dict:
     f = {"get_offers": get_offers, "send_mail": send_mail, "book": book, "crm": crm, "deal": deal,
-         "mail_carrier": mail_carrier, "note": note, "no_reply": no_reply}.get(name)
+         "mail_carrier": mail_carrier, "carrier_status": carrier_status, "note": note,
+         "no_reply": no_reply}.get(name)
     if f is None:
         return {"error": f"unknown tool {name}"}
     return f(ctx, **args)
@@ -242,6 +250,43 @@ def mail_carrier(ctx: Ctx, to: str, subject: str, body: str, in_reply_to: int | 
     return {"sent": mid, "note": "their answer comes back into this deal"}
 
 
+def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: float) -> dict:
+    rec = store.get(deal_id)
+    b = (rec or {}).get("data", {}).get("booking")
+    if not b:
+        return {"error": f"{deal_id} has no booking"}
+    air = (b.get("option") and (rec["data"].get("options") or {}).get(b["option"], {}).get("air")) or {}
+    carrier = kit.world().carrier_by_name(b["airline"])
+    to = air.get("email") or (carrier.email if carrier else None)
+    if not to:
+        return {"error": f"no mail address for {b['airline']}"}
+    ref = b.get("booking_reference") or b.get("rate_id") or b["team_reference"]
+    body = question or (f"Hello,\n\ncould you tell me the current status of our shipment {ref} ({b['route']}, "
+                        f"{b.get('weight_kg')} kg, our reference {b['team_reference']})? Where is it now, and when do "
+                        f"you expect it to arrive?\n\nThanks,\n{settings.persona}, {settings.company}")
+    before = len(rec["data"].get("carrier_messages") or [])
+    mid = ctx.fw.mail_carrier(deal_id, to, f"Shipment status {ref}", body, in_reply_to=air.get("reply_mail"))
+    end = time.time() + max(0.0, float(wait_seconds))
+    reply = None
+    while time.time() < end:
+        msgs = store.get(deal_id)["data"].get("carrier_messages") or []
+        reply = next((x for x in msgs[before:] if x["from"].lower() == to.lower() and x["mail"] > mid), None)
+        if reply:
+            break
+        ctx.fw.wait_step()
+    facts = _summary(store.get(deal_id), store.get(f"booking-{rec['data']['root']}"))
+    if not reply:
+        return {"asked": mid, "carrier_reply": None, "note": "no answer yet; it will be stored on the deal when it "
+                "comes (deal tool)", "booking": facts["booking"]}
+    status = {"text": reply["text"], "mail": reply["mail"], "at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())}
+    store.update(deal_id, lambda r: (r["status"], {**r["data"], "booking": {**r["data"]["booking"],
+                                                                           "carrier_status": status}}))
+    bid = f"booking-{rec['data']['root']}"
+    if store.get(bid):
+        store.update(bid, lambda r: (r["status"], {**r["data"], "carrier_status": status}))
+    return {"carrier_reply": reply["text"], "received": status["at"], "booking": facts["booking"]}
+
+
 def note(ctx: Ctx, text: str, flag: str) -> dict:
     _ensure_deal(ctx)
     store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "notes": r["data"].get("notes", []) + [
@@ -277,8 +322,8 @@ def _summary(rec: dict, b: dict | None) -> dict:
             "shipment": d.get("request"), "quote": {k: (d.get("quote") or {}).get(k) for k in ("amount", "option")}
             if d.get("quote") else None,
             "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",
-                                                   "transit_days", "status", "via", "pickup", "amount")},
-                         "airline_email": getattr(kit.world().carrier_by_name(bd.get("airline") or ""), "email", None),
+                                                   "transit_days", "status", "via", "pickup", "amount",
+                                                   "carrier_status")},
                          "booked_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(bd["booked_at"])),
                          "estimated_arrival": eta(bd)} if bd else None)}
 

@@ -5,7 +5,7 @@ install:
 api:           # API only, no forwarder loop (safe on any laptop)
 	cd backend && uv run uvicorn app.main:app --reload --port 8000
 live:          # THE production forwarder on the real mailbox. ONE machine only. Restarts by itself;
-	# deploy new code with: pkill -f "bin/uvicorn app.main"
+	# deploy new code with: pkill -f "uvicorn app.main:app --port 8000"
 	backend/live.sh
 
 web:

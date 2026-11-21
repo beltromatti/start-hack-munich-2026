@@ -107,3 +107,15 @@ in the zone file.
   (read, ~6 bid parses, write) costs about **$0.0008**, i.e. ~39.7 of 40 cost points.
 - **Production runs on Mattia's Mac (`make live`) from Sat 15:10.** Nobody else runs `make live`: two pollers on
   one mailbox would answer twice.
+
+## First live round (Sat 16:00, Mattia's Claude)
+
+- **Customers write from `@hackloop.mail` addresses** too (e.g. `lindqvist-medtech@hackloop.mail`): never route by
+  domain; unknown senders are customers.
+- Round 1: CGN-ORD door-to-port (51447), 676 kg / 5.79 cbm (chargeable 966.93 kg, billed at the 1000 kg break),
+  fastest. We quoted Meridian (1 day) + pickup, **3230.03 EUR in 39 s: accepted, 60 points** (45 accuracy + 15 time;
+  cost points come hourly). The customer accepted 24 s later; booked on the portal (`BK-3ZY8SE7F`), confirmed,
+  the customer's thank-you got no reply. Whole deal: $0.0016 of model cost. Field: 4 teams answered, 3 accepted.
+- `/v1/board/me` request fields: `round_no, sent_at, answered_at, verdict, reason, booked`; plus `scores_revealed`
+  and our `bookings` with `booking_reference`. Public `rounds`: `round_no, sent_at, expires_at, voided, status,
+  answered, accepted`.

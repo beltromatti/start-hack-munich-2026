@@ -59,7 +59,8 @@ def test_deal_quote_book_track():
     api.customer("tracking@hackloop.mail", f"Where is {ref}?", f"Hello, where is shipment {ref}?")
     run(f)
     answers = to(api, "tracking@hackloop.mail")
-    assert len(answers) == 1 and "Arrives" in answers[0]["body"]
+    assert len(answers) == 1 and "in transit over the Atlantic" in answers[0]["body"]
+    assert "Atlantic" in store.get(f"booking-{rfq['id']}")["data"]["carrier_status"]["text"]
 
 
 def test_door_to_port_waits_for_truckers():
@@ -177,22 +178,11 @@ def test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status():
     f = Sync(api)
     ctx = tools.Ctx(f, "session-900", "deal-900", 900, "tracking", None)   # a tracking thread: nothing to price
     assert "error" in tools.get_offers(ctx, None, "unspecified", 1)        # nobody asked yet: nothing to wait for
-    tools.mail_carrier(ctx, "yellowtail-air-freight@hackloop.mail", "Status of booking BK-1",
+    tools.mail_carrier(ctx, "yellowtail-air-freight@hackloop.mail", "Shipment status BK-1",
                        "Hello, where is the shipment under booking BK-1 (FRA-ORD) now?", None)
     out = tools.get_offers(ctx, None, "unspecified", 5)
     assert out["still_waiting_for"] == [] and "in transit" in out["carrier_messages"][0]["text"]
     assert store.get("deal-900")["status"] == "new"                         # not shown as a deal being priced
-
-
-def test_crm_gives_the_airlines_address_for_a_status_question():
-    from app import tools
-    f = Sync(FakeFiveU())
-    booking = {"booking_reference": "BK-7", "team_reference": "SM-5", "airline": "Yellowtail Air Freight",
-               "route": "FRA-ORD", "transit_days": "4", "status": "confirmed", "booked_at": 1795273200.0}
-    store.put("deal-5", "deal", "booked", {"root": 5, "customer": "anna@acme.example", "booking": booking})
-    store.put("booking-5", "booking", "confirmed", booking)
-    out = tools.crm(tools.Ctx(f, "session-9", "deal-9", 9, "tracking", None), "BK-7")
-    assert out["matches"][0]["booking"]["airline_email"] == "yellowtail-air-freight@hackloop.mail"
 
 
 def test_a_carrier_that_says_no_takes_its_sheet_price_with_it():

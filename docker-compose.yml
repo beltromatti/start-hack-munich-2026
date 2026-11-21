@@ -1,0 +1,12 @@
+# The production forwarder. ONE instance per team key: never run this while `make live` runs elsewhere.
+services:
+  forwarder:
+    build: .
+    env_file: .env
+    environment:
+      WORKER: "1"
+    ports:
+      - "8000:8000"          # sessions UI and API: http://<server>:8000
+    volumes:
+      - ./backend/data:/app/backend/data   # the register (SQLite): survives rebuilds and restarts
+    restart: unless-stopped
