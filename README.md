@@ -44,6 +44,7 @@ Try the loop without any API: set `WORKER=1`, drop a JSON mail into `backend/dat
 | `frontend/` | Agent console: live timeline, runs, token count. The base for the demo UI. |
 | `docs/challenges/` | The problem sets as presented, one file per challenge. |
 | `docs/sempli-crm-reuse.md` | What we can reuse from Sam's Sempli CRM. Original TS files in `reference/sempli-ai/` (private, delete before going public). |
+| `reference/siever-mail/` | Mattia's SIEVER Mail vision (Italian original) and an English README with the agent-architecture principles that carry over to 5U (private, delete before going public). |
 | `docs/transcripts/` | Raw Whisper transcripts of the talks (noisy, but complete). |
 
 ## Working together
