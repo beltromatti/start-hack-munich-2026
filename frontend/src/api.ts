@@ -66,3 +66,10 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
+
+export type Incident = {
+  id: string; status: string; updated_at: number;
+  data: { key: string; change: string; what: string; at: number; evidence: unknown[];
+    diagnosis: { change?: string; confidence?: string; what_changed?: string; fix?: string; where?: string; urgent?: boolean;
+      error?: string } | null };
+};
