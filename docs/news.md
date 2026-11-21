@@ -2,6 +2,11 @@
 
 Newest on top. Source in brackets.
 
+- **Sat 14:00** Confirmed by Jan: first RFQ **16:00**, **every team pitches** (not only top 5), jury criteria are the
+  brief's (1. pitch, 2. UX and design, 3. codebase, 4. how human the emails read). **Margins: yes, in the CRM** as
+  insight per lane and quote. The quoted price stays at our best cost: a margin on top pushes the quote above the
+  best price, and more than 5 % above is rejected. Kit card: `docs/challenges/5u-kit.md` (Jan).
+
 - **Sat 13:2x** Allocated: **5U AI "Build the Forwarder"** (Hack League app, Cases).
 - **Sat 12:55** 5U posted the official brief + deep-dive slides: `docs/challenges/5u-official-brief.pdf`,
   `docs/challenges/5u-deep-dive-slides.pdf` (Discord #5u-ai).
