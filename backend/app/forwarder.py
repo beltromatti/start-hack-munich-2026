@@ -289,7 +289,7 @@ class Forwarder:
     def follow_up(self, rec: dict, m: dict, p: dict) -> None:
         rid, d = rec["id"], rec["data"]
         store.update(rid, lambda r: (r["status"], {**r["data"], "last_customer_mail": m["id"]}))
-        if p["intent"] == "accept" and rec["status"] == "quoted":
+        if p["intent"] == "accept" and rec["status"] == "quoted" and d.get("quote"):
             return self.book(rid, m)
         if p["intent"] == "decline":
             store.update(rid, lambda r: ("lost", {**r["data"], "reason": p.get("notes") or "declined"}))

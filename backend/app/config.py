@@ -32,7 +32,7 @@ class Settings:
     worker: bool = os.getenv("WORKER", "0") == "1"
     poll_seconds: float = float(os.getenv("POLL_SECONDS", "1.5"))
     # How long we wait for carrier and trucker replies before quoting with what we have.
-    bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "50"))
+    bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "85"))
     persona: str = os.getenv("PERSONA_NAME", "Giulia")
     company: str = os.getenv("COMPANY_NAME", "START Milan Forwarding")
 
