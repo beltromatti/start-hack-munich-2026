@@ -1,5 +1,9 @@
 # The whole flow: quote, book, track (Sat 21 Nov, ~15:20)
 
+> **Update Sat 15:50 (Mattia):** the team chose one forwarder agent per deal instead of the state machine below
+> (`AGENTS.md`, `backend/app/agent.py`). The facts here still hold and are used: carrier status by mail is the
+> `carrier_status` tool, tracking matches by any words through `crm`, the register is still the memory.
+
 Context for all of us and our agents. The 14:15 discussion designed the pricing step only. Steps 2 and 3 need
 state that carries across mails. Main's `backend/app/forwarder.py` (a6d3320) already has all three. This file says
 how they connect, where each fact comes from, and what is still weak.
