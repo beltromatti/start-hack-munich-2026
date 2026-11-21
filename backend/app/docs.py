@@ -23,6 +23,18 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
                     if any(c is not None for c in r):
                         rows.append("\t".join("" if c is None else str(c) for c in r))
             return "\n".join(rows)
+        if name.endswith(".xls"):  # the old Excel format: on 5U's own list of attachment types, and not a zip
+            import xlrd
+            wb = xlrd.open_workbook(file_contents=raw)
+            rows = []
+            for ws in wb.sheets():
+                rows.append(f"# sheet {ws.name}")
+                for i in range(ws.nrows):
+                    cells = [("" if c in ("", None) else str(int(c)) if isinstance(c, float) and c == int(c) else str(c))
+                             for c in ws.row_values(i)]
+                    if any(cells):
+                        rows.append("\t".join(cells))
+            return "\n".join(rows)
         if name.endswith(".docx"):
             from docx import Document
             d = Document(io.BytesIO(raw))
@@ -55,9 +67,12 @@ def _pdf(filename: str, raw: bytes, run_id: str | None) -> str:
         t = (page.extract_text() or "").strip()
         if len(t) < 20:  # a scanned page: its text is in its pictures
             from . import llm
-            for img in getattr(page, "images", []) or []:
-                mime = "image/png" if img.name.lower().endswith(".png") else "image/jpeg"
-                t += f"\n[page {i}, scanned, as read]\n" + llm.look(mime, img.data, run_id=run_id)
+            try:
+                for img in getattr(page, "images", []) or []:
+                    mime = "image/png" if img.name.lower().endswith(".png") else "image/jpeg"
+                    t += f"\n[page {i}, scanned, as read]\n" + llm.look(mime, img.data, run_id=run_id)
+            except Exception as e:  # one page's picture must not cost the text of the others
+                t += f"\n[page {i}: its picture could not be read: {e!r}]"
         out.append(t)
     return "\n".join(out)
 

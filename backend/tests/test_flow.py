@@ -730,3 +730,44 @@ def test_an_offer_accepted_in_a_new_thread_is_booked_on_its_own_deal():
     store.save_mail(other, "in")
     eve = tools.Ctx(f, f"session-{other['id']}", f"deal-{other['id']}", other["id"], "customer", store.mail(other["id"]))
     assert tools.book(eve, "A1", offer) == {"error": "that deal belongs to another customer"}
+
+
+def test_an_xls_and_a_scanned_pdf_are_read():
+    """`.xls` is on 5U's own list of attachment types (pdf, xlsx, xls, csv, txt, png, jpg, docx) and was the one we
+    passed on as "binary attachment". A scanned pdf needs Pillow, which the lock did not carry: every page came back
+    as "could not read ... pillow is required", a text page next to the scan included."""
+    import zlib
+    from pathlib import Path
+    from app import docs, llm
+    xls = docs.text("Packing-List.XLS", (Path(__file__).parent / "data" / "packing-list.xls").read_bytes())
+    assert "# sheet Packing list" in xls and "2\t120\t80\t95\t160.5" in xls and "Total gross weight kg\t356" in xls
+
+    def pdf(pages):  # a hand-made pdf; each page: (text or None, with a picture)
+        img = zlib.compress(bytes([200, 30, 30] * 4))
+        objs, kids, n = {1: b"<< /Type /Catalog /Pages 2 0 R >>", 4: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"}, [], 5
+        objs[3] = (b"<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 "
+                   b"/Filter /FlateDecode /Length %d >>\nstream\n" % len(img)) + img + b"\nendstream"
+        for txt, pic in pages:
+            c = (b"BT /F1 12 Tf 50 700 Td (" + txt.encode() + b") Tj ET\n" if txt else b"") + \
+                (b"q 400 0 0 500 50 100 cm /Im0 Do Q\n" if pic else b"")
+            objs[n] = b"<< /Length %d >>\nstream\n" % len(c) + c + b"endstream"
+            res = b"<< /Font << /F1 4 0 R >>" + (b" /XObject << /Im0 3 0 R >>" if pic else b"") + b" >>"
+            objs[n + 1] = b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources " + res + b" /Contents %d 0 R >>" % n
+            kids.append(n + 1)
+            n += 2
+        objs[2] = b"<< /Type /Pages /Kids [" + b" ".join(b"%d 0 R" % k for k in kids) + b"] /Count %d >>" % len(kids)
+        out, off = b"%PDF-1.4\n", {}
+        for i in sorted(objs):
+            off[i] = len(out)
+            out += b"%d 0 obj\n" % i + objs[i] + b"\nendobj\n"
+        x = len(out)
+        out += b"xref\n0 %d\n0000000000 65535 f \n" % n + b"".join(b"%010d 00000 n \n" % off[i] for i in range(1, n))
+        return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (n, x)
+
+    seen, real = [], llm.look
+    llm.look = lambda mime, raw, run_id=None: seen.append(mime) or "Our total for the pickup is 340.60 EUR"
+    try:
+        scan = docs.text("offer.pdf", pdf([("Request for quote: 11 pieces, 1804 kg, 17.18 cbm, to LIM", False), (None, True)]))
+    finally:
+        llm.look = real
+    assert "could not read" not in scan and "1804 kg" in scan and "340.60 EUR" in scan and len(seen) == 1
