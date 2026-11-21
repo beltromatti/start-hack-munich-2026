@@ -64,6 +64,9 @@ def test_pickup_city_maps_to_zone_and_asks_for_the_postcode():
     assert r["missing"] and "postcode" in r["missing"][0]  # truckers price by postcode (live round 15)
     p["pickup"] = {"postcode": "64283", "city": "Darmstadt"}
     assert not normalise(p, kit.world())["missing"]
+    p["pickup"] = {"postcode": None, "city": None}  # "from our warehouse", no place given: ask for the postcode
+    assert normalise(p, kit.world())["missing"] == [normalise(
+        {**p, "pickup": {"postcode": None, "city": "Darmstadt"}}, kit.world())["missing"][0]]
 
 
 def test_live_bid_beats_stale_sheet():

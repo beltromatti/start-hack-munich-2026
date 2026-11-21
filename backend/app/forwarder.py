@@ -558,14 +558,14 @@ def normalise(s: dict, w: kit.World) -> dict:
         origin = w.zones[zone]["airport"]  # the truck goes to its zone's airport
     dest = kit.destination_code(s.get("destination_airport"))  # a city name is its airport in our network
     missing = []
-    if not origin or origin not in w.origins():
-        missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
-                       f"pickup postcodes start with {', '.join(sorted(w.zones))})")
-    if pickup and (pickup.get("postcode") or pickup.get("city")) and not zone:
-        missing.append("a pickup postcode inside our pickup zones")
-    elif zone and len(postcode) < 5:  # truckers price a collection by postcode (live round 15: a town was not enough)
+    if pickup and (postcode or pickup.get("city")) and not zone:
+        missing.append(f"a pickup postcode inside our pickup zones (they start with {', '.join(sorted(w.zones))})")
+    elif pickup and len(postcode) < 5:  # truckers price a collection by postcode (live rounds 15-18)
         missing.append("the pickup postcode: truckers price the collection by postcode, and a town alone (or the one "
                        "in a signature) is not enough")
+    if (not origin or origin not in w.origins()) and not missing:
+        missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
+                       f"pickup postcodes start with {', '.join(sorted(w.zones))})")
     if not dest:
         missing.append("destination airport (we fly to: " + ", ".join(
             f"{c} {n.split(' / ')[0]}" for c, n in kit.DESTINATIONS.items()) + ")")
