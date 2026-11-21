@@ -279,7 +279,11 @@ Then:
   (`mail_carrier`) and the airline's answer reaches the deal, but the booking status does not change by itself.
 - Notes carried to a customer's next thread are every note of their earlier deals, routine ones included: the
   agent judges them, but they are noise next to the one wish that matters.
-- **Untrusted input has no size bound:** a mail body (up to 200,000 characters) and its attachments (up to 5 of
-  10 MB) enter the agent's first message whole, and every turn re-reads them. A huge document would cost the hour's
-  cost points or overflow the context. SIEVER's answer (§2.3, §13.6 of its vision): what fits goes in whole, the
-  rest as pages the agent reads when it needs them. Not built: so far every document is a page or two.
+- **Untrusted input has no size bound:** a mail body (5U allows 200,000 characters) and its attachments (5 of 10
+  MB) enter the agent's first message whole. Measured at 21:50: the longest customer mail 905 characters, the
+  largest first message (round 57, with its packing list) 2,285. A real 30-page document (about 15,000 tokens) would
+  cost about 0.002 USD at gpt-6-luna's 0.10 USD per million, and the agent sees all of it at once, which the
+  document-wins rule needs. Only a pathological size breaks us: past the 1.05 million-token context the request is
+  refused and the round is lost. SIEVER's answer (§2.3, §13.6 of its vision) is pages the agent reads on demand;
+  not built, because for real documents it would add calls, not save them. Decide again if a document ever runs
+  to more than a few dozen pages.
