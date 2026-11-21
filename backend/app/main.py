@@ -79,7 +79,7 @@ def deal(deal_id: str) -> dict:
     root = r["data"]["root"]
     s = store.get(f"session-{root}")
     return {**r, "mails": store.thread(root), "events": store.events(run_id=deal_id), "usage": store.usage(deal_id),
-            "session": {"status": s["status"], "messages": s["data"]["messages"]} if s else None}
+            "session": {"status": s["status"], "items": s["data"].get("items", [])} if s else None}
 
 
 @app.get("/api/sessions")

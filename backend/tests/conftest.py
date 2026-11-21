@@ -29,18 +29,20 @@ def fake_llm(name, system, user, schema):
 
 
 def call(name, **args):
-    return {"role": "assistant", "content": "", "tool_calls": [
-        {"id": f"c{abs(hash((name, json.dumps(args))))}", "type": "function",
-         "function": {"name": name, "arguments": json.dumps(args)}}]}
+    return [{"type": "function_call", "call_id": f"c{abs(hash((name, json.dumps(args))))}", "name": name,
+             "arguments": json.dumps(args)}]
 
 
-def fake_agent(messages, tools):
-    """A scripted forwarder: enough to drive the harness and the tools through a whole deal."""
-    last = messages[-1]
-    if last["role"] == "tool":
-        prev = next(m for m in reversed(messages) if m["role"] == "assistant")
-        name = prev["tool_calls"][0]["function"]["name"]
-        out = json.loads(last["content"])
+def say(text):
+    return [{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": text}]}]
+
+
+def fake_agent(items, tools):
+    """A scripted forwarder on Responses items: enough to drive the harness and the tools through a whole deal."""
+    last = items[-1]
+    if last.get("type") == "function_call_output":
+        prev = next(i for i in reversed(items) if i.get("type") == "function_call")
+        name, out = prev["name"], json.loads(last["output"])
         if name == "get_offers":
             if out.get("missing"):
                 return call("send_mail", kind="question", body="Could you send the weight?", option_id=None, to=None)
@@ -50,25 +52,24 @@ def fake_agent(messages, tools):
                         option_id=opt, to=None)
         if name == "book":
             return call("send_mail", kind="booking_confirmation",
-                        body=f"Booked: {out.get('booking_reference') or out.get('team_reference')}", option_id=None, to=None)
+                        body=f"Booked: {out.get('booking_reference') or out.get('team_reference')}", option_id=None,
+                        to=None)
         if name == "crm":
             m = out["matches"][0] if out["matches"] else None
             return call("send_mail", kind="tracking_answer",
                         body=f"Arrives {m['booking']['estimated_arrival']}" if m else "Which reference?",
                         option_id=None, to=None)
-        return {"role": "assistant", "content": "done"}
+        return say("done")
     text = last["content"]
     if "Update from the system" in text:
         ref = re.search(r"booking reference (\S+)", text)
         return call("send_mail", kind="booking_confirmation", body=f"Confirmed: {ref.group(1)}", option_id=None, to=None)
-    if "tracking desk" in messages[1]["content"] and len(messages) == 2:
+    if "tracking desk" in items[0]["content"] and len(items) == 1:
         ref = re.search(r"\b(BK-\S+|SM-\d+)", text)
         return call("crm", query=ref.group(1) if ref else text[-80:])
     if re.search(r"book it|go ahead", text, re.I):
-        deal = re.search(r"(A\d+f?)", json.dumps([m for m in messages if m["role"] == "tool"]))
-        quoted = next(json.loads(m["function"]["arguments"])["option_id"] for x in messages if x["role"] == "assistant"
-                      for m in x.get("tool_calls") or [] if m["function"]["name"] == "send_mail"
-                      and json.loads(m["function"]["arguments"])["kind"] == "quote")
+        quoted = next(json.loads(i["arguments"])["option_id"] for i in items if i.get("type") == "function_call"
+                      and i["name"] == "send_mail" and json.loads(i["arguments"])["kind"] == "quote")
         return call("book", option_id=quoted)
     kg = re.search(r"(\d+(?:\.\d+)?)\s*kg", text)
     cbm = re.search(r"(\d+(?:\.\d+)?)\s*cbm", text)
@@ -88,8 +89,8 @@ def fake_agent(messages, tools):
 def world():
     store.use_connection(sqlite3.connect(":memory:", check_same_thread=False))
     llm.use_fake(fake_llm)
-    llm.use_fake_chat(fake_agent)
+    llm.use_fake_turn(fake_agent)
     w = kit.load()
     yield w
     llm.use_fake(None)
-    llm.use_fake_chat(None)
+    llm.use_fake_turn(None)

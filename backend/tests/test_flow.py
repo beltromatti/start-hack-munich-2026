@@ -91,12 +91,11 @@ def test_tariff_mail_replaces_the_airlines_sheet():
     assert store.get("tariff-yellowtail-air-freight")["status"] == "active"
 
 
-def test_restart_mid_turn_keeps_the_conversation_valid():
+def test_restart_mid_turn_keeps_the_session_valid():
     from app import agent
-    msgs = [{"role": "system", "content": "s"}, {"role": "user", "content": "u"},
-            {"role": "assistant", "content": "", "tool_calls": [{"id": "a", "type": "function", "function": {
-                "name": "crm", "arguments": "{}"}}, {"id": "b", "type": "function", "function": {
-                    "name": "crm", "arguments": "{}"}}]},
-            {"role": "tool", "tool_call_id": "a", "content": "{}"}]
-    agent._close_dangling(msgs)
-    assert [m.get("tool_call_id") for m in msgs[3:]] == ["a", "b"]
+    items = [{"role": "user", "content": "u"},
+             {"type": "function_call", "call_id": "a", "name": "crm", "arguments": "{}"},
+             {"type": "function_call", "call_id": "b", "name": "crm", "arguments": "{}"},
+             {"type": "function_call_output", "call_id": "a", "output": "{}"}]
+    agent._close_dangling(items)
+    assert [i.get("call_id") for i in items[3:]] == ["a", "b"] and items[-1]["type"] == "function_call_output"

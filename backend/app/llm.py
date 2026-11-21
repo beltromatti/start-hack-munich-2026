@@ -1,8 +1,11 @@
 """Every model call goes through here: one OpenAI-compatible client (the 5U gateway in production), tokens and
 USD cost logged per call.
 
-A model that does not answer is not a failure: the call waits and runs again (transient errors, the gateway down:
-OpenAI directly as a last resort). Only a request the provider will never accept (400, 413, 422) fails at once.
+The forwarder agent runs on the Responses API (tools with reasoning, stateless: we keep the items, encrypted
+reasoning included, in the register). The small extraction calls for the tools run on Chat Completions.
+
+A model that does not answer is not a failure: the call waits and runs again (transient errors; the gateway down:
+OpenAI directly as a last resort). Only a request the provider will never accept (400, 422) fails at once.
 """
 import base64
 import json
@@ -26,20 +29,20 @@ PRICES = {
     "gpt-4.1-mini": (0.40, 0.10, 1.60), "gpt-4o-mini": (0.15, 0.075, 0.60), "gpt-6.1-terra": (1.00, 0.05, 5.00),
     "gpt-6-sol": (2.00, 0.20, 10.00), "gpt-6.2-sol": (2.00, 0.10, 10.00),
 }
-# Real context windows (tokens), so a long session is never cut short by a number of ours.
+# Real context windows (tokens): a session is never cut short by a number of ours.
 CONTEXT = {"gpt-6": 1_050_000, "gpt-5.6": 1_050_000, "gpt-5": 400_000, "gpt-4.1": 1_047_576}
 WAITS = [1, 3, 10, 30, 60]  # seconds between attempts once the gateway and OpenAI both fail
 
 _client: OpenAI | None = None
 _direct: OpenAI | None = None
 _fake: Callable[..., dict] | None = None
-_fake_chat: Callable[..., dict] | None = None
+_fake_turn: Callable[..., list] | None = None
 
 
 def client() -> OpenAI:
     global _client
     if _client is None:
-        _client = OpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key or "missing", timeout=90,
+        _client = OpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key or "missing", timeout=120,
                          max_retries=2)
     return _client
 
@@ -50,20 +53,20 @@ def direct() -> OpenAI | None:
     global _direct
     key = os.getenv("OPENAI_API_KEY")
     if _direct is None and key and settings.llm_base_url:
-        _direct = OpenAI(api_key=key, timeout=90, max_retries=1)
+        _direct = OpenAI(api_key=key, timeout=120, max_retries=1)
     return _direct
 
 
 def use_fake(fn: Callable[..., dict] | None) -> None:
-    """Tests: structured calls. fn(name, system, user, schema) -> dict."""
+    """Tests: extraction calls. fn(name, system, user, schema) -> dict."""
     global _fake
     _fake = fn
 
 
-def use_fake_chat(fn: Callable[..., dict] | None) -> None:
-    """Tests: agent turns. fn(messages, tools) -> assistant message dict."""
-    global _fake_chat
-    _fake_chat = fn
+def use_fake_turn(fn: Callable[..., list] | None) -> None:
+    """Tests: agent turns. fn(items, tools) -> output items (function_call / message), as the Responses API."""
+    global _fake_turn
+    _fake_turn = fn
 
 
 def prompt(name: str) -> str:
@@ -74,28 +77,34 @@ def context_window(model: str) -> int:
     return next((v for k, v in CONTEXT.items() if model.startswith(k)), 128_000)
 
 
-def cost(model: str, usage: Any) -> float | None:
+def cost(model: str, tokens_in: int, cached: int, tokens_out: int) -> float | None:
     p = PRICES.get(model)
-    if p is None or usage is None:
+    if p is None:
         return None
-    cached = getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0
-    fresh = (usage.prompt_tokens or 0) - cached
-    return (fresh * p[0] + cached * p[1] + (usage.completion_tokens or 0) * p[2]) / 1e6
+    return ((tokens_in - cached) * p[0] + cached * p[1] + tokens_out * p[2]) / 1e6
 
 
-def _call(args: dict, label: str, run_id: str | None, agent: str) -> tuple[Any, Any]:
-    """One completion, waiting through anything transient. Returns (response, usage)."""
+def _call(args: dict, label: str, run_id: str | None, agent: str, api: str = "chat") -> Any:
+    """One request, waiting through anything transient. `api`: chat (Chat Completions) or responses."""
     t, attempt = time.time(), 0
     while True:
         c = client() if attempt < 2 or direct() is None else direct()
         try:
-            res = c.chat.completions.create(**args)
+            res = c.responses.create(**args) if api == "responses" else c.chat.completions.create(**args)
             via = " DIRECT (gateway down)" if c is _direct else ""
             u = res.usage
-            store.log(agent, "llm", f"{args['model']} [{label}] {time.time() - t:.1f}s{via}", None, run_id=run_id,
-                      tokens_in=getattr(u, "prompt_tokens", 0) or 0, tokens_out=getattr(u, "completion_tokens", 0) or 0,
-                      cost_usd=cost(args["model"], u))
-            return res, u
+            if api == "responses":
+                tin, tout = u.input_tokens, u.output_tokens
+                cached = getattr(u.input_tokens_details, "cached_tokens", 0) or 0
+                reasoning = getattr(u.output_tokens_details, "reasoning_tokens", 0) or 0
+            else:
+                tin, tout = u.prompt_tokens, u.completion_tokens
+                cached = getattr(getattr(u, "prompt_tokens_details", None), "cached_tokens", 0) or 0
+                reasoning = getattr(getattr(u, "completion_tokens_details", None), "reasoning_tokens", 0) or 0
+            store.log(agent, "llm", f"{args['model']} [{label}] {time.time() - t:.1f}s{via}",
+                      {"cached": cached, "reasoning": reasoning}, run_id=run_id, tokens_in=tin or 0,
+                      tokens_out=tout or 0, cost_usd=cost(args["model"], tin or 0, cached, tout or 0))
+            return res
         except (openai.BadRequestError, openai.UnprocessableEntityError) as e:  # never accepted: fail this request
             store.log(agent, "error", f"{args['model']} [{label}] rejected: {e!r}"[:500], run_id=run_id)
             raise
@@ -106,24 +115,20 @@ def _call(args: dict, label: str, run_id: str | None, agent: str) -> tuple[Any, 
             attempt += 1
 
 
-def chat(messages: list[dict], tools: list[dict], *, model: str, effort: str | None, run_id: str | None,
-         agent: str = "forwarder") -> dict:
-    """One agent turn. Returns the assistant message as a plain dict (content, tool_calls)."""
-    if _fake_chat is not None:
-        msg = _fake_chat(messages, tools)
+def respond(instructions: str, items: list[dict], tools: list[dict], *, model: str, effort: str | None,
+            run_id: str | None, agent: str = "forwarder") -> list[dict]:
+    """One agent turn on the Responses API, stateless: the items (encrypted reasoning included) live in the
+    register, so a session survives restarts and the next turn continues the same line of thought."""
+    if _fake_turn is not None:
+        out = _fake_turn(items, tools)
         store.log(agent, "llm", "fake turn", None, run_id=run_id)
-        return msg
-    args: dict[str, Any] = {"model": model, "messages": messages, "tools": tools, "parallel_tool_calls": True}
+        return out
+    args: dict[str, Any] = {"model": model, "instructions": instructions, "input": items, "tools": tools,
+                            "store": False, "include": ["reasoning.encrypted_content"], "parallel_tool_calls": True}
     if effort:
-        args["reasoning_effort"] = effort
-    res, _ = _call(args, "turn", run_id, agent)
-    m = res.choices[0].message
-    out: dict[str, Any] = {"role": "assistant", "content": m.content or ""}
-    if m.tool_calls:
-        out["tool_calls"] = [{"id": c.id, "type": "function",
-                              "function": {"name": c.function.name, "arguments": c.function.arguments}}
-                             for c in m.tool_calls]
-    return out
+        args["reasoning"] = {"effort": effort}
+    res = _call(args, "turn", run_id, agent, api="responses")
+    return [i.model_dump(exclude_none=True) for i in res.output]
 
 
 def structured(name: str, system: str, user: str, schema: dict, *, model: str, run_id: str | None = None,
@@ -142,7 +147,7 @@ def structured(name: str, system: str, user: str, schema: dict, *, model: str, r
     e = settings.effort_for(model) if effort == "default" else effort
     if e:
         args["reasoning_effort"] = e
-    res, _ = _call(args, name, run_id, agent)
+    res = _call(args, name, run_id, agent)
     return json.loads(res.choices[0].message.content or "{}")
 
 
