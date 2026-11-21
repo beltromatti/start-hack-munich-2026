@@ -124,10 +124,12 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
   time and arrive transit days later. The quote, the booking and the tracking answer say the same dates.
 - **Numbers read by a model are checked against their source:** an amount the bid reader returns must appear in the
   carrier's mail; if not, it is read again, then left out (a trucker's "94.08 EUR" once came back as 9408).
-- **The airline's booking price is what it charges.** From round 48 the portal booked the quoted rate at 10 % more
-  (5655.55 became 6221.11). The booking total is recomputed by code from the airline's price plus the pickup,
+- **The airline's booking price is what it charges.** For an hour (rounds 48-50) the portal booked the quoted rate
+  at 10 % more (5655.55 became 6221.11). The booking total is recomputed by code from the airline's price plus the pickup,
   `book` returns `price_changed` with both totals, and the agent says it in the confirmation (round 50: "letting me
-  know about the change before invoicing", the customer wrote back).
+  know about the change before invoicing", the customer wrote back). An airline's own mail about the booking is read
+  the same way: code says whether its price is the flight price we booked (so the all-in total stays) or another
+  one (round 51: the agent took the flight price for a change of the all-in total).
 
 ## 6. How the agent writes (and how we write prompts)
 

@@ -186,3 +186,9 @@ from the airline's price and returns `price_changed`; round 50 said it in the co
 (+10 %, customer never told) `adjustment: -22.5`; round 48 (told in a correction after the confirmation)
 `-32.5` once its tracking 10 came in (its total stayed 76.35); round 50 (told in the confirmation) closed with no
 adjustment. Saying the booked price in the confirmation looks like what 5U expects; to confirm with 5U.
+The +10 % held for that hour only: round 53 (21:18) booked on the portal at the quoted rate.
+
+**Booking by mail for some airlines (Sat from 21:05, rounds 51-52):** `POST /v1/portal/bookings` answers `503 Booking is
+not available for Nova Atlas Cargo. Please book by email with nova-atlas-cargo@hackloop.mail.` (Tamarind in round
+52). We book by mail with the rate reference; the airline replies in our thread ("thank you for your booking ...
+Price: 4466.52 EUR", the flight price as quoted, no +10 %), then mails "Booking BK-... confirmed".
