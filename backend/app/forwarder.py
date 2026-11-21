@@ -102,12 +102,13 @@ class Forwarder:
             return "tracking"
         if sender == RATEDESK:
             return "ratedesk"
-        if re.match(r"^booking\s+\S+\s+confirmed", subject, re.I):
-            return "booking"
         if self.deal_for_bid(m):
             return "bid"
         if kit.world().carrier_by_email(sender):
-            if booking_for(f"{subject}\n{m['body']}"):  # news about one of our bookings: delay, change, cancellation
+            # a confirmation, or news about one of our bookings (delay, change, cancellation): only from a carrier on
+            # our list. A subject saying "Booking BK-... confirmed" from anyone else is what the mail claims, not who
+            # sent it: with our reference and another price it would reprice the booking and the customer's total
+            if re.match(r"^booking\s+\S+\s+confirmed", subject, re.I) or booking_for(f"{subject}\n{m['body']}"):
                 return "booking"
             if m.get("attachments") or re.search(r"tariff|rate sheet|rates", subject, re.I):
                 return "tariff"
