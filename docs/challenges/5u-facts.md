@@ -203,3 +203,9 @@ attached"); the truckers answered "You find our price offer in the attachment" a
 "Lead time 29 hours from order to collection" or "Our driver can be at the pickup address 13 hours after your
 order". The gateway has no audio model and its chat API takes only text and images. Our question to the customer
 ("cannot price the collection yet") was scored `rejected declined_in_scope`; the quote sent after it did not count.
+
+**The customer wants the offer as a PDF (Sat 23:36, round 76):** "Please attach your offer as a PDF to your reply, as
+our purchasing department needs it for filing." We quoted in the body and wrote that we could not attach a PDF; the
+customer answered "I asked for the offer as a PDF and did not get one with your price in it, so we will not go
+ahead with it." 5U's send API takes attachments (at most 5, 10 MB each; pdf, xlsx, xls, csv, txt, png, jpg, docx).
+Since 23:40 `send_mail` attaches our offer as a PDF made by code from the option (`offer_pdf`).
