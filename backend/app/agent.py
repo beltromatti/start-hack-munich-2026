@@ -1,15 +1,14 @@
 """The forwarder agent: one identity, one session per thread, as many executions as the thread needs.
 
-A session is the deal's working memory: it lives in the register (restart-safe) and every new mail in the thread,
-or a person writing into it, resumes it with the same prefix (identity, tools, the thread so far), so the provider
-cache stays warm and the agent always has the whole deal in front of it.
+A session is the deal's working memory: its items (mails, tool calls and results, the model's encrypted
+reasoning) live in the register, so it survives restarts, and every new mail in the thread, or a person writing
+into it, resumes it with the same prefix: the provider cache stays warm and the agent has the whole deal at hand.
 
 The system keeps one constraint per execution, the required outcome (a mail answered, or a reasoned no-reply),
 and one stop: an execution that turns 10 times in a row without anything succeeding. Everything else, how many
 steps, which tools, how long the mail, is the model's.
 """
 import json
-import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -34,25 +33,23 @@ def resume_inbox(fw: Any, inbox_id: str) -> None:
     if not s:
         return
     event = "\n\n".join(f"Update from the system ({t['at']}): {t['text']}" if t["who"] == "system" else
-                          f"Message from {t['who']} (a person on our team, {t['at']}): {t['text']}"
-                          for t in taken["data"]["taken"])
+                        f"Message from {t['who']} (a person on our team, {t['at']}): {t['text']}"
+                        for t in taken["data"]["taken"])
     execute(fw, s["data"]["root"], s["data"]["task"], mail=None, event=event)
 
 
 def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> None:
     sid, deal_id = f"session-{root}", f"deal-{root}"
-    s = store.get(sid)
-    if s is None:
+    rec = store.get(sid)
+    if rec is None or "items" not in rec["data"]:
         earlier = _earlier(root, mail)  # a thread that started before this session (a restart, a migration)
-        messages = [{"role": "system", "content": _system()},
-                    {"role": "user", "content": f"{llm.prompt('tasks/' + task)}\n\n{_context()}\n\n{earlier}{event}"}]
-        s = {"root": root, "task": task, "messages": messages, "seen": [], "executions": 0}
+        s = {"root": root, "task": task, "seen": [], "executions": 0,
+             "items": [_user(f"{llm.prompt('tasks/' + task)}\n\n{_context()}\n\n{earlier}{event}")]}
     else:
-        s = s["data"]
-        _close_dangling(s["messages"])
-        key = f"mail:{mail['id']}" if mail else None
-        if key is None or key not in s["seen"]:
-            s["messages"].append({"role": "user", "content": f"{_context()}\n\n{event}"})
+        s = rec["data"]
+        _close_dangling(s["items"])
+        if not (mail and f"mail:{mail['id']}" in s["seen"]):
+            s["items"].append(_user(f"{_context()}\n\n{event}"))
     if mail and f"mail:{mail['id']}" not in s["seen"]:
         s["seen"].append(f"mail:{mail['id']}")
     s["executions"] += 1
@@ -64,36 +61,35 @@ def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> 
 
     failing, nudged = 0, False
     while True:
-        turn = llm.chat(s["messages"], tools.TOOLS, model=settings.model_agent, effort=settings.effort_agent,
-                        run_id=deal_id)
-        s["messages"].append(turn)
+        out = llm.respond(_system(), s["items"], tools.TOOLS, model=settings.model_agent,
+                          effort=settings.effort_agent, run_id=deal_id)
+        s["items"].extend(out)
         store.put(sid, "session", "running", s)
-        calls = turn.get("tool_calls") or []
-        if turn.get("content"):
-            store.log("forwarder", "thought", turn["content"][:500], run_id=deal_id)
+        text = _text(out)
+        if text:
+            store.log("forwarder", "thought", text[:500], run_id=deal_id)
+        calls = [i for i in out if i.get("type") == "function_call"]
         if not calls:
             if mail is not None and not ctx.outcome and not nudged:
                 nudged = True  # the one thing the system asks: this mail gets an answer, or a reasoned no-reply
-                s["messages"].append({"role": "user", "content": (
-                    "(system) The mail you are handling has not been answered yet. Send the answer with send_mail, "
-                    "or call no_reply with the reason if nothing should be sent.")})
+                s["items"].append(_user("(system) The mail you are handling has not been answered yet. Send the "
+                                        "answer with send_mail, or call no_reply with the reason if nothing "
+                                        "should be sent."))
                 continue
             if mail is not None and not ctx.outcome:
                 store.log("forwarder", "error", "execution ended without answering the mail", run_id=deal_id)
             break
         ok = 0
         for c in calls:
-            name = c["function"]["name"]
             try:
-                args = json.loads(c["function"]["arguments"] or "{}")
-                result = tools.run(ctx, name, args)
+                result = tools.run(ctx, c["name"], json.loads(c.get("arguments") or "{}"))
             except Exception as e:  # the model sees what went wrong and decides
                 result = {"error": f"{type(e).__name__}: {e}"}
             ok += 0 if isinstance(result, dict) and "error" in result else 1
-            store.log("forwarder", "tool", f"{name}({_short(c['function']['arguments'])})",
-                      {"args": c["function"]["arguments"], "result": result}, run_id=deal_id)
-            s["messages"].append({"role": "tool", "tool_call_id": c["id"],
-                                  "content": json.dumps(result, default=str, ensure_ascii=False)})
+            store.log("forwarder", "tool", f"{c['name']}({_short(c.get('arguments'))})",
+                      {"args": c.get("arguments"), "result": result}, run_id=deal_id)
+            s["items"].append({"type": "function_call_output", "call_id": c["call_id"],
+                               "output": json.dumps(result, default=str, ensure_ascii=False)})
             store.put(sid, "session", "running", s)
         failing = 0 if ok else failing + 1
         if failing >= SPINNING:
@@ -133,8 +129,16 @@ def _context() -> str:
 
 
 def _now() -> str:
-    t = datetime.now(timezone.utc)
-    return t.strftime("%a %d %b %Y %H:%M:%S UTC")
+    return datetime.now(timezone.utc).strftime("%a %d %b %Y %H:%M:%S UTC")
+
+
+def _user(text: str) -> dict:
+    return {"role": "user", "content": text}
+
+
+def _text(out: list[dict]) -> str:
+    return "".join(c.get("text", "") for i in out if i.get("type") == "message"
+                   for c in i.get("content") or [] if c.get("type") == "output_text").strip()
 
 
 def _mail_event(fw: Any, m: dict) -> str:
@@ -158,18 +162,14 @@ def _earlier(root: int, mail: dict | None) -> str:
     return "Earlier in this thread:\n\n" + "\n\n".join(lines) + "\n\n"
 
 
-def _close_dangling(messages: list[dict]) -> None:
-    """After a restart mid-turn: every tool call gets a result, so the conversation stays valid."""
-    last = next((i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "assistant"), None)
-    if last is None:
-        return
-    answered = {m.get("tool_call_id") for m in messages[last + 1:] if m.get("role") == "tool"}
-    for c in messages[last].get("tool_calls") or []:
-        if c["id"] not in answered:
-            messages.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(
-                {"error": "interrupted by a restart; the outcome is unknown. Check the deal before repeating it."})})
+def _close_dangling(items: list[dict]) -> None:
+    """After a restart mid-turn: every tool call gets an output, so the session stays valid."""
+    answered = {i.get("call_id") for i in items if i.get("type") == "function_call_output"}
+    for i in [i for i in items if i.get("type") == "function_call" and i.get("call_id") not in answered]:
+        items.append({"type": "function_call_output", "call_id": i["call_id"], "output": json.dumps(
+            {"error": "interrupted by a restart; the outcome is unknown. Check the deal before repeating it."})})
 
 
-def _short(args: str) -> str:
+def _short(args: str | None) -> str:
     s = (args or "").replace("\n", " ")
     return s if len(s) < 160 else s[:157] + "..."
