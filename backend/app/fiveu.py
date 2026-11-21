@@ -24,6 +24,7 @@ class FiveU:
         self._rate_left: int | None = None
         self._rate_reset = 0.0
         self._sent: dict[str, deque] = defaultdict(deque)
+        self._last_poll = time.time()  # after a restart the old process may have just polled: wait one gap
         self._send_lock = threading.Lock()
 
     def _req(self, method: str, path: str, **kw: Any) -> httpx.Response:
