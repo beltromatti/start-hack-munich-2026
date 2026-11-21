@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Any, Callable
 
-from . import agent, anomaly, docs, kit, language, pricing, store
+from . import agent, docs, kit, language, pricing, store
 from .config import settings
 from .pricing import Offer
 
@@ -511,7 +511,6 @@ class Forwarder:
                 seen.add(key)
                 store.log("watcher", "info", f"round {rnd}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
-        anomaly.check()  # a market change, seen before failed quotes pile up (app/anomaly.py)
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
@@ -523,7 +522,7 @@ def waiting_for(d: dict) -> list[str]:
 
 
 def pickup_variants(pickups: list[Offer], preference: str = "cheapest") -> list[tuple[str, Offer | None]]:
-    """The one trucker an option carries, by PICKUP_RULE (docs/research/pricing.md, round-log.md).
+    """The one trucker an option carries, by PICKUP_RULE (docs/challenges/5u-facts.md).
     asked: the fastest when the customer asked for fastest (round 1: full accuracy), else the cheapest.
     cheapest: always the cheapest. balanced: always the 50/50 pick (BALANCE_RULE).
     One variant only: with two on the table the agent took the fast trucker for a "cheapest" request because the

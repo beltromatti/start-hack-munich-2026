@@ -178,11 +178,3 @@ button, input, textarea { font: inherit; color: inherit; }
   .step, .said, .journal, .note, .t-live { margin-left: 8px; }
 }
 
-/* ---- watcher (anomaly incidents) ------------------------------------------------------------------------ */
-.incidents { list-style: none; margin: 0; padding: 0 16px 24px; display: flex; flex-direction: column; gap: 10px; }
-.incidents li:not(.empty) { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; }
-.incidents li.urgent { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
-.inc-top { display: flex; align-items: center; gap: 8px; }
-.inc-top .link { margin-left: auto; background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
-.inc-what { margin-top: 6px; font-weight: 600; }
-.inc-fix { margin-top: 4px; color: var(--ink-2); }

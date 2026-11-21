@@ -119,3 +119,12 @@ in the zone file.
 - `/v1/board/me` request fields: `round_no, sent_at, answered_at, verdict, reason, booked`; plus `scores_revealed`
   and our `bookings` with `booking_reference`. Public `rounds`: `round_no, sent_at, expires_at, voided, status,
   answered, accepted`.
+
+## Which trucker 5U counts (rounds 1 and 2, Sat 16:00 and 16:07)
+
+Accuracy is linear: full at the best price, zero at 10 % above it (round 2: 2.414 % above gave 34.14 of 45).
+For door-to-port the best price uses one trucker; only the **50/50 ratio rule** (price / cheapest + time / fastest,
+`PICKUP_RULE=balanced`, `BALANCE_RULE=ratio`, the defaults) picks 5U's trucker in both rounds: round 1 Westfalenroute
+(220.03 EUR, 11 h) over Elbkante (134.69, 29 h); round 2 Bodenseefracht (119.01, 30 h) over Hansekogge (245.02, 23 h).
+"Cheapest" misses round 1, "fastest" and min-max miss round 2. The airline follows the customer's preference.
+Regression test: `tests/test_pricing.py::test_balanced_ratio_trucker_matches_the_scored_rounds`.

@@ -71,7 +71,7 @@ def test_live_bid_beats_stale_sheet():
     assert best["Yellowtail Air Freight"].total == 850 and best["Orion Cargo Air"].total == 900
 
 
-# ---- pick rules (docs/research/pricing.md) -------------------------------------------------------------------
+# ---- pick rules (docs/challenges/5u-facts.md) ----------------------------------------------------------------
 
 def zone_60():
     # live trucker bids, zone 60 -> FRA, Sat 21 Nov 14:10 UTC (mails 164-168): price EUR, pickup hours

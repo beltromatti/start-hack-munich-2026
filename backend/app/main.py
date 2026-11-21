@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import agent, anomaly, store
+from . import agent, store
 from .config import settings
 
 forwarder = None
@@ -148,17 +148,6 @@ def board() -> dict:
 def board_history(limit: int = 200) -> list[dict]:
     return [r["data"] for r in store.records("board", limit=limit)]
 
-
-@app.get("/api/incidents")
-def incidents(status: str = "open") -> list[dict]:
-    """Market changes the anomaly watch found, each with its evidence and the reasoning model's diagnosis."""
-    return store.records("incident", status)
-
-
-@app.post("/api/incidents/{incident_id}/close")
-def close_incident(incident_id: str) -> dict:
-    anomaly.close(incident_id)
-    return {"ok": True}
 
 
 # Last: the UI mount at "/" would shadow any route added after it.

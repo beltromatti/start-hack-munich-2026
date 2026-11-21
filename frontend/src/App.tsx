@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Board, Deal, DealRow, Health, Incident, Usage, get } from "./api";
+import { Board, Deal, DealRow, Health, Usage, get } from "./api";
 import { DealView } from "./DealView";
-import { BoardPane, DealList, Incidents } from "./Side";
+import { BoardPane, DealList } from "./Side";
 import { usd } from "./format";
 
 const TEAM = "start-milan";
@@ -27,7 +27,6 @@ export default function App() {
   const [health] = usePoll<Health>("/api/health", 10000);
   const [usage] = usePoll<Usage>("/api/usage", 5000);
   const [board] = usePoll<Board>("/api/board", 10000);
-  const [incidents, , reloadIncidents] = usePoll<Incident[]>("/api/incidents", 15000);
   const [selected, setSelected] = useState<string | null>(null);
   const [deal, , reload] = usePoll<Deal>(selected ? `/api/deals/${selected}` : null, 1500);
 
@@ -73,9 +72,7 @@ export default function App() {
             <p>Every request becomes a deal with its own agent session: the mails, what the agent did and why, the priced options, the booking. Select one on the left.</p>
           </section>
         )}
-        <BoardPane board={board} team={TEAM}>
-          <Incidents items={incidents ?? []} onChange={reloadIncidents} />
-        </BoardPane>
+        <BoardPane board={board} team={TEAM} />
       </main>
     </div>
   );

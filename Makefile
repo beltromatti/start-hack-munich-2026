@@ -1,4 +1,4 @@
-.PHONY: install api live web test sim fake-inbox
+.PHONY: install api live web test sim
 install:
 	cd backend && uv sync
 	cd frontend && npm install
@@ -14,5 +14,3 @@ test:
 	cd backend && uv run pytest -q
 sim:           # real model (OpenAI direct, not scored) + fake 5U: realistic mails end to end
 	cd backend && LLM_TARGET=openai DB_PATH=:memory: BID_WAIT_SECONDS=20 uv run python -m app.sim
-fake-inbox:  # 31 synthetic 5U mails into backend/data/inbox, answer key in backend/synthetic/expected.json
-	cd backend && uv run python -m synthetic.build

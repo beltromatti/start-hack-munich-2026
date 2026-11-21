@@ -1,4 +1,4 @@
-# Disruption watcher: what can change each hour and how we notice first
+# Likely changes: what 5U can change each hour, how we notice first, how we respond
 
 Question 4 of the research brief. 5U: "After a few hours the setup changes about once an hour, unannounced.
 Teams learn of a change from failed quotes." A failed quote is the last signal, it costs 100 points. Every change
@@ -16,7 +16,7 @@ The lanes six carriers named by mail equal their portal or sheet lanes exactly (
 | # | Change | Why we expect it | Earliest signal (in code, before a quote fails) | Response |
 | --- | --- | --- | --- | --- |
 | 1 | New tariff for an airline | Brief: "The airlines also send monthly tariffs"; `Rate.dataset_version` exists | Mail from a carrier that answers nothing, with a file; `dataset_version` not `v1` on any portal rate; a sheet airline's mail price differs from its sheet price | green: ingest, the live price already wins over the sheet. yellow if the mail price and the new sheet disagree |
-| 2 | Tariff that is not valid yet (December sheet) | Sheets say "valid 01.11. to 30.11."; "Read the rate sheets closely" | `valid_from` later than today on the ingested sheet | yellow: keep the old sheet until `valid_from`. Today `on_tariff` replaces at once |
+| 2 | Tariff that is not valid yet (December sheet) | Sheets say "valid 01.11. to 30.11."; "Read the rate sheets closely" | `valid_from` later than today on the ingested sheet | green: sheets keep their validity, the price uses the one valid on the ready date (`kit.add_sheet`, `kit.sheet(on=)`) |
 | 3 | Portal down for a lane or airline | `GET /rates`: "503 with a message that says where to get the rate instead" | 503 on a rate read | green: mail the airline (built), or the rate desk |
 | 4 | Booking by API down | `POST /bookings`: "503 ... how to book by email with the airline" | 503 on booking | green: book by mail in the bid thread (built) |
 | 5 | Lower portal limit | "Limits may be tuned"; header `X-RateLimit-Limit` | header value below 10; 429 | yellow: one call per airline, next break only when within 10 % |
@@ -37,9 +37,3 @@ outside news explains it. What a small model can predict from our own register a
 per carrier, acceptance per lane and weight band, which carrier wins a lane. What it cannot predict: the next
 unannounced change. Honest pitch line: we detect a change within one round from the signals above, we do not
 forecast it.
-
-## Built on this branch
-
-`backend/research/rounds.py` reads only the mailbox and the board and prints per request the signals SLOW,
-CURRENCY, FORMAT, ASKED BACK and NOTICE. The same checks belong into the register once the agent version
-stands: each is one comparison against the baseline above.

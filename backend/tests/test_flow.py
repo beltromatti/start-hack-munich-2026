@@ -103,7 +103,7 @@ def test_restart_mid_turn_keeps_the_session_valid():
     assert [i.get("call_id") for i in items[3:]] == ["a", "b"] and items[-1]["type"] == "function_call_output"
 
 
-# ---- research/pricing: which weight to ask, when to price, which trucker (docs/research/pricing.md) --------
+# ---- research/pricing: which weight to ask, when to price, which trucker (docs/challenges/5u-facts.md) ---
 
 def test_sheetless_airline_is_also_asked_at_the_next_break():
     # Zephyr, Himalaya and Pampero fly to KTM, have no sheet and are not on the portal: their breaks are unknown.
@@ -170,7 +170,7 @@ def test_pickup_rule_decides_which_trucker_the_recommended_option_carries(monkey
     assert recommended("unspecified", pickup_rule="cheapest")[0] == "Fast"  # default: ratio balance, speed dominates
 
 
-# ---- research: tracking needs the airline's word (5U at the booth, docs/research/README.md) ------------------
+# ---- research: tracking needs the airline's word (5U at the booth, docs/news.md) ---------------------------------
 
 def test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status():
     from app import tools

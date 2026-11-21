@@ -10,12 +10,11 @@ Read `docs/challenges/5u.md` before building anything. The other challenge files
 How to reach 5U (mailbox, rate portal, LLM gateway, endpoints, `.env` names): `docs/challenges/5u-kit.md`.
 API spec: `docs/challenges/5u-api/openapi.json`. Rate sheets, carrier list, pickup zones: `docs/challenges/5u-kit/start-kit/`.
 Counted facts for decisions (lanes, rate limit, email-only airlines, weight breaks, trucker zones): `docs/challenges/5u-facts.md`.
+What 5U will likely change each hour, the earliest signal and our response: `docs/likely-changes.md`.
 The 10 rate sheets as one checked table (158 lanes, EUR per kg, minimum, surcharges): `docs/challenges/5u-kit/tariffs.json`.
 Read it instead of the raw pdf/xlsx/jpg files. Pricing: also price the next weight break up and take the cheaper
 (299 kg cost more than 300 kg on the portal, see `5u-facts.md`).
 The team key never goes into the repo. It lives only in each person's `.env`.
-Test data: 31 synthetic 5U mails (every mail kind, DE/IT/ES/FR/EN, the hard cases) in `backend/synthetic/mails.py`,
-their answer key with computed prices (sheets plus 34 live portal rates) in `backend/synthetic/expected.json`.
 Feed a mail into the local 5U with `FakeFiveU.customer(m["frm"], m["subject"], m["body"])` and compare the quote with
 the key. Forwarder vocabulary for the parse prompt: `backend/app/prompts/glossary.md`.
 
@@ -66,6 +65,23 @@ mail in -> register (SQLite) -> router (code, by sender/thread)
 4. No secrets in code or commits. `.env` only.
 5. Small, working steps. `make test` stays green. Add a test for anything that touches money or sending.
 6. Prefer deleting over adding layers. No new framework without asking the team.
+
+## Before you change anything (read this if you are an AI assistant)
+
+The design is Mattia's agent harness (`reference/siever-mail/README.md`). Changes that fight it were removed
+on Sat 16:30 (a regex pre-sort, a second pricing engine, a separate dashboard, a rule-based watcher), so:
+
+- **Intelligence goes to the agent, guarantees go to tools.** A new capability is a tool (or a field a tool
+  returns), described in its own words, that the agent chooses to use. Not a pipeline step, not a classifier in
+  front of the agent, not if-then rules on mail text.
+- **No hard checks on what the model writes.** Teach with the prompt (criteria and the reason), measure with
+  diagnostics. The only hard rules live inside tools: money computed in `pricing.py`, who may be mailed, IDs.
+- **One implementation per thing.** Prices only in `pricing.py`, model calls only in `llm.py`, state only in the
+  register (`store.py`). Never a parallel copy "for tests" or "for the UI".
+- **Flexibility by the data model, not by examples.** When a round fails, ask what kind of change it was
+  (`docs/likely-changes.md`) and make the system handle that kind, not that mail.
+- **Prompts are soft:** goals, criteria, why. No procedures, no word lists, no word limits.
+- **Work on a short branch from `main`**, run `make test` and `make sim`, and let Mattia merge. Never `make live`.
 
 ## Commands
 

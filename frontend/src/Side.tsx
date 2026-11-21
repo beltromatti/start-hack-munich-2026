@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Board, DealRow, Incident, post } from "./api";
+import { Board, DealRow } from "./api";
 import { STATUS, ago, who } from "./format";
 
 const FILTERS: [string, (d: DealRow) => boolean][] = [
@@ -59,32 +59,7 @@ export function DealList({ deals, selected, onSelect }: { deals: DealRow[]; sele
   );
 }
 
-export function Incidents({ items, onChange }: { items: Incident[]; onChange: () => void }) {
-  return (
-    <>
-      <div className="pane-head"><h3>Watcher <span className="count">{items.length} open</span></h3></div>
-      <ul className="incidents">
-        {items.map((i) => {
-          const g = i.data.diagnosis ?? {};
-          return (
-            <li key={i.id} className={g.urgent ? "urgent" : ""}>
-              <div className="inc-top">
-                <span className={`pill ${g.urgent ? "bad" : "warn"}`}>{g.urgent ? "urgent" : "check"}</span>
-                <span className="muted small">{ago(i.data.at)}{g.confidence ? ` · ${g.confidence}` : ""}</span>
-                <button className="link" onClick={() => post(`/api/incidents/${i.id}/close`, {}).then(onChange)}>Close</button>
-              </div>
-              <div className="inc-what">{i.data.what}</div>
-              {g.fix ? <div className="inc-fix"><span className="muted">Fix</span> {g.fix}{g.where ? <span className="muted"> · {g.where}</span> : null}</div> : null}
-            </li>
-          );
-        })}
-        {!items.length && <li className="empty">Nothing unusual: the market looks like the baseline.</li>}
-      </ul>
-    </>
-  );
-}
-
-export function BoardPane({ board, team, children }: { board: Board | null; team: string; children?: React.ReactNode }) {
+export function BoardPane({ board, team }: { board: Board | null; team: string }) {
   const ranking = board?.public.ranking ?? [];
   const mine = board?.me.requests ?? [];
   return (
@@ -116,7 +91,6 @@ export function BoardPane({ board, team, children }: { board: Board | null; team
         ))}
         {!mine.length && <li className="empty">Verdicts appear after the first rounds.</li>}
       </ul>
-      {children}
     </aside>
   );
 }
