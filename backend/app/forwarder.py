@@ -627,11 +627,35 @@ class Forwarder:
         now = {"rules": public.get("rules"), "frozen_at": public.get("frozen_at") or me.get("frozen_at"),
                "points": points, "kinds": sorted({k for p in points.values() for k in p}),
                "reasons": sorted({str(r["reason"]) for r in reqs if r.get("reason")}
-                                 | set((before or {}).get("reasons", [])))}
+                                 | set((before or {}).get("reasons", []))),
+               "fields": sorted({f"{part}.{k}" for part, rows in (("requests", reqs), ("rounds", public.get("rounds")),
+                                                                  ("ranking", public.get("ranking")))
+                                 for r in rows or [] if isinstance(r, dict) for k in r}
+                                | set((before or {}).get("fields", []))),
+               "multipliers": dict((before or {}).get("multipliers", {}))}
+        # Sun 00:27, 5U: from round 84 a round that only one, two or three teams get right pays them a multiple of
+        # accuracy, time and cost, the more the fewer they are. Such a round is worth several: when we lost it, it
+        # is the first one to read. The field's name is not in the spec, so any field named like a multiplier counts.
+        mine = {str(r.get("round_no")): r for r in reqs}
+        multiplied = []
+        for r in list(public.get("rounds") or []) + reqs:
+            n = str(r.get("round_no"))
+            for k, v in r.items():
+                if "multipl" in k.lower() and v not in (None, 1, 1.0, "1", "1.0", "x1") and n not in now["multipliers"]:
+                    now["multipliers"][n] = v
+                    multiplied.append((n, v, r.get("accepted"), mine.get(n, {})))
         store.kv_set("board_scoring", json.dumps(now))
         if before is None:  # the first look after this code starts is the baseline: nothing changed yet
             return
+        for n, v, accepted, r in multiplied:
+            won = r.get("verdict") == "accepted"
+            store.log("watcher", "info" if won else "error",
+                      f"scoring: round {n} pays a multiple ({v})" + (f", {accepted} teams accepted" if accepted is not None
+                                                                     else "")
+                      + f"; ours: {r.get('verdict') or 'not seen yet'} {r.get('reason') or ''}".rstrip(), r)
         said = []
+        if set(now["fields"]) - set(before.get("fields", now["fields"])):
+            said.append(f"new field on the board: {', '.join(sorted(set(now['fields']) - set(before['fields'])))}")
         if now["rules"] != before["rules"]:
             said.append(f"5U changed the board rules: {before['rules']} -> {now['rules']}")
         if now["frozen_at"] and not before["frozen_at"]:
