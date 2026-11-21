@@ -13,7 +13,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from . import docs, llm, store, tools
+from . import language, docs, llm, store, tools
 from .config import settings
 
 SPINNING = 10
@@ -146,8 +146,10 @@ def _text(out: list[dict]) -> str:
 
 
 def _mail_event(fw: Any, m: dict) -> str:
+    lang = language.language_of(m["body"])  # a fact for the agent, not a rule: it still writes the mail
     text = (f"New mail in this thread: id {m['id']}, from {m['sender']}, at {m['received_at']}\n"
-            f"Subject: {m['subject']}\n\n{m['body']}")
+            + (f"Their own words are in {lang}.\n" if lang else "")
+            + f"Subject: {m['subject']}\n\n{m['body']}")
     for a in m.get("attachments") or []:
         try:
             text += f"\n\n[attachment {a.get('filename')}]\n" + docs.text(

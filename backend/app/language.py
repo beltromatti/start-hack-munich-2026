@@ -134,11 +134,42 @@ _TIME = (r"(?:lead|pickup|pick-up|collection|transit)\s*time\s*[:\-]?\s*(?:is\s*
          r"(?:collection|pickup|collect(?:ed)?)\s*in\s*(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|days?)\b")
 
 
+_WORDS = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen "
+                                       "fourteen fifteen sixteen seventeen eighteen nineteen".split())}
+_WORDS.update({"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70})
+
+
+def _digits(text: str) -> str:
+    """Small numbers said in words as digits ('seven hours', 'twenty-four hours'), for reading times."""
+    def one(m: re.Match) -> str:
+        parts = re.split(r"[-\s]+", m.group(0).lower())
+        return str(sum(_WORDS[x] for x in parts))
+    names = "|".join(sorted(_WORDS, key=len, reverse=True))
+    return re.sub(rf"\b(?:{names})(?:[-\s]+(?:{names}))?\b(?=\s+(?:hours?|hrs?|days?)\b)", one, text or "", flags=re.I)
+
+
+EN = set("the and please could you your our is are for with we to of a an this that would be will".split())
+DE = set("der die das und bitte wir ist sind für mit sie ihr ihre zu von ein eine den dem uns unser können".split())
+
+
+def language_of(text: str) -> str | None:
+    """The language a mail's own words are in, when it is clear (English or German), counted by code: a German
+    company writing in English writes English (rounds 29, 49, 69 were answered in German). None when unclear."""
+    words = re.findall(r"[a-zäöüß]+", (text or "").lower())
+    en, de = sum(w in EN for w in words), sum(w in DE for w in words)
+    if en >= 4 and en >= 3 * de:
+        return "English"
+    if de >= 4 and de >= 3 * en:
+        return "German"
+    return None
+
+
 def time_in(text: str) -> Decimal | None:
     """A trucker's time as its mail states it, by code, when the reader missed it (round 63: three of three
     attachment offers came back without a time, and a slow trucker looked instant in the 50/50 pick)."""
+    text = _digits(text or "")
     for pattern in _TIME:
-        m = re.search(pattern, text or "", re.I)
+        m = re.search(pattern, text, re.I)
         if m:
             return days(m.group(1).replace(",", "."), m.group(2))
     return None

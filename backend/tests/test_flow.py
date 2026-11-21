@@ -642,3 +642,16 @@ def test_a_truckers_time_is_read_by_code_when_the_reader_misses_it():
     assert language.time_in("We need 12 hours from your order to the collection.") == Decimal("0.5")
     assert language.time_in("Collection in 7 hours") == Decimal("0.292")
     assert language.time_in("waiting time after the first 30 minutes, 45.00 EUR for each hour") is None
+
+
+def test_the_language_of_a_mail_and_times_said_in_words():
+    from app import language
+    from decimal import Decimal
+    en = ("Hello, I am on the road today, so I recorded our quotation request as a voice message. Please listen to "
+          "the attached recording. Please reply by mail with your all-in price in EUR.\\n\\nBest greetings from "
+          "Regensburg\\nTobias Auer\\nVersand / Shipping\\nAuer Maschinenbau GmbH")
+    de = "Guten Tag, bitte senden Sie uns ein Angebot für die Sendung. Wir sind ab dem 24. bereit und die Ware ist verpackt."
+    assert language.language_of(en) == "English" and language.language_of(de) == "German"
+    assert language.language_of("Thanks!\\nViele Gruesse / Many greetings") is None
+    assert language.time_in("We need seven hours from your order to the collection.") == Decimal("0.292")
+    assert language.time_in("Lead time twenty-four hours from order to collection") == Decimal("1")

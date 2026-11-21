@@ -182,7 +182,10 @@ def transcribe(raw: bytes, filename: str, *, run_id: str | None = None) -> str:
             f = io.BytesIO(raw)
             f.name = filename or "voice.mp3"
             t = time.time()
-            text = c.audio.transcriptions.create(model="gpt-4o-mini-transcribe", file=f).text
+            text = c.audio.transcriptions.create(  # numbers as digits: the code reads them (round 69: "seven hours")
+                model="gpt-4o-mini-transcribe", file=f,
+                prompt="Write every number as digits: amounts like 340.60 euros, weights like 1410 kilos, times like "
+                       "7 hours, postcodes like 51252, dates like 24 November.").text
             store.log("docs", "llm", f"gpt-4o-mini-transcribe [transcribe] {time.time() - t:.1f}s DIRECT, not gateway",
                       {"chars": len(text)}, run_id=run_id)
             return text
