@@ -43,7 +43,8 @@ def test_agent_calls_tool_logs_steps_and_counts_tokens() -> None:
     assert fake.calls[0]["tools"][0]["function"]["parameters"]["properties"]["weight_kg"]["type"] == "number"
     kinds = [e["kind"] for e in store.events(run_id=res.run_id)]
     assert kinds == ["start", "llm", "tool", "llm", "done"]
-    assert store.usage() == {"tokens_in": 20, "tokens_out": 10, "llm_calls": 2}
+    # default model gpt-6-luna: 20 in × $0.1 + 10 out × $0.5 per 1M tokens
+    assert store.usage() == {"tokens_in": 20, "tokens_out": 10, "llm_calls": 2, "cost_usd": 7e-06}
 
 
 def test_tool_error_goes_back_to_model() -> None:

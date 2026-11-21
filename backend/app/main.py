@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import store, worker
+from .ai import budget
 from .channels.mail import adapter
 from .config import settings
 
@@ -35,7 +36,7 @@ def events(since: int = 0, run_id: str | None = None) -> list[dict]:
 
 @app.get("/api/usage")
 def usage() -> dict:
-    return store.usage()
+    return {**store.usage(), "budget": budget.status()}
 
 
 @app.get("/api/records")

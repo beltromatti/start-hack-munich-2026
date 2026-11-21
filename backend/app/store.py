@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS events (
   summary TEXT NOT NULL,
   data TEXT,                     -- JSON
   tokens_in INTEGER DEFAULT 0,
-  tokens_out INTEGER DEFAULT 0
+  tokens_out INTEGER DEFAULT 0,
+  cost_usd REAL                  -- NULL = unknown price (counted separately by the budget)
 );
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id);
 CREATE TABLE IF NOT EXISTS records (
@@ -47,17 +48,24 @@ def conn() -> sqlite3.Connection:
         if settings.db_path != ":memory:":
             Path(settings.db_path).parent.mkdir(parents=True, exist_ok=True)
         _conn = sqlite3.connect(settings.db_path, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-        _conn.executescript(SCHEMA)
+        _init(_conn)
     return _conn
 
 
 def use_connection(c: sqlite3.Connection) -> None:
     """Tests: swap in an in-memory database."""
     global _conn
+    _init(c)
+    _conn = c
+
+
+def _init(c: sqlite3.Connection) -> None:
     c.row_factory = sqlite3.Row
     c.executescript(SCHEMA)
-    _conn = c
+    cols = {r["name"] for r in c.execute("PRAGMA table_info(events)")}
+    if "cost_usd" not in cols:  # databases created before cost tracking
+        c.execute("ALTER TABLE events ADD COLUMN cost_usd REAL")
+        c.commit()
 
 
 def new_id(prefix: str = "") -> str:
@@ -65,12 +73,13 @@ def new_id(prefix: str = "") -> str:
 
 
 def log(agent: str, kind: str, summary: str, data: Any = None, run_id: str | None = None,
-        tokens_in: int = 0, tokens_out: int = 0) -> int:
+        tokens_in: int = 0, tokens_out: int = 0, cost_usd: float | None = None) -> int:
     with _lock:
         cur = conn().execute(
-            "INSERT INTO events(ts, run_id, agent, kind, summary, data, tokens_in, tokens_out) VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO events(ts, run_id, agent, kind, summary, data, tokens_in, tokens_out, cost_usd) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             (time.time(), run_id, agent, kind, summary[:500],
-             json.dumps(data, default=str) if data is not None else None, tokens_in, tokens_out),
+             json.dumps(data, default=str) if data is not None else None, tokens_in, tokens_out, cost_usd),
         )
         conn().commit()
         return int(cur.lastrowid)
@@ -91,9 +100,17 @@ def events(since_id: int = 0, run_id: str | None = None, limit: int = 300) -> li
 def usage() -> dict:
     r = conn().execute(
         "SELECT COALESCE(SUM(tokens_in),0) AS tin, COALESCE(SUM(tokens_out),0) AS tout, "
-        "COUNT(*) FILTER (WHERE kind='llm') AS calls FROM events"
+        "COUNT(*) FILTER (WHERE kind='llm') AS calls, COALESCE(SUM(cost_usd),0) AS cost FROM events"
     ).fetchone()
-    return {"tokens_in": r["tin"], "tokens_out": r["tout"], "llm_calls": r["calls"]}
+    return {"tokens_in": r["tin"], "tokens_out": r["tout"], "llm_calls": r["calls"], "cost_usd": round(r["cost"], 6)}
+
+
+def spend() -> dict:
+    r = conn().execute(
+        "SELECT COALESCE(SUM(cost_usd),0) AS cost, COUNT(*) FILTER (WHERE cost_usd IS NULL) AS unpriced "
+        "FROM events WHERE kind='llm'"
+    ).fetchone()
+    return {"cost_usd": r["cost"], "unpriced_calls": r["unpriced"]}
 
 
 def upsert(type_: str, data: dict, status: str = "new", id_: str | None = None) -> str:

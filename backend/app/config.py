@@ -15,7 +15,7 @@ class Settings:
     # Any OpenAI-compatible endpoint: OpenAI, a challenge LLM gateway, OpenRouter, a local model.
     llm_base_url: str | None = os.getenv("LLM_BASE_URL") or None
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
-    llm_model: str = os.getenv("LLM_MODEL", "gpt-4.1-mini")
+    llm_model: str = os.getenv("LLM_MODEL", "gpt-6-luna")
     db_path: str = os.getenv("DB_PATH", str(ROOT / "backend" / "data" / "hack.db"))
     # Background worker: polls the channels every N seconds when WORKER=1.
     worker: bool = os.getenv("WORKER", "0") == "1"

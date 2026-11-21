@@ -9,6 +9,8 @@ from typing import Any, Protocol
 from openai import OpenAI
 
 from . import store
+from .ai import budget
+from .ai.cost import cost_usd
 from .config import settings
 
 
@@ -40,11 +42,13 @@ def chat(messages: list[dict], *, agent: str, run_id: str | None = None, tools: 
         args["tools"] = tools
     if json_mode:
         args["response_format"] = {"type": "json_object"}
+    budget.guard()
     res = client().create(**args)
     u = getattr(res, "usage", None)
     msg = res.choices[0].message
     store.log(agent, "llm", f"{args['model']}: {_preview(msg)}", run_id=run_id,
-              tokens_in=getattr(u, "prompt_tokens", 0) or 0, tokens_out=getattr(u, "completion_tokens", 0) or 0)
+              tokens_in=getattr(u, "prompt_tokens", 0) or 0, tokens_out=getattr(u, "completion_tokens", 0) or 0,
+              cost_usd=cost_usd(args["model"], u))
     return msg
 
 

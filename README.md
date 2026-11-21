@@ -35,6 +35,7 @@ Try the loop without any API: set `WORKER=1`, drop a JSON mail into `backend/dat
 | Path | What it does |
 | --- | --- |
 | `backend/app/llm.py` | All model calls. OpenAI-compatible, so OpenAI, a challenge gateway or OpenRouter. Logs tokens per call. |
+| `backend/app/ai/` | Ported from Sempli: OpenAI/Anthropic adapters, per-stage model profiles, USD cost per call, budget stop at 90 %. |
 | `backend/app/agent.py` | Small tool-calling loop. `@tool` turns a typed function into a tool. Every step is logged. |
 | `backend/app/store.py` | SQLite: `events` (agent timeline, tokens) and `records` (generic CRM: quotes, shipments, suppliers…). |
 | `backend/app/channels/mail.py` | Mailbox interface + `FakeMail` (local files). One adapter per challenge goes here. |
@@ -42,6 +43,7 @@ Try the loop without any API: set `WORKER=1`, drop a JSON mail into `backend/dat
 | `backend/app/main.py` | API for the dashboard: `/api/events`, `/api/usage`, `/api/records`, `/api/tick`. |
 | `frontend/` | Agent console: live timeline, runs, token count. The base for the demo UI. |
 | `docs/challenges/` | The problem sets as presented, one file per challenge. |
+| `docs/sempli-crm-reuse.md` | What we can reuse from Sam's Sempli CRM. Original TS files in `reference/sempli-ai/` (private, delete before going public). |
 | `docs/transcripts/` | Raw Whisper transcripts of the talks (noisy, but complete). |
 
 ## Working together

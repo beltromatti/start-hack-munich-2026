@@ -13,6 +13,8 @@ challenge-specific: `lio.md` (1st choice), `5u.md` (2nd), `revel8.md` (3rd).
 - `backend/` Python 3.12, FastAPI, SQLite, `uv`. Entry `app/main.py`.
 - Every model call goes through `app/llm.py` (`chat`, `ask_json`). Never instantiate a model client elsewhere:
   token cost may be scored and a challenge may force its own gateway (`LLM_BASE_URL`).
+- Structured, cost-sensitive calls (extract, classify, write) use `app/ai/service.generate_structured` with a
+  stage profile from `app/ai/profiles.stage(...)`. Every call stores tokens and `cost_usd`; `LLM_BUDGET_USD` stops at 90 %.
 - Agents use `app/agent.py` (`@tool` + `run`). Tools do the work and enforce rules; the model decides.
 - Everything an agent does is logged with `store.log(...)`; the dashboard and the pitch depend on it.
 - Domain data goes into `store.upsert(type, data, status)` until a real schema is clearly needed.
