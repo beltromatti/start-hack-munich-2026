@@ -660,7 +660,11 @@ def normalise(s: dict, w: kit.World) -> dict:
     if not dest:
         missing.append("destination airport (we fly to: " + ", ".join(
             f"{c} {n.split(' / ')[0]}" for c, n in kit.DESTINATIONS.items()) + ")")
-    if kg is None:
+    odd = language.unknown_units(s.get("lots") or [])
+    if odd:  # never guessed; the agent passes the same unit under a name we know (it never converts)
+        missing.append("units we do not know: " + ", ".join(odd) + "; pass them again as kg, lb or t (weight), "
+                       "cbm, cft or l (volume), cm, mm, in or ft (dimensions), as the customer meant them")
+    elif kg is None:
         missing.append("total weight")
     cw = pricing.chargeable(kg, cbm) if kg else None
     return {"origin": origin, "destination": dest, "weight_kg": str(kg) if kg else None,

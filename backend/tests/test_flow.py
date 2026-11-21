@@ -613,3 +613,19 @@ def test_any_attachment_becomes_what_a_person_would_read():
     out = docs.text("forwarded.eml", bytes(msg))
     assert "Packing list" in out and "3 pallets, 212 kg each" in out
     assert Decimal("340.60") in amounts_in("the total is 340 euros and 60 cents")
+
+
+def test_units_are_read_however_written_and_never_guessed():
+    """'2 metric tons' read as 2 kg, or '45 cubic feet' as 45 cbm, prices a shipment 1000 or 35 times wrong."""
+    from app import language
+    from app.forwarder import normalise
+    from decimal import Decimal
+    assert language.weight_kg({"value": 2, "unit": "Metric Tons"}, 1) == 2000
+    assert language.weight_kg({"value": 100, "unit": "LBS."}, 1) == Decimal("45.359237")
+    assert round(language.volume_cbm({"value": 45, "unit": "cubic feet"}, [], 1), 3) == Decimal("1.274")
+    assert language.volume_cbm({}, [{"length": 48, "width": 40, "height": 50, "unit": "Inches", "count": 1}], 1) > 1
+    kit.load(FakeFiveU())
+    s = {"origin_airport": "FRA", "destination_airport": "ORD",
+         "lots": [{"pieces": 1, "weight": {"value": 3, "unit": "stone"}, "volume": {"value": 1, "unit": "cbm"}}]}
+    n = normalise(s, kit.world())
+    assert n["weight_kg"] is None and "weight unit 'stone'" in " ".join(n["missing"])

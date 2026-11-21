@@ -3,6 +3,7 @@
 The forwarder agent reads and writes to people itself. These are the data readers its tools use, so the agent
 sees offers and lanes, not raw prose.
 """
+import re
 from decimal import Decimal, InvalidOperation
 
 from . import llm
@@ -48,35 +49,64 @@ def to_decimal(x) -> Decimal | None:
         return None
 
 
-WEIGHT = {"kg": 1, "kgs": 1, "kilo": 1, "kilos": 1, "kilogram": 1, "kilograms": 1, "t": 1000, "ton": 1000,
-          "tons": 1000, "tonne": 1000, "tonnes": 1000, "lb": Decimal("0.45359237"), "lbs": Decimal("0.45359237"),
-          "pound": Decimal("0.45359237"), "pounds": Decimal("0.45359237"), "g": Decimal("0.001")}
-VOLUME = {"cbm": 1, "m3": 1, "m³": 1, "cubicmeter": 1, "cubicmeters": 1, "cft": Decimal("0.0283168"),
-          "ft3": Decimal("0.0283168"), "cuft": Decimal("0.0283168"), "l": Decimal("0.001"), "liter": Decimal("0.001"),
-          "liters": Decimal("0.001"), "litre": Decimal("0.001")}
-LENGTH = {"cm": Decimal("0.01"), "mm": Decimal("0.001"), "m": Decimal(1), "in": Decimal("0.0254"),
-          "inch": Decimal("0.0254"), "inches": Decimal("0.0254"), "ft": Decimal("0.3048")}
+def unit(u: str | None) -> str:
+    """A unit as written, in the form the tables use: 'KGS.', 'cu. ft', 'm³', 'Metric Tons' -> 'kgs', 'cuft', 'm3',
+    'metrictons'."""
+    return re.sub(r"[\s.^]", "", (u or "").lower()).replace("³", "3")
+
+
+_LB, _CFT = Decimal("0.45359237"), Decimal("0.0283168")
+WEIGHT = {**dict.fromkeys(("kg", "kgs", "kilo", "kilos", "kilogram", "kilograms", "kilogramme", "kilogrammes"), 1),
+          **dict.fromkeys(("t", "ton", "tons", "tonne", "tonnes", "mt", "metricton", "metrictons"), 1000),
+          **dict.fromkeys(("lb", "lbs", "pound", "pounds"), _LB),
+          **dict.fromkeys(("g", "gram", "grams", "gramme", "grammes"), Decimal("0.001"))}
+VOLUME = {**dict.fromkeys(("cbm", "m3", "cum", "cubicmeter", "cubicmeters", "cubicmetre", "cubicmetres"), 1),
+          **dict.fromkeys(("cft", "ft3", "cuft", "cubicfoot", "cubicfeet"), _CFT),
+          **dict.fromkeys(("l", "ltr", "liter", "liters", "litre", "litres"), Decimal("0.001")),
+          **dict.fromkeys(("in3", "cuin", "cubicinch", "cubicinches"), Decimal("0.000016387064"))}
+LENGTH = {**dict.fromkeys(("cm", "cms", "centimeter", "centimeters", "centimetre", "centimetres"), Decimal("0.01")),
+          **dict.fromkeys(("mm", "millimeter", "millimeters", "millimetre", "millimetres"), Decimal("0.001")),
+          **dict.fromkeys(("m", "meter", "meters", "metre", "metres"), Decimal(1)),
+          **dict.fromkeys(("in", "inch", "inches", '"'), Decimal("0.0254")),
+          **dict.fromkeys(("ft", "foot", "feet", "'"), Decimal("0.3048"))}
+
+
+def unknown_units(lots: list[dict]) -> list[str]:
+    """Units in the shipment our tables do not know. They are never guessed: a 'metric tons' read as kg, or
+    'cubic feet' as cbm, is a price wrong by a factor of 1000 or 35."""
+    out = []
+    for lot in lots or []:
+        for key, table, default in (("weight", WEIGHT, "kg"), ("volume", VOLUME, "cbm")):
+            u = ((lot.get(key) or {}).get("unit") or default)
+            if (lot.get(key) or {}).get("value") is not None and unit(u) not in table:
+                out.append(f"{key} unit '{u}'")
+        d = lot.get("dimensions") or {}
+        if d and unit(d.get("unit") or "cm") not in LENGTH:
+            out.append(f"dimension unit '{d.get('unit')}'")
+    return out
 
 
 def weight_kg(q: dict, pieces: int | None) -> Decimal | None:
     v = to_decimal((q or {}).get("value"))
-    if v is None or v <= 0:
+    f = WEIGHT.get(unit((q or {}).get("unit") or "kg"))
+    if v is None or v <= 0 or f is None:
         return None
-    v = v * Decimal(str(WEIGHT.get((q.get("unit") or "kg").lower().strip(), 1)))
+    v = v * Decimal(str(f))
     return v * pieces if q.get("per_piece") and pieces else v
 
 
 def volume_cbm(q: dict, dims: list[dict], pieces: int | None) -> Decimal | None:
     v = to_decimal((q or {}).get("value"))
-    if v is not None and v > 0:
-        v = v * Decimal(str(VOLUME.get((q.get("unit") or "cbm").lower().replace(" ", ""), 1)))
+    f = VOLUME.get(unit((q or {}).get("unit") or "cbm"))
+    if v is not None and v > 0 and f is not None:
+        v = v * Decimal(str(f))
         return v * pieces if q.get("per_piece") and pieces else v
     total = Decimal(0)
     for d in dims or []:
         l, w, h = (to_decimal(d.get(k)) for k in ("length", "width", "height"))
-        if not (l and w and h):
+        f = LENGTH.get(unit(d.get("unit") or "cm"))
+        if not (l and w and h) or f is None:
             continue
-        f = LENGTH.get((d.get("unit") or "cm").lower(), Decimal("0.01"))
         total += (l * f) * (w * f) * (h * f) * (d.get("count") or 1)
     return total or None
 
