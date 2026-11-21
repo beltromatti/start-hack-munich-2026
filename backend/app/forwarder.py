@@ -400,10 +400,23 @@ class Forwarder:
                     return rid
         return None
 
+    def with_attachments(self, m: dict) -> dict:
+        """A carrier's mail as a person reads it: the body and what its attachments say (round 63: the truckers
+        sent their prices as a PDF, a Word letter and a voice message, and a body-only reader saw no price)."""
+        parts = [m["body"] or ""]
+        for a in m.get("attachments") or []:
+            try:
+                parts.append(f"[attachment {a.get('filename')}]\n" + docs.text(a.get("filename", ""),
+                                                                           self.api.attachment(m["id"], a.get("id"))))
+            except Exception as e:
+                parts.append(f"[attachment {a.get('filename')}: could not be read: {e!r}]")
+        return {**m, "body": "\n\n".join(parts)} if len(parts) > 1 else m
+
     def on_bid(self, m: dict) -> None:
         deal_id = self.deal_for_bid(m)
         if deal_id is None:
             return
+        m = self.with_attachments(m)
         rec = store.get(deal_id)
         booked = (rec or {}).get("data", {}).get("booking") or {}
         if booked and (is_confirmation(m) or (m.get("in_reply_to") and m["in_reply_to"] == booked.get("request_mail"))):
@@ -486,6 +499,7 @@ class Forwarder:
         lane = re.search(r"\b([A-Z]{3})-([A-Z]{3})\b", m["subject"] or "")
         if not lane:
             return
+        m = self.with_attachments(m)
         for rec in store.records("deal"):
             req = rec["data"].get("request") or {}
             if (req.get("origin"), req.get("destination")) == lane.groups() and rec["status"] in ("new", "pricing"):

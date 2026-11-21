@@ -28,6 +28,11 @@ def text(filename: str, raw: bytes) -> str:
             return "\n".join(parts)
         if name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
             return f"[image attachment {filename}: not read as text]"
-        return raw.decode("utf-8", errors="replace")
+        if name.endswith((".mp3", ".wav", ".m4a", ".ogg", ".aac", ".flac")):
+            return f"[audio attachment {filename}: not read as text]"
+        text = raw.decode("utf-8", errors="replace")
+        if text.count("\ufffd") > max(8, len(text) // 50):  # binary, not text: say so instead of passing noise on
+            return f"[binary attachment {filename}: not read as text]"
+        return text
     except Exception as e:
         return f"[could not read {filename}: {e!r}]"

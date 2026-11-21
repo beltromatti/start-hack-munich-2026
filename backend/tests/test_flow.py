@@ -559,3 +559,20 @@ def test_a_reference_read_with_words_around_it_is_kept_as_its_id():
     assert clean_reference("R--Bhl2SbrPA2LipP9") == "R--Bhl2SbrPA2LipP9"  # a valid id is kept as written
     assert clean_reference("TRK-5150") == "TRK-5150" and clean_reference("Q-2026/11/0034") == "Q-2026/11/0034"
     assert clean_reference(None) is None
+
+
+def test_a_carrier_price_in_an_attachment_is_read():
+    """Round 63: the truckers answered 'You find our price offer in the attachment' (PDF, Word, a voice message).
+    The bid reader saw only the body, found no price, and the round had no pickup and no quote."""
+    from app import docs
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    files = {1: b"Price offer TRK-5779\nTotal: 165.70 EUR\nPickup time: 9 hours", 2: bytes(range(256)) * 50}
+    api.attachment = lambda mid, aid: files[aid]
+    m = {"id": 5, "sender": "elbkante-logistik@hackloop.mail", "subject": "Re: Pickup", "body": "See the attachment.",
+         "attachments": [{"id": 1, "filename": "price-offer.txt"}, {"id": 2, "filename": "voice-message.mp3"}]}
+    body = f.with_attachments(m)["body"]
+    assert "Total: 165.70 EUR" in body and "[audio attachment voice-message.mp3: not read as text]" in body
+    assert docs.text("blob.bin", bytes(range(256)) * 50).startswith("[binary attachment")
+    assert f.with_attachments({**m, "attachments": []}) == {**m, "attachments": []}
