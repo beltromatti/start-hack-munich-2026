@@ -150,7 +150,7 @@ function Options({ out }: { out: Record<string, any> }) {
   );
 }
 
-function ToolStep({ s }: { s: Extract<Step, { k: "tool" }> }) {
+function ToolStep({ s, files = [] }: { s: Extract<Step, { k: "tool" }>; files?: Attachment[] }) {
   const [open, setOpen] = useState(false);
   const { name, args, out } = s;
   const err = out && "error" in out ? String(out.error) : null;
@@ -163,6 +163,7 @@ function ToolStep({ s }: { s: Extract<Step, { k: "tool" }> }) {
           {out?.recorded_quote ? <span className="amount mono">{out.recorded_quote}</span> : null}
         </div>
         {err ? <p className="error">{err}</p> : <pre className="body">{args.body}</pre>}
+        {out?.sent && files.length ? <Attachments mailId={out.sent} files={files} /> : null}
       </div>
     );
   }
@@ -282,7 +283,7 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
             })()}
             {s.k === "said" && <div className={`said${s.system ? " system" : ""}`}><strong>{s.who}</strong> {s.text}</div>}
             {s.k === "nudge" && <div className="said system"><strong>System</strong> {s.text}</div>}
-            {s.k === "tool" && <ToolStep s={s} />}
+            {s.k === "tool" && <ToolStep s={s} files={deal.mails.find((m) => m.id === s.out?.sent)?.attachments ?? []} />}
             {s.k === "journal" && <div className="journal">{s.text}</div>}
           </li>
         ))}

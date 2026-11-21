@@ -81,11 +81,14 @@ def _pdf(filename: str, raw: bytes, run_id: str | None) -> str:
     out = []
     for i, page in enumerate(PdfReader(io.BytesIO(raw)).pages, 1):
         t = (page.extract_text() or "").strip()
-        if len(t) < 20:  # a scanned page: its text is in its pictures
+        if len(t) < 20:  # a scanned page: its text is in its pictures (pypdf needs Pillow for them)
             from . import llm
-            for img in getattr(page, "images", []) or []:
-                mime = "image/png" if img.name.lower().endswith(".png") else "image/jpeg"
-                t += f"\n[page {i}, scanned, as read]\n" + llm.look(mime, img.data, run_id=run_id)
+            try:
+                for img in page.images:
+                    mime = "image/png" if img.name.lower().endswith(".png") else "image/jpeg"
+                    t += f"\n[page {i}, scanned, as read]\n" + llm.look(mime, img.data, run_id=run_id)
+            except Exception as e:  # one page we cannot see does not cost the pages we can
+                t += f"\n[page {i}: could not read its pictures: {e!r}]"
         out.append(t)
     return "\n".join(out)
 

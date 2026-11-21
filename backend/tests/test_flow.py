@@ -699,3 +699,23 @@ def test_an_offer_asked_as_a_pdf_is_attached_with_the_options_total():
     assert text.count("408.55 EUR") == 1 and "279.50" not in text and "129.05" not in text
     assert "Lumen Air Cargo" in text and "Sternmeile Logistik" in text and "Sun 29 Nov 2026" in text
     assert "0.37 cbm" in text and "1 day in transit" in text
+
+
+def test_a_scanned_pdf_page_is_read_and_the_text_pages_are_kept():
+    """Sam, Sun 00:10: pypdf needs Pillow for the pictures of a scanned page; without it the whole pdf was lost,
+    the text pages too. A pdf of a text page and a scanned page reads as both."""
+    import io
+    from PIL import Image
+    from pypdf import PdfReader, PdfWriter
+    from app import docs
+    scan = io.BytesIO()
+    Image.new("RGB", (200, 100), "white").save(scan, "PDF")  # a page that is only a picture
+    text = docs.pdf("Offer TRK-1", ["Total for pickup to FRA: 165.70 EUR", "Pickup time: 8 hours"])
+    w = PdfWriter()
+    for src in (text, scan.getvalue()):
+        for p in PdfReader(io.BytesIO(src)).pages:
+            w.add_page(p)
+    both = io.BytesIO()
+    w.write(both)
+    out = docs.text("offer.pdf", both.getvalue())
+    assert "165.70 EUR" in out and "[page 2, scanned, as read]" in out and "could not read" not in out
