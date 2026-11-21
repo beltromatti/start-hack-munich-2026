@@ -25,6 +25,20 @@
     "billed_kg": "500",
     "rate_eur_per_kg": "1.47",
     "total_eur": "1285.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Borealis Freight Airways",
+    "airline_code": "BX",
+    "billed_kg": "420",
+    "total_eur": "1537.20",
+    "transit_days": 1,
+    "portal_total": "1537.20",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "420",
+     "volume_cbm": "2.4"
+    }
    }
   ],
   "expected_quote": {
@@ -54,6 +68,20 @@
     "billed_kg": "180",
     "rate_eur_per_kg": "2.19",
     "total_eur": "590.40"
+   },
+   {
+    "source": "portal",
+    "airline": "Polaris Air Logistics",
+    "airline_code": "PL",
+    "billed_kg": "180",
+    "total_eur": "662.40",
+    "transit_days": 6,
+    "portal_total": "662.40",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "180",
+     "volume_cbm": "0.9"
+    }
    },
    {
     "source": "sheet",
@@ -141,6 +169,32 @@
   "chargeable_kg": "299",
   "offers": [
    {
+    "source": "portal",
+    "airline": "Juniper Cargo Lines",
+    "airline_code": "JP",
+    "billed_kg": "300",
+    "total_eur": "1026.00",
+    "transit_days": 5,
+    "portal_total": "1026.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "300"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Ultraviolet Air Freight",
+    "airline_code": "UV",
+    "billed_kg": "300",
+    "total_eur": "1068.00",
+    "transit_days": 4,
+    "portal_total": "1068.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "300"
+    }
+   },
+   {
     "source": "sheet",
     "airline": "Wayzata Air Cargo",
     "transit_days": 2,
@@ -150,11 +204,11 @@
    }
   ],
   "expected_quote": {
-   "airline": "Wayzata Air Cargo",
-   "source": "sheet",
-   "total_eur": "1137.00",
+   "airline": "Juniper Cargo Lines",
+   "source": "portal",
+   "total_eur": "1026.00",
    "currency": "EUR",
-   "transit_days": 2,
+   "transit_days": 5,
    "note": null
   }
  },
@@ -173,6 +227,34 @@
   "chargeable_kg": "300.6",
   "offers": [
    {
+    "source": "portal",
+    "airline": "Ultraviolet Air Freight",
+    "airline_code": "UV",
+    "billed_kg": "300.6",
+    "total_eur": "874.74",
+    "transit_days": 6,
+    "portal_total": "874.74",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "120",
+     "volume_cbm": "1.8"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Juniper Cargo Lines",
+    "airline_code": "JP",
+    "billed_kg": "300.6",
+    "total_eur": "922.84",
+    "transit_days": 7,
+    "portal_total": "922.84",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "120",
+     "volume_cbm": "1.8"
+    }
+   },
+   {
     "source": "sheet",
     "airline": "Yellowtail Air Freight",
     "transit_days": 7,
@@ -190,11 +272,11 @@
    }
   ],
   "expected_quote": {
-   "airline": "Yellowtail Air Freight",
-   "source": "sheet",
-   "total_eur": "985.97",
+   "airline": "Ultraviolet Air Freight",
+   "source": "portal",
+   "total_eur": "874.74",
    "currency": "EUR",
-   "transit_days": 7,
+   "transit_days": 6,
    "note": null
   }
  },
@@ -219,6 +301,34 @@
     "billed_kg": "641.28",
     "rate_eur_per_kg": "1.36",
     "total_eur": "1532.66"
+   },
+   {
+    "source": "portal",
+    "airline": "Fjordline Air Cargo",
+    "airline_code": "FQ",
+    "billed_kg": "641.28",
+    "total_eur": "1635.27",
+    "transit_days": 3,
+    "portal_total": "1635.27",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "380",
+     "volume_cbm": "3.84"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Ultraviolet Air Freight",
+    "airline_code": "UV",
+    "billed_kg": "641.28",
+    "total_eur": "1680.15",
+    "transit_days": 6,
+    "portal_total": "1680.15",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "380",
+     "volume_cbm": "3.84"
+    }
    },
    {
     "source": "sheet",
@@ -260,6 +370,19 @@
     "billed_kg": "500",
     "rate_eur_per_kg": "1.66",
     "total_eur": "1220.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Tamarind Airways",
+    "airline_code": "TM",
+    "billed_kg": "500",
+    "total_eur": "1315.00",
+    "transit_days": 3,
+    "portal_total": "1315.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "500"
+    }
    },
    {
     "source": "sheet",
@@ -423,14 +546,42 @@
     "billed_kg": "367.4",
     "rate_eur_per_kg": "1.77",
     "total_eur": "1153.64"
+   },
+   {
+    "source": "portal",
+    "airline": "Tamarind Airways",
+    "airline_code": "TM",
+    "billed_kg": "367.4",
+    "total_eur": "1183.03",
+    "transit_days": 6,
+    "portal_total": "1183.03",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "360",
+     "volume_cbm": "2.2"
+    }
+   },
+   {
+    "source": "portal",
+    "airline": "Ibisair Cargo",
+    "airline_code": "IB",
+    "billed_kg": "367.4",
+    "total_eur": "1344.69",
+    "transit_days": 3,
+    "portal_total": "1344.69",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "360",
+     "volume_cbm": "2.2"
+    }
    }
   ],
   "expected_quote": {
-   "airline": "Cobalt Skylift",
-   "source": "sheet",
-   "total_eur": "859.72",
+   "airline": "Ibisair Cargo",
+   "source": "portal",
+   "total_eur": "1344.69",
    "currency": "EUR",
-   "transit_days": 4,
+   "transit_days": 3,
    "note": "airport to airport; add the cheapest trucker bid"
   }
  },
@@ -548,14 +699,28 @@
     "billed_kg": "350",
     "rate_eur_per_kg": "1.43",
     "total_eur": "1057.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Riverbend Airlines Cargo",
+    "airline_code": "RV",
+    "billed_kg": "350",
+    "total_eur": "1162.00",
+    "transit_days": 1,
+    "portal_total": "1162.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "350",
+     "volume_cbm": "1.6"
+    }
    }
   ],
   "expected_quote": {
-   "airline": "Yellowtail Air Freight",
-   "source": "sheet",
-   "total_eur": "896.00",
+   "airline": "Riverbend Airlines Cargo",
+   "source": "portal",
+   "total_eur": "1162.00",
    "currency": "EUR",
-   "transit_days": 3,
+   "transit_days": 1,
    "note": null
   }
  },
@@ -574,12 +739,40 @@
   "chargeable_kg": "210",
   "offers": [
    {
+    "source": "portal",
+    "airline": "Riverbend Airlines Cargo",
+    "airline_code": "RV",
+    "billed_kg": "210",
+    "total_eur": "735.00",
+    "transit_days": 4,
+    "portal_total": "735.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "210",
+     "volume_cbm": "1.0"
+    }
+   },
+   {
     "source": "sheet",
     "airline": "Cobalt Skylift",
     "transit_days": 3,
     "billed_kg": "210",
     "rate_eur_per_kg": "3.03",
     "total_eur": "907.20"
+   },
+   {
+    "source": "portal",
+    "airline": "Solace Air Cargo",
+    "airline_code": "SL",
+    "billed_kg": "210",
+    "total_eur": "1022.70",
+    "transit_days": 3,
+    "portal_total": "1022.70",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "210",
+     "volume_cbm": "1.0"
+    }
    },
    {
     "source": "sheet",
@@ -591,11 +784,11 @@
    }
   ],
   "expected_quote": {
-   "airline": "Cobalt Skylift",
-   "source": "sheet",
-   "total_eur": "907.20",
+   "airline": "Riverbend Airlines Cargo",
+   "source": "portal",
+   "total_eur": "735.00",
    "currency": "EUR",
-   "transit_days": 3,
+   "transit_days": 4,
    "note": null
   }
  },
@@ -629,6 +822,20 @@
     "billed_kg": "1200",
     "rate_eur_per_kg": "1.28",
     "total_eur": "3108.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Fjordline Air Cargo",
+    "airline_code": "FQ",
+    "billed_kg": "1200",
+    "total_eur": "3336.00",
+    "transit_days": 3,
+    "portal_total": "3336.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "1200",
+     "volume_cbm": "5.5"
+    }
    }
   ],
   "expected_quote": {
@@ -669,6 +876,20 @@
     "billed_kg": "190",
     "rate_eur_per_kg": "3.63",
     "total_eur": "934.80"
+   },
+   {
+    "source": "portal",
+    "airline": "Aurelia Air Cargo",
+    "airline_code": "AU",
+    "billed_kg": "190",
+    "total_eur": "995.60",
+    "transit_days": 3,
+    "portal_total": "995.60",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "190",
+     "volume_cbm": "0.9"
+    }
    }
   ],
   "expected_quote": {
@@ -698,6 +919,19 @@
     "billed_kg": "100",
     "rate_eur_per_kg": "2.92",
     "total_eur": "372.00"
+   },
+   {
+    "source": "portal",
+    "airline": "Solace Air Cargo",
+    "airline_code": "SL",
+    "billed_kg": "100",
+    "total_eur": "396.00",
+    "transit_days": 2,
+    "portal_total": "396.00",
+    "portal_currency": "EUR",
+    "asked": {
+     "weight_kg": "100"
+    }
    },
    {
     "source": "sheet",
