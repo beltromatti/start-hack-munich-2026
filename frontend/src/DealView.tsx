@@ -80,7 +80,7 @@ function Attachments({ mailId, files, read }: { mailId: number; files: Attachmen
           );
         })}
       </div>
-      {open && read?.get(open) ? <pre className="body read">{read.get(open)}</pre> : null}
+      {open && read?.get(open) ? <pre className="body read">{read.get(open)!.replace(/^\[(voice message|picture)[^\]\n]*\]\n/, "")}</pre> : null}
     </div>
   );
 }
