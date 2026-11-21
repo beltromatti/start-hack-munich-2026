@@ -64,6 +64,8 @@ class Forwarder:
         if nxt and nxt != since:
             store.kv_set("since_id", str(nxt))
         for m in store.unhandled():
+            if float(store.kv_get(f"retry_at:{m['id']}", "0") or 0) > time.time():
+                continue
             # one lane per thread: mails of the same thread are handled in order, threads in parallel
             self.submit(f"thread:{m['root']}", self.handle, m)
         for rec in store.records("rfq", "collecting"):
@@ -123,7 +125,8 @@ class Forwarder:
         except Exception:
             tries = int(store.kv_get(f"tries:{m['id']}", "0") or 0) + 1
             store.kv_set(f"tries:{m['id']}", str(tries))
-            if tries < 3:  # transient (model or network): the next tick tries again
+            if tries < 3:  # transient (model or network): try again in 5 s, then 20 s
+                store.kv_set(f"retry_at:{m['id']}", str(time.time() + (5 if tries == 1 else 20)))
                 raise
         store.mark_handled(m["id"], kind)
 
@@ -137,8 +140,11 @@ class Forwarder:
         status = rec["status"] if rec else None
         if status in ("quoted", "booking", "booked", "lost"):
             return self.follow_up(rec, m, parsed)
-        if status in ("collecting", "quoting"):
-            return  # the quote is on its way; only the first one counts
+        if status in ("collecting", "quoting", "held"):
+            return  # the quote is on its way (or a person holds it); only the first one counts
+        if status == "pricing":  # an earlier attempt stopped half way: quote with what it has, never ask twice
+            store.update(rid, lambda r: ("collecting", {**r["data"], "deadline": time.time() + 20}))
+            return
         self.start_rfq(rid, m, parsed)
 
     def start_rfq(self, rid: str, m: dict, p: dict) -> None:
@@ -299,8 +305,7 @@ class Forwarder:
                  "airline": (d.get("quote") or {}).get("air", {}).get("carrier"),
                  "transit_days": (d.get("quote") or {}).get("transit_days"),
                  "booking": d.get("booking")}
-        self.reply_customer(rid, m, language.write("reply", facts, rid, d.get("amount") if
-                                                   "price" in (p.get("notes") or "").lower() else None))
+        self.reply_customer(rid, m, language.write("reply", facts, rid, d.get("amount")))
 
     # ---- booking -------------------------------------------------------------------------------------------
 

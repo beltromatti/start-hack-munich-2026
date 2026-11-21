@@ -74,22 +74,26 @@ def write(kind: str, facts: dict, run_id: str, amount: str | None = None) -> str
     """A mail body in the persona's voice. Checked in code: the amount appears exactly once and no other
     amount of money appears. If the model breaks that twice, a plain template is used instead."""
     system = llm.prompt("write").format(persona=settings.persona, company=settings.company)
-    user = f"kind: {kind}\namount: {amount or 'none'}\nfacts: {facts}"
+    note = "" if kind == "quote" else " (mention it only if it helps the answer)"
+    user = f"kind: {kind}\namount: {amount or 'none'}{note if amount else ''}\nfacts: {facts}"
     for _ in range(2):
         try:
             body = llm.structured("write", system, user, MAIL, model=settings.model_write, run_id=run_id,
                                   agent="writer")["body"].strip()
         except RuntimeError:
             break
-        if money_ok(body, amount):
+        if money_ok(body, amount, required=kind == "quote"):
             return body
     return template(kind, facts, amount)
 
 
-def money_ok(body: str, amount: str | None) -> bool:
+def money_ok(body: str, amount: str | None, required: bool = True) -> bool:
+    """A quote carries the amount exactly once and no other; other mails may repeat our amount once, nothing else."""
     found = MONEY.findall(body)
     if amount is None:
         return not found
+    if not required and not found:
+        return True
     return body.count(amount) == 1 and len(found) == 1
 
 

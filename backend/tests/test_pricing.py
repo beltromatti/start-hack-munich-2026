@@ -66,3 +66,10 @@ def test_pickup_city_maps_to_zone():
          "destination_airport": "JFK", "preference": "cheapest"}
     r = normalise(p, kit.world())
     assert r["pickup_zone"] == "64" and r["origin"] == "FRA" and not r["missing"]
+
+
+def test_money_check_other_kinds():
+    assert language.money_ok("Booked, all good.", "900.00 EUR", required=False)
+    assert language.money_ok("Your 900.00 EUR quote is booked.", "900.00 EUR", required=False)
+    assert not language.money_ok("Booked for 950.00 EUR.", "900.00 EUR", required=False)
+    assert not language.money_ok("All good.", "900.00 EUR", required=True)
