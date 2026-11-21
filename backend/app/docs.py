@@ -243,6 +243,12 @@ def _runs(filename: str, raw: bytes) -> str:
 def _plain(filename: str, raw: bytes) -> str:
     """Text as it was written: UTF-8, UTF-16 (with its mark, as Windows writes it) or Windows' western encoding."""
     encodings = (("utf-16",) if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else ()) + ("utf-8-sig", "cp1252", "latin-1")
+    head = raw[:400]  # two bytes a character without the mark that says so (a Windows export): every other byte is 0
+    if len(head) >= 8 and raw[:2] not in (b"\xff\xfe", b"\xfe\xff"):
+        if head[1::2].count(0) > len(head) * 0.4 and head[0::2].count(0) < len(head) * 0.05:
+            encodings = ("utf-16-le",) + encodings
+        elif head[0::2].count(0) > len(head) * 0.4 and head[1::2].count(0) < len(head) * 0.05:
+            encodings = ("utf-16-be",) + encodings
     t = ""
     for enc in encodings:
         try:

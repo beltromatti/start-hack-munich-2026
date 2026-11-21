@@ -937,3 +937,27 @@ def test_a_carriers_price_counts_where_it_is_written_and_a_portal_gap_is_asked_b
     asked = set(d["asked"].values())
     portal_airlines = {kit.world().carrier_by_name(a["name"]).email for a in kit.world().portal[("CGN", "DEL")]}
     assert portal_airlines <= asked                                    # each was asked by mail for what the portal missed
+
+
+def test_dates_units_and_text_files_as_people_write_them():
+    """A date in German, French, Italian or Spanish, or with an ordinal, was not a date: the ready date fell back to
+    today and the dates in the quote were wrong. cm³ and dm³ were unknown units (no price, a question instead). A
+    csv saved as UTF-16 without its mark came back as "binary attachment". (ergebnis_8_kanten.md, cases 13, 15, 22)"""
+    from datetime import date, timedelta
+    from decimal import Decimal
+    from app import docs, language
+    from app.forwarder import _day
+    assert [_day(t) for t in ("1. Dezember 2026", "December 1st, 2026", "le 1 décembre 2026", "il 1 dicembre 2026",
+                              "1 de diciembre de 2026", "1 Dec 2026", "01.12.2026", "01.12.26")] == ["2026-12-01"] * 8
+    today = date.today()
+    monday = (today + timedelta(days=(0 - today.weekday() - 1) % 7 + 1)).isoformat()
+    assert _day("Montag") == monday == _day("lundi") == _day("Monday") and _day("morgen") == _day("tomorrow")
+    assert _day("KW 48") is None and _day("whenever") is None                 # not guessed: it stays the customer's words
+    lots = [{"pieces": 2, "weight": {"value": 25, "unit": "kg", "per_piece": True},
+             "volume": {"value": 500000, "unit": "cm³", "per_piece": True}}]
+    assert language.unknown_units(lots) == [] and language.volume_cbm(lots[0]["volume"], [], 2) == Decimal("1.000000")
+    assert language.volume_cbm({"value": 1000, "unit": "dm³", "per_piece": False}, [], 1) == 1
+    assert language.unit("Kubikmeter") in language.VOLUME and language.unit("mètres cubes") in language.VOLUME
+    wide = "Gross weight kg;320\nVolume cbm;1,5\nDestination;São Paulo".encode("utf-16-le")
+    assert docs.text("details.csv", wide) == "Gross weight kg;320\nVolume cbm;1,5\nDestination;São Paulo"
+    assert docs.text("details.csv", b"Gross weight kg;320\nVolume cbm;1,5") == "Gross weight kg;320\nVolume cbm;1,5"
