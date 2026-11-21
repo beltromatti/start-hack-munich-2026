@@ -193,7 +193,7 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
           <button role="tab" aria-selected={mode === "agent"} onClick={() => setMode("agent")}>Tell the agent</button>
           <button role="tab" aria-selected={mode === "customer"} onClick={() => setMode("customer")}>Reply to the customer</button>
         </div>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={text.includes("\n") ? 4 : 2}
           placeholder={mode === "agent" ? "An instruction for this deal: it is followed, and wins over earlier decisions." : "Your own mail to the customer, sent in this thread."}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); }} />
         <div className="composer-foot">

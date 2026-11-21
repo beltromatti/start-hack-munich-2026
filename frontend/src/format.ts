@@ -11,7 +11,7 @@ export function ago(ts: number | string | null | undefined): string {
 export function clock(ts: number | string | null | undefined): string {
   if (ts == null) return "";
   const t = typeof ts === "number" ? new Date(ts * 1000) : new Date(ts);
-  return t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return t.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 export function usd(x: number | null | undefined, digits = 4): string {

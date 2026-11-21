@@ -3,10 +3,13 @@
 Run: uv run uvicorn app.main:app --port 8000   (make api / make live)
 """
 import json
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import agent, anomaly, store
 from .config import settings
@@ -156,3 +159,10 @@ def incidents(status: str = "open") -> list[dict]:
 def close_incident(incident_id: str) -> dict:
     anomaly.close(incident_id)
     return {"ok": True}
+
+
+# Last: the UI mount at "/" would shadow any route added after it.
+# The sessions UI, built (frontend/dist): served by the same process on a server (Docker), so one port is enough.
+_dist = Path(os.getenv("FRONTEND_DIST", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
+if _dist.is_dir():
+    app.mount("/", StaticFiles(directory=_dist, html=True), name="ui")

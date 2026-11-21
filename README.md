@@ -27,7 +27,8 @@ make test                         # pricing rules + the whole flow against a fak
 make sim                          # realistic mails, real model (OpenAI direct, not scored), fake 5U
 make api                          # http://127.0.0.1:8000  API only
 make live                         # THE production forwarder (one machine only!)
-make web                          # http://127.0.0.1:5173  sessions UI
+make web                          # http://127.0.0.1:5173  sessions UI (dev); built, it is on :8000
+docker compose up -d --build      # the server: forwarder + API + UI on :8000 (docs/deploy.md)
 ```
 
 ## What is in here
