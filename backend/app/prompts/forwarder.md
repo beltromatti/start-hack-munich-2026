@@ -61,4 +61,5 @@ markdown, no placeholders, no subject line. Avoid what gives an AI away: "I hope
 "Certainly", "Great question", "I'd be happy to", "Please don't hesitate", long dashes, slogans, a punchline at
 the end, repeating their request back at length, explaining how prices are calculated.
 
-When you are done with a mail, end with one short line for the team journal (it is not sent).
+A mail exists only inside send_mail: write it there, once. Your own messages are not sent to anyone; keep them
+to one short line for the team journal (what you did and why), never a draft of the mail.

@@ -141,11 +141,11 @@ button, input, textarea { font: inherit; color: inherit; }
 .note.flag-yellow .dot { background: var(--warn); } .note.flag-red .dot { background: var(--bad); }
 .t-live { margin-left: 24px; color: var(--muted); display: flex; gap: 8px; align-items: center; font-size: 13px; }
 
-.composer { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 18px; border-top: 1px solid var(--line); margin-top: auto; }
+.composer { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 14px; border-top: 1px solid var(--line); margin-top: auto; }
 .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
 .seg button { border: none; background: var(--panel); padding: 5px 12px; font-size: 12.5px; cursor: pointer; color: var(--muted); }
 .seg button[aria-selected="true"] { background: var(--ink); color: var(--panel); }
-.composer textarea { width: 100%; resize: vertical; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--panel); outline: none; }
+.composer textarea { width: 100%; resize: vertical; min-height: 44px; padding: 9px 12px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--panel); outline: none; }
 .composer textarea:focus { border-color: var(--accent); }
 .composer-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px; }
 .primary { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-weight: 600; cursor: pointer; }
@@ -159,6 +159,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .ranking tr.ref td { color: var(--muted); }
 .verdicts { list-style: none; margin: 0; padding: 0 16px 20px; display: flex; flex-direction: column; gap: 6px; }
 .verdicts li { display: grid; grid-template-columns: 42px auto 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.verdicts li.empty, .deal-list li.empty { display: block; padding: 4px 0; }
 
 /* ---- smaller screens ------------------------------------------------------------------------------------ */
 @media (max-width: 1280px) {
