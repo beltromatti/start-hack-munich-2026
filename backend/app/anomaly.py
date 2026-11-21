@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 from app import kit, llm, store
+from app.config import settings
 
 OPS_MODEL = os.getenv("OPS_MODEL", "gpt-5.5")
 SLOW_S = 75  # baseline: about 30 s after our mail
@@ -153,7 +154,12 @@ def diagnose(s: dict) -> dict:
         "where": {"type": "string", "description": "file, prompt, config, or 'ask 5U'"},
         "urgent": {"type": "boolean", "description": "true if quotes fail or lose points until fixed"},
     })
-    c = llm.direct() or llm.client()
+    # production (gateway target): only OpenAI directly. Without a direct key the diagnosis is skipped, never
+    # sent through the gateway, whose spend 5U scores. Dev (LLM_TARGET=openai): client() is OpenAI already.
+    c = llm.direct() if settings.llm_base_url else llm.client()
+    if c is None:
+        store.log("ops", "info", "diagnosis skipped: no OPENAI_API_KEY (never on the scored gateway)", run_id="ops")
+        return {"skipped": "no OPENAI_API_KEY for an off-gateway call"}
     t = time.time()
     try:
         res = c.chat.completions.create(
@@ -179,8 +185,10 @@ def check(diagnose_new: bool = True) -> list[dict]:
     since = time.time() - WINDOW_S
     mails = [m for m in store.mails(500) if (_ts(m.get("received_at")) or time.time()) >= since]
     events = [e for e in store.events(limit=500) if e["ts"] >= since]
-    deals = [d for d in store.records("deal", limit=300) if d["updated_at"] >= since]
-    found = signals(mails, events, board, deals)
+    deals = store.records("deal", limit=300)  # all: a carrier's price history is the shock's baseline
+    recent = {d["id"] for d in deals if d["updated_at"] >= since}
+    found = [s for s in signals(mails, events, board, deals)
+             if not s["key"].startswith("price:") or any(e["deal"] in recent for e in s["evidence"])]
     opened = []
     for s in found:
         rid = "incident-" + re.sub(r"[^\w-]+", "-", s["key"])[:80]

@@ -74,3 +74,13 @@ def test_check_opens_once_and_reopens_on_new_evidence():
                      "in_reply_to": 1, "references": [1], "received_at": "2026-11-21T15:00:40+00:00"}, "in")
     assert [i["id"] for i in anomaly.check(diagnose_new=False)] == ["incident-currency-USD"]
     assert "Total USD 900.00" in anomaly.brief(store.records("incident", "open"))
+
+
+def test_diagnosis_never_goes_through_the_scored_gateway(monkeypatch):
+    """Production without a direct OpenAI key: the diagnosis is skipped, the gateway client is never touched."""
+    from dataclasses import replace
+    from app import llm
+    monkeypatch.setattr(anomaly, "settings", replace(anomaly.settings, llm_base_url="https://gateway.example/v1"))
+    monkeypatch.setattr(llm, "direct", lambda: None)
+    monkeypatch.setattr(llm, "client", lambda: (_ for _ in ()).throw(AssertionError("gateway used")))
+    assert "skipped" in anomaly.diagnose({"key": "x", "change": "7", "what": "y", "evidence": []})
