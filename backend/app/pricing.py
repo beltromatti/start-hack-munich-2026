@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
+from .config import settings
+
 KG_PER_CBM = Decimal("167")
 CENT = Decimal("0.01")
 
@@ -77,18 +79,35 @@ class Offer:
                      d.get("extra") or {})
 
 
-def pick(offers: list[Offer], preference: str) -> Offer | None:
+def pick(offers: list[Offer], preference: str, balance: str | None = None) -> Offer | None:
     """cheapest: lowest total, then fastest. fastest: fewest days, then cheapest.
-    Otherwise the most balanced: price and speed weigh 50/50, each relative to the best on offer."""
+    Anything else: the most balanced, price and speed weigh 50/50 (see `balanced`)."""
     if not offers:
         return None
     if preference == "cheapest":
         return min(offers, key=lambda o: (o.total, o.days))
     if preference == "fastest":
         return min(offers, key=lambda o: (o.days, o.total))
-    p0 = min(o.total for o in offers) or Decimal(1)
-    d0 = min(o.days for o in offers) or Decimal("0.1")
-    return min(offers, key=lambda o: (o.total / p0 + o.days / d0, o.total))
+    return balanced(offers, balance or settings.balance_rule)
+
+
+def balanced(offers: list[Offer], rule: str = "ratio") -> Offer:
+    """Price and speed 50/50. The brief does not say how the two are made comparable, and the rules disagree:
+    ratio   each relative to the best on offer (total / lowest + days / fewest). Speed dominates when one
+            offer is much faster (3 h against 26 h), so it mostly picks the fastest.
+    minmax  each scaled 0..1 between the best and the worst on offer. Picks a middle offer when there is one;
+            cheapest and fastest tie at 0.5, the tie goes to the cheaper."""
+    p_lo, p_hi = min(o.total for o in offers), max(o.total for o in offers)
+    d_lo, d_hi = min(o.days for o in offers), max(o.days for o in offers)
+    if rule == "minmax":
+        def score(o: Offer) -> Decimal:
+            p = (o.total - p_lo) / (p_hi - p_lo) if p_hi > p_lo else Decimal(0)
+            d = (o.days - d_lo) / (d_hi - d_lo) if d_hi > d_lo else Decimal(0)
+            return p + d
+    else:
+        def score(o: Offer) -> Decimal:
+            return o.total / (p_lo or Decimal(1)) + o.days / (d_lo or Decimal("0.1"))
+    return min(offers, key=lambda o: (score(o), o.total))
 
 
 def best_by_carrier(offers: list[Offer]) -> list[Offer]:
@@ -106,14 +125,24 @@ def best_by_carrier(offers: list[Offer]) -> list[Offer]:
     return list(best.values())
 
 
-def quote(air: list[Offer], pickup: list[Offer], preference: str, needs_pickup: bool) -> dict | None:
-    """The one option we offer: best air leg (+ best pickup leg for door-to-port). None if it can't be priced."""
-    a = pick(best_by_carrier(air), preference)
+def quote(air: list[Offer], pickup: list[Offer], preference: str, needs_pickup: bool,
+          pickup_rule: str | None = None, balance: str | None = None, unspecified: str | None = None) -> dict | None:
+    """The one option we offer: best air leg (+ best pickup leg for door-to-port). None if it can't be priced.
+
+    pickup_rule  which trucker goes into the all-in total: `asked` (cheapest, or the fastest when the customer
+                 asked for fastest), `cheapest` (always) or `balanced` (always the 50/50 pick).
+    unspecified  what a request without "cheapest" or "fastest" gets: `balanced`, `cheapest` or `fastest`."""
+    pickup_rule, balance = pickup_rule or settings.pickup_rule, balance or settings.balance_rule
+    if preference not in ("cheapest", "fastest"):
+        preference = unspecified or settings.unspecified_rule
+    a = pick(best_by_carrier(air), preference, balance)
     if a is None:
         return None
     p = None
     if needs_pickup:
-        p = pick(best_by_carrier(pickup), "fastest" if preference == "fastest" else "cheapest")
+        how = {"asked": "fastest" if preference == "fastest" else "cheapest", "cheapest": "cheapest"}.get(
+            pickup_rule, "balanced")
+        p = pick(best_by_carrier(pickup), how, balance)
         if p is None:
             return None
     total = money(a.total + (p.total if p else 0))

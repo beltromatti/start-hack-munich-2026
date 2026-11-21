@@ -81,3 +81,45 @@ def test_live_bid_beats_stale_sheet():
     only_sheet = Offer("air", "Orion Cargo Air", D(900), D(2), "sheet")
     best = {o.carrier: o for o in pricing.best_by_carrier([sheet, mail, only_sheet])}
     assert best["Yellowtail Air Freight"].total == 850 and best["Orion Cargo Air"].total == 900
+
+
+# ---- pick rules (docs/research/pricing.md) -------------------------------------------------------------------
+
+def zone_60():
+    # live trucker bids, zone 60 -> FRA, Sat 21 Nov 14:10 UTC (mails 164-168): price EUR, pickup hours
+    bids = [("Bodenseefracht", "88.60", 26), ("Westfalenroute", "96.80", 23), ("Isarwelle Spedition", "129.80", 16),
+            ("Domblick Kurierdienst", "151.60", 15), ("Taunusfracht", "177.40", 3)]
+    return [Offer("pickup", n, D(p), (D(h) / 24).quantize(D("0.001")), "email") for n, p, h in bids]
+
+
+def test_balance_rules_disagree_on_live_trucker_bids():
+    assert pricing.balanced(zone_60(), "ratio").carrier == "Taunusfracht"      # the fastest: 3 h outweighs 2x price
+    assert pricing.balanced(zone_60(), "minmax").carrier == "Westfalenroute"   # 0.48: neither cheapest nor fastest
+
+
+def test_minmax_with_two_offers_takes_the_cheaper():
+    two = [Offer("pickup", "A", D(100), D(1), "email"), Offer("pickup", "B", D(150), D("0.2"), "email")]
+    assert pricing.balanced(two, "minmax").carrier == "A"
+    assert pricing.balanced([two[0]], "minmax").carrier == "A"
+
+
+def test_pickup_rule_decides_the_all_in_total():
+    air = [Offer("air", "Slow", D(700), D(5), "sheet"), Offer("air", "Fast", D(900), D(2), "sheet")]
+    q = lambda pref, **kw: pricing.quote(air, zone_60(), pref, True, **kw)
+    # defaults (behaviour so far): the trucker follows what the customer asked for
+    assert q("cheapest")["total"] == "788.60" and q("cheapest")["pickup"]["carrier"] == "Bodenseefracht"
+    assert q("fastest")["total"] == "1077.40" and q("fastest")["pickup"]["carrier"] == "Taunusfracht"
+    # the fastest trucker costs 88.80 more than the cheapest: 9.0 % on this total, outside the 5 % band
+    assert q("fastest", pickup_rule="cheapest")["total"] == "988.60"
+    assert q("fastest", pickup_rule="balanced", balance="minmax")["total"] == "996.80"
+    assert q("cheapest", pickup_rule="balanced", balance="minmax")["total"] == "796.80"
+    assert q("cheapest", pickup_rule="balanced", balance="minmax")["air"]["carrier"] == "Slow"
+
+
+def test_request_without_preference_follows_the_switch():
+    air = [Offer("air", "Slow", D(700), D(5), "sheet"), Offer("air", "Mid", D(720), D(4), "sheet"),
+           Offer("air", "Fast", D(900), D(2), "sheet")]
+    q = lambda **kw: pricing.quote(air, [], "unspecified", False, **kw)["air"]["carrier"]
+    assert q() == "Fast"                                   # default so far: ratio balance, speed dominates
+    assert q(unspecified="cheapest") == "Slow"
+    assert q(balance="minmax") == "Mid"                    # 0.05 + 0.33 beats 0 + 1 and 1 + 0

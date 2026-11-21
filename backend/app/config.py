@@ -33,6 +33,12 @@ class Settings:
     poll_seconds: float = float(os.getenv("POLL_SECONDS", "1.5"))
     # How long we wait for carrier and trucker replies before quoting with what we have.
     bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "85"))
+    # How 5U scores the pick is only half documented ("price and speed weigh 50/50"). These three switches let
+    # production follow what /v1/board/me shows, with a restart instead of new code. Defaults = behaviour so far.
+    # See docs/research/pricing.md.
+    pickup_rule: str = os.getenv("PICKUP_RULE", "asked")              # asked | cheapest | balanced
+    balance_rule: str = os.getenv("BALANCE_RULE", "ratio")            # ratio | minmax
+    unspecified_rule: str = os.getenv("UNSPECIFIED_RULE", "balanced")  # balanced | cheapest | fastest
     persona: str = os.getenv("PERSONA_NAME", "Giulia")
     company: str = os.getenv("COMPANY_NAME", "START Milan Forwarding")
 
