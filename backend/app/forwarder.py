@@ -34,7 +34,7 @@ class Forwarder:
         self.inflight: set[str] = set()
         self.lock = threading.Lock()
         self.stop = threading.Event()
-        self.fx_eur_per_usd: Decimal | None = None
+        self.fx: dict[str, Decimal] = {}  # EUR per 1 unit of a currency, as last stated with a price
         self._last_portal = time.time()
         self._last_board = 0.0
 
@@ -404,7 +404,7 @@ class Forwarder:
     def offer(self, o: dict, m: dict, carrier: kit.Carrier | None) -> Offer | None:
         if not o.get("available") or o.get("total") is None:
             return None
-        total = self.eur(Decimal(str(o["total"])), o.get("currency") or "EUR", None)
+        total = self.eur(Decimal(str(o["total"])), o.get("currency") or "EUR", o.get("fx_eur_per_unit"))
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
@@ -434,14 +434,22 @@ class Forwarder:
                     "offers": r["data"]["offers"] + [o.as_dict() for o in offers]}))
 
     def eur(self, amount: Decimal, currency: str, fx: Any) -> Decimal | None:
+        """Any price in EUR. A rate stated with a price (portal `fx_eur_per_usd`: EUR per 1 unit of the price's
+        currency, whatever that currency is) is remembered per currency and stands in when a later price in
+        that currency states none."""
         cur = (currency or "EUR").upper()
-        if fx:
-            self.fx_eur_per_usd = Decimal(str(fx))
         if cur == "EUR":
             return pricing.money(amount)
-        if cur == "USD" and self.fx_eur_per_usd:
-            return pricing.money(amount * self.fx_eur_per_usd)
-        store.log("bids", "error", f"cannot convert {amount} {cur} to EUR")
+        try:
+            rate = Decimal(str(fx)) if fx else None
+        except ArithmeticError:
+            rate = None
+        if rate and rate > 0:
+            self.fx[cur] = rate
+        rate = self.fx.get(cur)
+        if rate:
+            return pricing.money(amount * rate)
+        store.log("bids", "error", f"cannot convert {amount} {cur} to EUR: no exchange rate seen for {cur}")
         return None
 
     # ---- tracking ------------------------------------------------------------------------------------------

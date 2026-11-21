@@ -5,6 +5,8 @@ list every offer in it as JSON. Copy numbers exactly as written; never compute o
   is an entry with available false (and its email address in note, if given).
 - total: the all-in amount for the whole shipment as written, with its currency code (EUR, USD, ...).
   If the mail gives only a rate per kg or lists charges separately without a total, put them in note and total null.
+- fx_eur_per_unit: only when the price is not in EUR and the mail states an exchange rate: EUR per 1 unit of that
+  currency, exactly as written (e.g. "1 USD = 0.92 EUR" -> 0.92). Otherwise null. Never convert the total yourself.
 - transit_days for airlines; pickup_hours for truckers (convert "same day", "next morning" only if a number is given).
 - reference: the rate_id / offer reference / booking reference exactly as written (e.g. R-abc123, TRK-49).
 - valid_until: as written.

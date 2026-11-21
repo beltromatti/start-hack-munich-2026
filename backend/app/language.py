@@ -36,6 +36,7 @@ CUSTOMER = strict({
 
 BID = strict({"offers": {"type": "array", "items": strict({
     "carrier": {"type": "string"}, "airline_code": S, "available": B, "total": N, "currency": S,
+    "fx_eur_per_unit": N,
     "transit_days": N, "pickup_hours": N, "reference": S, "valid_until": S, "note": S})}})
 
 MAIL = strict({"body": {"type": "string"}})
