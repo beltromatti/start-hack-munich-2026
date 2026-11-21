@@ -83,7 +83,7 @@ export function BoardPane({ board, team }: { board: Board | null; team: string }
       <ul className="verdicts">
         {mine.map((r, i) => (
           <li key={i}>
-            <span className="mono">R{String(r.round ?? "?")}</span>
+            <span className="mono">R{String(r.round_no ?? r.round ?? "?")}</span>
             <span className={`pill ${r.verdict === "accepted" ? "ok" : r.verdict === "rejected" || r.verdict === "no answer" ? "bad" : "neutral"}`}>{String(r.verdict ?? "")}</span>
             <span className="muted small">{typeof r.reason === "string" ? r.reason : ""}</span>
             <span className="num mono">{typeof r.points === "object" && r.points ? Object.values(r.points as Record<string, number>).reduce((a, b) => a + (Number(b) || 0), 0).toFixed(1) : ""}</span>
