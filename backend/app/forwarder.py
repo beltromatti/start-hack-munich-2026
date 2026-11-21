@@ -234,7 +234,7 @@ class Forwarder:
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "options": table}))
         waiting = waiting_for(d)
         pref_key = preference if preference in ("cheapest", "fastest") else settings.unspecified_rule
-        return {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
+        result = {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
                                                  "pieces", "pickup_zone", "pickup_postcode")},
                 "options": rows, "recommended": rec.get(pref_key), "recommended_for": pref_key,
                 "recommended_by_preference": rec,
@@ -245,6 +245,12 @@ class Forwarder:
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
                                            if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
+        if not rows:  # nothing to quote: say why, with everything the carriers wrote (round 15 showed neither)
+            result["no_options_because"] = ("no trucker has priced the pickup" if needs_pickup and air
+                                            else "no airline has priced this route")
+            result["carriers_without_price"] = [{"from": c["from"], "mail": c["mail"], "says": c["text"][:300]}
+                                                for c in d.get("carrier_messages", [])][-12:]
+        return result
 
     def ask_airline(self, deal_id: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
                     req: dict) -> int:
@@ -557,6 +563,9 @@ def normalise(s: dict, w: kit.World) -> dict:
                        f"pickup postcodes start with {', '.join(sorted(w.zones))})")
     if pickup and (pickup.get("postcode") or pickup.get("city")) and not zone:
         missing.append("a pickup postcode inside our pickup zones")
+    elif zone and len(postcode) < 5:  # truckers price a collection by postcode (live round 15: a town was not enough)
+        missing.append("the pickup postcode: truckers price the collection by postcode, and a town alone (or the one "
+                       "in a signature) is not enough")
     if not dest:
         missing.append("destination airport (we fly to: " + ", ".join(
             f"{c} {n.split(' / ')[0]}" for c, n in kit.DESTINATIONS.items()) + ")")
