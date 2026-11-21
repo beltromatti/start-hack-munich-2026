@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import agent, store
+from . import agent, anomaly, store
 from .config import settings
 
 forwarder = None
@@ -138,3 +138,15 @@ def mails(limit: int = 200) -> list[dict]:
 @app.get("/api/board")
 def board() -> dict:
     return json.loads(store.kv_get("board_me") or "{}")
+
+
+@app.get("/api/incidents")
+def incidents(status: str = "open") -> list[dict]:
+    """Market changes the anomaly watch found, each with its evidence and the reasoning model's diagnosis."""
+    return store.records("incident", status)
+
+
+@app.post("/api/incidents/{incident_id}/close")
+def close_incident(incident_id: str) -> dict:
+    anomaly.close(incident_id)
+    return {"ok": True}

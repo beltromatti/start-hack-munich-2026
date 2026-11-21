@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Any, Callable
 
-from . import agent, docs, kit, language, pricing, store
+from . import agent, anomaly, docs, kit, language, pricing, store
 from .config import settings
 from .pricing import Offer
 
@@ -466,6 +466,7 @@ class Forwarder:
                 seen.add(key)
                 store.log("watcher", "info", f"round {r.get('round')}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
+        anomaly.check()  # a market change, seen before failed quotes pile up (app/anomaly.py)
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
