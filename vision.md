@@ -257,9 +257,10 @@ Then:
 
 ## 13. Open, and known limits
 
-- **Round 48's `adjustment` of -22.5** (half the accuracy points) came with no reason. That round's booking was the
-  first at +10 %, and we told the customer in a correction after a confirmation without the price. To ask 5U what
-  it is for and what they expect when the booking price is not the quoted one.
+- **The `adjustment` on rounds booked at +10 %** comes with no reason: round 49 (customer never told) -22.5, round
+  48 (told in a correction after a confirmation without the price) -22.5, then -32.5 when its tracking 10 came in;
+  round 50 (told in the confirmation) none. It looks like 5U expects the booked price in the confirmation, which is
+  what `price_changed` does now. To confirm with 5U, and to watch on the next bookings.
 - **Mailbox 429s:** 12 between 20:00 and 21:00 although we poll every 5.5 s. From 21:00 a failed poll is never
   retried early, and 429s still came (21:01, 21:03): another client polls with the team key. Each costs a few
   seconds, not a mail; whoever reads the mailbox besides production should stop or use the UI.

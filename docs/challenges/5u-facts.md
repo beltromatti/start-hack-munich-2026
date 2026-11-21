@@ -182,4 +182,7 @@ to the gap it learns from the 429; bids now arrive up to 5 s later, quotes still
 709.52 -> 780.47), and the airline's confirmation mail states the same. Round 48 then shows `adjustment: -22.5` with
 no reason (we had confirmed without the price and corrected it after the airline's mail); round 42 shows
 `adjustment: +120` (5U's correction of the excluded-airline verdict). Since 20:55 `book` recomputes the all-in total
-from the airline's price and returns `price_changed`; round 50 said it in the confirmation.
+from the airline's price and returns `price_changed`; round 50 said it in the confirmation. At 21:06: round 49
+(+10 %, customer never told) `adjustment: -22.5`; round 48 (told in a correction after the confirmation)
+`-32.5` once its tracking 10 came in (its total stayed 76.35); round 50 (told in the confirmation) closed with no
+adjustment. Saying the booked price in the confirmation looks like what 5U expects; to confirm with 5U.
