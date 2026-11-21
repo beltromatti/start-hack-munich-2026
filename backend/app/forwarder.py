@@ -188,10 +188,16 @@ class Forwarder:
                 asked[str(self.ask_trucker(deal_id, c, req))] = c.email
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked}}))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
-        for name in failed:  # portal down or over the limit for this airline: ask the airline by mail
-            c = w.carrier_by_name(name)
+        for name in failed:  # portal down or over the limit for this airline: ask the airline by mail, also at the
+            c = w.carrier_by_name(name)  # break above when it can bill cheaper there (as for every mail airline)
             if c and c.email not in asked.values():
-                asked[str(self.ask_airline(deal_id, c, o, d, cw, cbm, req))] = c.email
+                code = next((a["code"] for a in w.portal.get((o, d), []) if a["name"] == name), None)
+                breaks = w.brackets.get(code or "", [])
+                nb = pricing.next_break(breaks, cw)
+                above = ([nb] if nb is not None and nb / cw < Decimal("1.5") else []) if breaks \
+                    else pricing.breaks_to_try(cw)
+                for wt in [cw] + above:
+                    asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
         store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",

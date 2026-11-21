@@ -139,7 +139,9 @@ Regression test: `tests/test_pricing.py::test_balanced_ratio_trucker_matches_the
   divides by fewer quotes, so it lowers everyone's cost points that hour.
 - **tracking**: 10 per booked shipment asked about (once 5, round 7).
 - **humanity**: 10 on rounds 1, 4, 5, 8 (the jury's pick, per round).
-- **booking**: 0.0 on every booked round. Not in the brief: ask 5U what earns it.
+- **booking**: always 0.0, by design (5U, asked by Jan at 18:40): booking earns no points itself, but only a booked
+  shipment gets the tracking question (+10). Round 10 was accepted and never booked (the DG papers never came), so
+  it had no tracking. Nothing to change.
 
 **Round 11 (DG declared in the attachment, the mail said non-DG), explained by 5U in person:** the job runs on speed.
 When a document and the mail disagree, ask the customer to send the document again and confirm it (one question
