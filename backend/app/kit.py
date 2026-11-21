@@ -73,8 +73,18 @@ class World:
     def origins(self) -> set[str]:
         return {z["airport"] for z in self.zones.values()} | {o for o, _ in self.portal}
 
-    def sheet(self, origin: str, destination: str) -> list[dict]:
-        return [l for l in self.sheet_lanes if l["origin"] == origin and l["destination"] == destination]
+    def sheet(self, origin: str, destination: str, on: str | None = None) -> list[dict]:
+        """Each airline's lane valid on `on` (ISO day, default today); of several valid, the newest tariff."""
+        day = on or time.strftime("%Y-%m-%d")
+        best: dict[str, dict] = {}
+        for l in self.sheet_lanes:
+            if l["origin"] != origin or l["destination"] != destination:
+                continue
+            if not (l.get("valid_from") or "") <= day <= (l.get("valid_to") or "9999"):
+                continue
+            if l["airline"] not in best or (l.get("valid_from") or "") >= (best[l["airline"]].get("valid_from") or ""):
+                best[l["airline"]] = l
+        return list(best.values())
 
     def email_airlines(self, origin: str, destination: str) -> list[Carrier]:
         """Airlines not on the portal that fly to this destination: they quote by email."""
@@ -105,7 +115,10 @@ def load(api=None) -> World:
     with open(START / "pickup_zones.csv") as f:
         for row in csv.DictReader(f):
             w.zones[row["zone"].strip()] = {"area": row["area"].strip(), "airport": row["airport"].strip()}
-    w.sheet_lanes = json.load(open(KIT / "tariffs.json"))["lanes"]
+    kit_tariffs = json.load(open(KIT / "tariffs.json"))
+    rules = kit_tariffs.get("rules", {})
+    w.sheet_lanes = [{**l, "valid_from": rules.get("valid_from"), "valid_to": rules.get("valid_to")}
+                     for l in kit_tariffs["lanes"]]
     _apply_ingested(w)
     if api is not None:
         refresh_portal(api, w)
@@ -127,15 +140,22 @@ def refresh_portal(api, w: World | None = None) -> None:
     store.log("kit", "info", f"portal: {len(w.portal)} lanes, {len(w.brackets)} airlines")
 
 
-def replace_sheet(airline: str, lanes: list[dict], source: str) -> None:
-    """Tariff ingestion: an airline's new sheet replaces its old lanes."""
-    store.put(f"tariff-{airline.lower().replace(' ', '-')}", "tariff", "active",
-              {"airline": airline, "lanes": lanes, "source": source, "at": time.time()})
+def add_sheet(airline: str, lanes: list[dict], source: str, valid_from: str | None, valid_to: str | None) -> None:
+    """Tariff ingestion: an airline's new sheet joins with its validity. It wins from its first valid day; the old
+    one keeps pricing what ships before (a December tariff mailed in November does not reprice November)."""
+    valid_from = valid_from or time.strftime("%Y-%m-%d")
+    lanes = [{**l, "valid_from": valid_from, "valid_to": valid_to} for l in lanes]
+    store.put(f"tariff-{airline.lower().replace(' ', '-')}-{valid_from}", "tariff", "active",
+              {"airline": airline, "lanes": lanes, "source": source, "at": time.time(), "valid_from": valid_from,
+               "valid_to": valid_to})
     with _lock:
-        _world.sheet_lanes = [l for l in _world.sheet_lanes if l["airline"] != airline] + lanes
+        _world.sheet_lanes = [l for l in _world.sheet_lanes
+                              if not (l["airline"] == airline and l.get("valid_from") == valid_from)] + lanes
 
 
 def _apply_ingested(w: World) -> None:
     for rec in store.records("tariff", "active"):
-        airline = rec["data"]["airline"]
-        w.sheet_lanes = [l for l in w.sheet_lanes if l["airline"] != airline] + rec["data"]["lanes"]
+        d = rec["data"]
+        vf = d.get("valid_from") or d["lanes"][0].get("valid_from") if d.get("lanes") else None
+        w.sheet_lanes = [l for l in w.sheet_lanes if not (l["airline"] == d["airline"] and l.get("valid_from") == vf)] \
+            + [{**l, "valid_from": l.get("valid_from") or vf} for l in d["lanes"]]

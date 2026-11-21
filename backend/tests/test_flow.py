@@ -90,7 +90,7 @@ def test_tariff_mail_replaces_the_airlines_sheet():
     run(f, 2)
     yl = [l for l in kit.world().sheet("FRA", "ORD") if l["airline"] == "Yellowtail Air Freight"]
     assert len(yl) == 1 and yl[0]["minimum_eur"] == "99.00" and yl[0]["fuel_eur_per_kg"] == "1.00"
-    assert store.get("tariff-yellowtail-air-freight")["status"] == "active"
+    assert [r["data"]["airline"] for r in store.records("tariff", "active")] == ["Yellowtail Air Freight"]
 
 
 def test_restart_mid_turn_keeps_the_session_valid():
@@ -250,3 +250,27 @@ def test_a_quote_with_two_amounts_is_sent_and_flagged():
     out = tools.send_mail(ctx, "quote", two, "A1", None)
     assert out["recorded_quote"] == "2748.00 EUR" and len(to(api, "sam@lumen.example")) == 1
     assert any("quote mail amounts" in e["summary"] for e in store.events() if e["kind"] == "error")
+
+
+def test_a_december_tariff_does_not_reprice_november():
+    from app import kit
+    kit.load(FakeFiveU())
+    nov = [l for l in kit.world().sheet("FRA", "ORD", on="2026-11-25") if l["airline"] == "Yellowtail Air Freight"][0]
+    dec = {**nov, "rates_eur_per_kg": [str(round(float(r) * 1.2, 2)) for r in nov["rates_eur_per_kg"]]}
+    kit.add_sheet("Yellowtail Air Freight", [dec], "test", "2026-12-01", "2026-12-31")
+    on_nov = [l for l in kit.world().sheet("FRA", "ORD", on="2026-11-25") if l["airline"] == "Yellowtail Air Freight"]
+    on_dec = [l for l in kit.world().sheet("FRA", "ORD", on="2026-12-03") if l["airline"] == "Yellowtail Air Freight"]
+    assert on_nov[0]["rates_eur_per_kg"] == nov["rates_eur_per_kg"]
+    assert on_dec[0]["rates_eur_per_kg"] == dec["rates_eur_per_kg"]
+
+
+def test_a_bid_quoted_per_kg_gets_its_total_from_code():
+    from app.forwarder import Forwarder
+    f = Forwarder(FakeFiveU())
+    store.kv_set("bidweight:41", "300")
+    o = {"carrier": "x", "available": True, "total": None, "currency": "EUR", "fx_eur_per_unit": None,
+         "rate_per_kg": 2.42, "minimum_charge": 110, "surcharges_per_kg": 0.77, "fixed_fees": 25, "billed_kg": None,
+         "transit_days": 4, "pickup_hours": None, "reference": "R-9", "valid_until": None, "note": None}
+    m = {"id": 42, "in_reply_to": 41, "sender": "yellowtail-air-freight@hackloop.mail"}
+    off = f.offer(o, m, kit.world().carrier_by_email(m["sender"]))
+    assert str(off.total) == "982.00"  # 300 x 2.42 + 300 x 0.77 + 25

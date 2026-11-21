@@ -6,7 +6,9 @@ list every offer in it as JSON. Copy numbers exactly as written; never compute o
   address, in note). A carrier that only asks us for more facts did not say no: available true, total null,
   what it needs in note.
 - total: the all-in amount for the whole shipment as written, with its currency code (EUR, USD, ...).
-  If the mail gives only a rate per kg or lists charges separately without a total, put them in note and total null.
+  If the mail gives no total but the parts (a rate per kg, a minimum, surcharges per kg such as fuel and security,
+  fixed fees per shipment, the weight it bills), copy each part into its field and leave total null: our code
+  adds them up. Several surcharges per kg: their sum in surcharges_per_kg; several fixed fees: their sum.
 - fx_eur_per_unit: only when the price is not in EUR and the mail states an exchange rate: EUR per 1 unit of that
   currency, exactly as written (e.g. "1 USD = 0.92 EUR" -> 0.92). Otherwise null. Never convert the total yourself.
 - transit_days for airlines; pickup_hours for truckers (convert "same day", "next morning" only if a number is given).

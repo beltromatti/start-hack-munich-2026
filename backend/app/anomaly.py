@@ -18,7 +18,10 @@ from typing import Any
 
 from app import kit, llm, store
 
-OPS_MODEL = os.getenv("OPS_MODEL", "gpt-5.5")
+# A diagnosis reads a short signal: a small reasoning model is enough, and its spend comes from the same OpenAI
+# credits the gateway uses for our quotes (10 gpt-5.5 diagnoses cost 25x our first four deals, Sat 16:19).
+OPS_MODEL = os.getenv("OPS_MODEL", "gpt-6-luna")
+OPS_EFFORT = os.getenv("OPS_EFFORT", "medium")
 SLOW_S = 75  # baseline: about 30 s after our mail
 WINDOW_S = 1800  # signals from the last 30 minutes: a change that is still happening
 Z_MIN, BASE_N, MIN_BASE, SD_FLOOR = 3.0, 10, 3, 0.02  # price shocks: own last 10 deals, at least 3
@@ -101,6 +104,8 @@ def signals(mails: list[dict], events: list[dict], board: dict | None, deals: li
         body, ev = m["body"] or "", {"mail": m["id"], "from": m["sender"], "subject": m["subject"],
                                      "body": (m["body"] or "")[:600]}
         asked = by_id.get(m.get("in_reply_to") or -1)
+        if asked and re.search(r"status|booking", asked.get("subject") or "", re.I):
+            continue  # the answer to a status or booking question is no market signal (5U airlines send their quote form)
         t_in, t_out = _ts(m.get("received_at")), _ts(asked.get("received_at")) if asked else None
         if t_in and t_out and t_in - t_out > SLOW_S:
             hit(f"slow:{m['sender']}", "8", f"{carrier.name} answered {t_in - t_out:.0f} s after our request",
@@ -157,7 +162,7 @@ def diagnose(s: dict) -> dict:
     t = time.time()
     try:
         res = c.chat.completions.create(
-            model=OPS_MODEL, reasoning_effort="high",
+            model=OPS_MODEL, reasoning_effort=OPS_EFFORT,
             messages=[{"role": "system", "content": llm.prompt("ops")},
                       {"role": "user", "content": json.dumps(s, ensure_ascii=False, default=str)}],
             response_format={"type": "json_schema", "json_schema": {"name": "diagnosis", "strict": True,

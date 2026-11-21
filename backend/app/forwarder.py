@@ -170,7 +170,7 @@ class Forwarder:
         o, d, cw = req["origin"], req["destination"], Decimal(req["chargeable_kg"])
         kg, cbm = Decimal(req["weight_kg"]), Decimal(req["volume_cbm"]) if req["volume_cbm"] else None
         offers: list[Offer] = []
-        for lane in w.sheet(o, d):  # known prices, instantly
+        for lane in w.sheet(o, d, on=_day(req.get("ready_date"))):  # known prices, valid on the ready date
             total, billed = pricing.sheet_price(lane, kg, cbm)
             offers.append(Offer("air", lane["airline"], total, Decimal(lane["transit_days"]), "sheet", None, billed))
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "request": req, "offers": [x.as_dict() for x in offers],
@@ -256,7 +256,9 @@ class Forwarder:
                 f"Ready: {req.get('ready_date') or 'now'}\n\n"
                 "Please send your all-in total, currency, transit time, rate reference and validity.\n\n"
                 f"Thanks,\n{settings.persona}, {settings.company}")
-        return self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {billed:.0f} kg", body)
+        mid = self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {billed:.0f} kg", body)
+        store.kv_set(f"bidweight:{mid}", str(billed.quantize(Decimal("1"))))
+        return mid
 
     def ask_trucker(self, deal_id: str, c: kit.Carrier, req: dict) -> int:
         z = kit.world().zones.get(req["pickup_zone"], {})
@@ -383,9 +385,12 @@ class Forwarder:
                                                         or "no price (see carrier_messages)"), run_id=deal_id)
 
     def offer(self, o: dict, m: dict, carrier: kit.Carrier | None) -> Offer | None:
-        if not o.get("available") or o.get("total") is None:
+        if not o.get("available"):
             return None
-        total = self.eur(Decimal(str(o["total"])), o.get("currency") or "EUR", o.get("fx_eur_per_unit"))
+        amount = Decimal(str(o["total"])) if o.get("total") is not None else self.total_from_parts(o, m)
+        if amount is None:
+            return None
+        total = self.eur(amount, o.get("currency") or "EUR", o.get("fx_eur_per_unit"))
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
@@ -397,6 +402,21 @@ class Forwarder:
         return Offer("pickup" if trucker else "air", name, total, days, "email", o.get("reference"),
                      reply_mail=m["id"], email=m["sender"] if carrier else None,
                      extra={"valid_until": o.get("valid_until"), "note": o.get("note")})
+
+    def total_from_parts(self, o: dict, m: dict) -> Decimal | None:
+        """A carrier that quotes per kg, or itemised, without a total: the total for the weight it bills (or the
+        weight we asked it for), by the same rule as the sheets: minimum on the freight, surcharges per kg, fees."""
+        rate = o.get("rate_per_kg")
+        if rate is None:
+            return None
+        kg = o.get("billed_kg") or store.kv_get(f"bidweight:{m.get('in_reply_to')}")
+        if kg is None:
+            return None
+        kg = Decimal(str(kg))
+        freight = max(Decimal(str(o.get("minimum_charge") or 0)), Decimal(str(rate)) * kg)
+        total = freight + Decimal(str(o.get("surcharges_per_kg") or 0)) * kg + Decimal(str(o.get("fixed_fees") or 0))
+        store.log("bids", "info", f"{m['sender']}: total computed from parts {total:.2f} for {kg} kg", o)
+        return pricing.money(total)
 
     def on_ratedesk(self, m: dict) -> None:
         lane = re.search(r"\b([A-Z]{3})-([A-Z]{3})\b", m["subject"] or "")
@@ -467,7 +487,7 @@ class Forwarder:
                           "breaks_kg": [int(b) for b in l["breaks_kg"]], "rates_eur_per_kg": rates,
                           "fuel_eur_per_kg": fixed[1], "security_eur_per_kg": fixed[2]})
         if lanes and (out.get("currency") or "EUR").upper() == "EUR":
-            kit.replace_sheet(airline, lanes, f"mail {m['id']}")
+            kit.add_sheet(airline, lanes, f"mail {m['id']}", _day(out.get("valid_from")), _day(out.get("valid_to")))
         store.log("tariff", "info", f"{airline}: {len(lanes)} lanes ingested", {"notes": out.get("notes")},
                   run_id=f"tariff-{m['id']}")
 
@@ -552,6 +572,21 @@ def normalise(s: dict, w: kit.World) -> dict:
             "chargeable_kg": str(cw) if cw else None, "pieces": pieces, "pickup_zone": zone,
             "pickup_postcode": pickup.get("postcode"), "ready_date": (s.get("cargo") or {}).get("ready_date"),
             "commodity": (s.get("cargo") or {}).get("commodity"), "missing": missing}
+
+
+def _day(text: Any) -> str | None:
+    """'2026-12-01', '01.12.2026', '1 Dec 2026' -> '2026-12-01'; anything else -> None."""
+    from datetime import datetime
+    t = str(text or "").strip()
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d %b %Y", "%d %B %Y", "%B %d, %Y", "%b %d, %Y"):
+        try:
+            return datetime.strptime(t[:len(t)], fmt).date().isoformat()
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(t[:10]).date().isoformat()
+    except ValueError:
+        return None
 
 
 def _num(x: Any) -> str | None:
