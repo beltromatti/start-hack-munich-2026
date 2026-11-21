@@ -141,7 +141,8 @@ def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: f
     _ensure_deal(ctx)
     store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" and shipment is not None else r["status"],
                                          {**r["data"], "preference": preference}))
-    out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds)
+    out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds,
+                                mail_id=ctx.mail["id"] if ctx.mail else None)
     if out.get("missing"):
         store.update(ctx.deal_id, lambda r: ("waiting_customer", r["data"]))
     return out

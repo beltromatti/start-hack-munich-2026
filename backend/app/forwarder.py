@@ -131,12 +131,13 @@ class Forwarder:
 
     # ---- engine: offers ------------------------------------------------------------------------------------
 
-    def collect_offers(self, deal_id: str, shipment: dict | None, preference: str, wait: float) -> dict:
+    def collect_offers(self, deal_id: str, shipment: dict | None, preference: str, wait: float,
+                       mail_id: int | None = None) -> dict:
         """Ask everyone who can carry it (mail, portal, sheets), wait for the answers, return priced options."""
         w = kit.world()
         deal = store.get(deal_id)
         if shipment is not None:
-            req = normalise(shipment, w)
+            req = pickup_asked_once(deal_id, shipment, normalise(shipment, w), w, mail_id)
             if req["missing"]:
                 return {"missing": req["missing"], "understood": req,
                         "hint": "if the customer's words already say it (a city is its airport), call again with it; "
@@ -154,7 +155,10 @@ class Forwarder:
                 return {"carrier_messages": d.get("carrier_messages", []), "still_waiting_for": waiting_for(d)}
             return {"error": "no shipment yet: call get_offers with the shipment"}
         self._wait(deal_id, wait)
-        return self.options(deal_id, preference)
+        out = self.options(deal_id, preference)
+        if deal["data"]["request"].get("pickup_assumed"):
+            out["pickup_assumed"] = deal["data"]["request"]["pickup_assumed"]
+        return out
 
     def _wait(self, deal_id: str, wait: float) -> None:
         end = time.time() + max(0.0, float(wait))
@@ -541,6 +545,44 @@ def pickup_variants(pickups: list[Offer], preference: str = "cheapest") -> list[
     return [("", pricing.pick(pickups, "cheapest"))]
 
 
+# The centre of each pickup zone's town: what truckers price when the customer knows only the town.
+TOWN_POSTCODE = {"60": "60311", "61": "61348", "63": "63065", "64": "64283", "65": "65183", "55": "55116",
+                 "35": "35390", "36": "36037", "80": "80331", "81": "81371", "84": "84028", "85": "85049",
+                 "86": "86150", "93": "93047", "40": "40213", "41": "41061", "42": "42103", "44": "44135",
+                 "45": "45127", "47": "47051", "20": "20095", "21": "21335", "22": "22297", "24": "24103",
+                 "28": "28195", "70": "70173", "71": "71032", "72": "72070", "73": "73728", "50": "50667",
+                 "51": "51465", "53": "53111"}
+PICKUP_QUESTIONS = ("the pickup postcode", "a pickup postcode", "departure airport or pickup place")
+
+
+def pickup_asked_once(deal_id: str, s: dict, req: dict, w: kit.World, mail_id: int | None) -> dict:
+    """The pickup postcode is asked for once. When the customer has answered that question with one of our pickup
+    towns but no postcode, the town's centre is priced and the agent is told so (live round 20: 'all I have is
+    Augsburg, I don't have the postcode' was asked five times, no quote, round missed)."""
+    if mail_id is None or not any(x.startswith(PICKUP_QUESTIONS) for x in req["missing"]):
+        return req
+    key = f"pickup_asked:{deal_id}"
+    first = store.kv_get(key)
+    if not first:
+        store.kv_set(key, str(mail_id))  # the question goes out with the answer to this mail
+    root = ((store.get(deal_id) or {}).get("data") or {}).get("root")
+    answered = (first and first != str(mail_id)) or (root is not None and mail_id != root)  # a reply in the thread
+    zone = req.get("pickup_zone")
+    if not answered or zone not in TOWN_POSTCODE or \
+            not any(x.startswith("the pickup postcode") for x in req["missing"]):
+        return req
+    centre = TOWN_POSTCODE[zone]
+    out = normalise({**s, "pickup": {**(s.get("pickup") or {}), "postcode": centre}}, w)
+    if out["pickup_zone"] != zone:
+        return req
+    area = w.zones[zone]["area"]
+    out["pickup_assumed"] = (f"The customer gave no pickup postcode after we asked: the pickup is priced for {area} "
+                             f"({centre}). Quote it as a pickup in {area}; the exact address is confirmed at "
+                             f"booking. Do not ask for the postcode again.")
+    store.log("forwarder", "info", f"pickup priced for {area} {centre}: no postcode after asking", run_id=deal_id)
+    return out
+
+
 def normalise(s: dict, w: kit.World) -> dict:
     """From the shipment as the agent passes it (the customer's words and units) to the facts code prices with."""
     pieces, kg, cbm = _goods(s)
@@ -551,6 +593,9 @@ def normalise(s: dict, w: kit.World) -> dict:
         zone = postcode[:2]
     if pickup and not zone and pickup.get("city"):  # "pickup in Darmstadt": that zone's area
         city = pickup["city"].strip().lower()
+        for a, b in (("münchen", "munich"), ("muenchen", "munich"), ("köln", "cologne"), ("koeln", "cologne"),
+                     ("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):  # the zones are written in English ASCII
+            city = city.replace(a, b)
         zone = next((z for z, v in w.zones.items() if v["area"].lower() == city), None) or \
             next((z for z, v in w.zones.items() if city in v["area"].lower() or v["area"].lower() in city), None)
     origin = (s.get("origin_airport") or "").upper() or None

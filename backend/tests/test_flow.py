@@ -304,3 +304,66 @@ def test_no_options_says_why_with_what_the_carriers_wrote():
     out = f.options("deal-1", "cheapest")
     assert out["options"] == [] and out["no_options_because"] == "no trucker has priced the pickup"
     assert "pickup postcode" in out["carriers_without_price"][0]["says"]
+
+
+def test_the_pickup_postcode_is_asked_once_then_the_town_is_priced():
+    """Live round 20: 'all I have is Augsburg, I don't have the postcode' was asked for the postcode five times, no
+    quote, round missed. The first question stands (round 15: a signature town is not the warehouse); once the
+    customer has answered it with one of our towns and no postcode, that town's centre is priced."""
+    from app import tools
+    from app.forwarder import normalise
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("klaus@weidner.example", "Air freight quote to RUH",
+                       "Fastest air freight to RUH please, 970 kg, 4 cbm, with truck pickup from our warehouse.")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    first = store.thread(rfq["id"])[0]
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", first)
+    kg = {"value": 970, "unit": "kg", "per_piece": False}
+    ship = {"origin_airport": None, "pickup": {"city": "Augsburg", "postcode": None}, "destination_airport": "RUH",
+            "pieces": 1, "weight": kg, "volume": {"value": 4, "unit": "cbm", "per_piece": False}, "dimensions": [],
+            "cargo": {"commodity": None, "ready_date": None, "notes": None}}
+    assert "the pickup postcode" in tools.get_offers(ctx, ship, "fastest", 0)["missing"][0]   # asked once
+    assert "the pickup postcode" in tools.get_offers(ctx, ship, "fastest", 0)["missing"][0]   # same mail: still
+    assert not any("Pickup quote" in m["subject"] for m in api.outbox)                         # nobody asked yet
+
+    answer = tools.Ctx(f, ctx.session_id, ctx.deal_id, ctx.root, "customer", {**first, "id": first["id"] + 1})
+    out = tools.get_offers(answer, ship, "fastest", 1)                                         # 'only Augsburg'
+    assert "missing" not in out and "Augsburg (86150)" in out["pickup_assumed"]
+    assert out["shipment"]["pickup_zone"] == "86" and out["shipment"]["origin"] == "MUC"
+    trucks = [m for m in api.outbox if m["subject"].startswith("Pickup quote zone 86")]
+    assert trucks and all("86150" in m["body"] for m in trucks)
+    assert "pickup_assumed" in tools.get_offers(answer, None, "fastest", 0)                    # stays on the deal
+
+    with_code = {**ship, "pickup": {"city": "Augsburg", "postcode": "86167"}}                 # a real postcode wins
+    assert normalise(with_code, kit.world())["pickup_postcode"] == "86167"
+    other = tools.Ctx(f, "session-x", "deal-x", 77, "customer", {**first, "id": 500})
+    nowhere = {**ship, "pickup": {"city": "Leipzig", "postcode": None}}                       # not our town: asks
+    tools.get_offers(other, nowhere, "fastest", 0)
+    assert tools.get_offers(tools.Ctx(f, "session-x", "deal-x", 77, "customer", {**first, "id": 501}),
+                            nowhere, "fastest", 0)["missing"]
+    assert normalise({**ship, "pickup": {"city": "München"}}, kit.world())["pickup_zone"] == "80"
+    assert normalise({**ship, "pickup": {"city": "Köln"}}, kit.world())["pickup_zone"] == "50"
+    assert normalise({**ship, "pickup": {"city": "Tübingen, Germany"}}, kit.world())["pickup_zone"] == "72"
+
+
+def test_a_reply_with_only_a_town_is_priced_at_once():
+    """Round 20's shape: the first mail gave no pickup place, the agent asked by mail without get_offers, and the
+    customer's reply names only the town. The reply is the answer: price the town, do not ask again."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("klaus@weidner.example", "Air freight quote to RUH", "Fastest to RUH, 970 kg, 4 cbm, with pickup.")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    first = store.thread(rfq["id"])[0]
+    reply = {**first, "id": first["id"] + 5}
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", reply)
+    ship = {"origin_airport": None, "pickup": {"city": "Augsburg, Germany", "postcode": None},
+            "destination_airport": "RUH", "pieces": 1, "weight": {"value": 970, "unit": "kg", "per_piece": False},
+            "volume": None, "dimensions": [], "cargo": {"commodity": None, "ready_date": None, "notes": None}}
+    out = tools.get_offers(ctx, ship, "fastest", 0)
+    assert "missing" not in out and out["shipment"]["pickup_zone"] == "86" and "pickup_assumed" in out
