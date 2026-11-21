@@ -36,7 +36,43 @@ def wait_idle(f: Forwarder, seconds: float) -> None:
         time.sleep(0.5)
 
 
+MARKET = [  # a customer tells of trouble, a second customer on the same lane should hear it (PR #4)
+    ("einkauf@nordwerk.example", "Angebot FRA-JFK",
+     "Hallo,\n\nbitte ein Angebot für 450 kg, 2 cbm, Frankfurt nach New York JFK, günstigste Option. Wir hören, "
+     "dass das Bodenpersonal in JFK ab Montag streikt. Kommt die Sendung trotzdem durch?\n\nGrüße\nPetra Lang"),
+    ("buyer@hudson-optics.example", "Quote FRA to JFK",
+     "Hi,\n\nplease quote 300 kg, 1.2 cbm, Frankfurt to JFK, cheapest please. Ready Monday.\n\nThanks\nDan"),
+]
+
+
+def market() -> None:
+    """`make sim-market`: deal 1 should leave a market note, deal 2's get_offers should carry it."""
+    store.use_connection(sqlite3.connect(":memory:", check_same_thread=False))
+    api = FakeFiveU()
+    kit.load(api)
+    f = Forwarder(api)
+    (s1, t1, b1), (s2, t2, b2) = MARKET
+    api.customer(s1, t1, b1)
+    wait_idle(f, 150)
+    api.customer(s2, t2, b2)
+    wait_idle(f, 150)
+    deals = sorted(store.records("deal"), key=lambda r: r["id"])
+    for r in deals:
+        notes = r["data"].get("notes", [])
+        print(f"\n=== {r['id']} {r['status']} notes={[(n['flag'], n['text']) for n in notes]}")
+        for m in store.thread(r["data"]["root"]):
+            if m["direction"] == "out":
+                print(f"--- to {m['recipient']}:\n{m['body']}")
+    noted = any(n["flag"] == "market" for r in deals[:1] for n in r["data"].get("notes", []))
+    s = store.get(f"session-{deals[-1]['data']['root']}") if len(deals) > 1 else None
+    seen = bool(s) and "notes_from_other_deals" in str(s["data"].get("items", []))
+    print(f"\nRESULT market note in deal 1: {noted} | deal 2 saw it in get_offers: {seen}")
+    print("usage", store.usage())
+
+
 def main() -> None:
+    if sys.argv[1:2] == ["market"]:
+        return market()
     store.use_connection(sqlite3.connect(os.getenv("SIM_DB", ":memory:"), check_same_thread=False))
     api = FakeFiveU()
     kit.load(api)

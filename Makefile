@@ -1,4 +1,4 @@
-.PHONY: install api live web test sim
+.PHONY: install api live web test sim sim-market
 install:
 	cd backend && uv sync
 	cd frontend && npm install
@@ -14,3 +14,6 @@ test:
 	cd backend && uv run pytest -q
 sim:           # real model (OpenAI direct, not scored) + fake 5U: realistic mails end to end
 	cd backend && LLM_TARGET=openai DB_PATH=:memory: BID_WAIT_SECONDS=20 uv run python -m app.sim
+
+sim-market:    # same, one strike told by a customer: does the next deal on the lane hear it (PR #4)
+	cd backend && LLM_TARGET=openai DB_PATH=:memory: BID_WAIT_SECONDS=20 uv run python -m app.sim market
