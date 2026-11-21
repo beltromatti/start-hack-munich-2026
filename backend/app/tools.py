@@ -84,8 +84,10 @@ TOOLS = [
         "option_id": S, "to": S, "done": DONE}),
     fn("book",
        "Book an option of this deal with the carrier: by its rate reference on the portal (a fresh rate if it "
-       "expired), otherwise by mail to the airline. Returns the booking with its reference and status.",
-       {"option_id": {"type": "string"}}),
+       "expired), otherwise by mail to the airline. Returns the booking with its reference and status. deal_id: "
+       "null for this thread's deal; the offer's own deal (crm finds it) when the customer accepts in a new mail "
+       "an offer we made them in another thread, because its options live there.",
+       {"option_id": {"type": "string"}, "deal_id": S}),
     fn("crm",
        "Search our CRM: deals and bookings by booking or rate reference, our reference (SM-...), customer name or "
        "address, company, route, airline, anything. Returns the matching deals with their shipment, quote, booking, "
@@ -216,9 +218,23 @@ def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dic
     return {"recorded_quote": opt["total_text"], "first_quote_in_thread": first}
 
 
-def book(ctx: Ctx, option_id: str) -> dict:
+def book(ctx: Ctx, option_id: str, deal_id: str | None = None) -> dict:
+    """A customer who accepts in a new mail instead of a reply opens a new thread, whose deal has no options: the
+    offer lives on the deal of the thread we quoted in. That deal can be booked from here when it is this
+    customer's own (the same permission as `deal` and `crm`)."""
     _ensure_deal(ctx)
-    return ctx.fw.book_option(ctx.deal_id, option_id)
+    if deal_id and deal_id != ctx.deal_id:
+        rec = store.get(deal_id)
+        if not rec or rec["type"] != "deal":
+            return {"error": "no such deal"}
+        if not _visible(ctx, rec):
+            return {"error": "that deal belongs to another customer"}
+        return ctx.fw.book_option(deal_id, option_id)
+    out = ctx.fw.book_option(ctx.deal_id, option_id)
+    if out.get("error") and not out.get("options"):
+        out["hint"] = ("this thread's deal has no priced options. If they accept an offer from another thread of "
+                       "theirs, find its deal with crm and pass its deal_id")
+    return out
 
 
 def _visible(ctx: Ctx, rec: dict) -> bool:
