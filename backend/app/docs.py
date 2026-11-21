@@ -1,5 +1,5 @@
 """Attachments to text, so the model reads what a person would see, whatever the file: pdf (scanned pages too),
-xlsx, docx, text in any common encoding, zip and eml (what is inside them), pictures (read by a model through the
+xlsx, xls, docx, text in any common encoding, zip and eml (what is inside them), pictures (read by a model through the
 gateway) and voice messages (transcribed). One reader for every mail: customers, carriers, the rate desk.
 What cannot be read is named, with why, never passed on as noise."""
 import io
@@ -22,6 +22,18 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
                 for r in ws.iter_rows(values_only=True):
                     if any(c is not None for c in r):
                         rows.append("\t".join("" if c is None else str(c) for c in r))
+            return "\n".join(rows)
+        if name.endswith(".xls"):  # the old Excel format, on 5U's list of attachment types (Sam, Sun 00:33)
+            import xlrd
+            wb = xlrd.open_workbook(file_contents=raw)
+            rows = []
+            for ws in wb.sheets():
+                rows.append(f"# sheet {ws.name}")
+                for i in range(ws.nrows):
+                    cells = ["" if c in ("", None) else str(int(c)) if isinstance(c, float) and c == int(c) else str(c)
+                             for c in ws.row_values(i)]
+                    if any(cells):
+                        rows.append("\t".join(cells))
             return "\n".join(rows)
         if name.endswith(".docx"):
             from docx import Document

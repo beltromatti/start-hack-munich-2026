@@ -768,3 +768,11 @@ def test_an_offer_accepted_in_a_new_thread_is_booked_on_its_own_deal():
     store.save_mail(other, "in")
     eve = tools.Ctx(f, f"session-{other['id']}", f"deal-{other['id']}", other["id"], "customer", store.mail(other["id"]))
     assert tools.book(eve, "A1", offer) == {"error": "that deal belongs to another customer"}
+
+
+def test_an_xls_is_read_like_an_xlsx():
+    """`.xls` is on 5U's own list of attachment types and was the one we passed on as a binary (Sam, Sun 00:33)."""
+    from pathlib import Path
+    from app import docs
+    xls = docs.text("Packing-List.XLS", (Path(__file__).parent / "data" / "packing-list.xls").read_bytes())
+    assert "# sheet Packing list" in xls and "2\t120\t80\t95\t160.5" in xls and "Total gross weight kg\t356" in xls

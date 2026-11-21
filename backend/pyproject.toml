@@ -12,6 +12,7 @@ dependencies = [
   "pypdf[image]>=7.1.1",
   "openpyxl>=3.1.5",
   "python-docx>=1.2.0",
+  "xlrd>=2.0.1",
 ]
 
 [dependency-groups]
