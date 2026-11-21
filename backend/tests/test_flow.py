@@ -655,3 +655,13 @@ def test_the_language_of_a_mail_and_times_said_in_words():
     assert language.language_of("Thanks!\\nViele Gruesse / Many greetings") is None
     assert language.time_in("We need seven hours from your order to the collection.") == Decimal("0.292")
     assert language.time_in("Lead time twenty-four hours from order to collection") == Decimal("1")
+
+
+def test_a_ready_date_said_relative_to_today_is_the_next_such_day():
+    from datetime import date, timedelta
+    from app.forwarder import _day
+    today = date.today()
+    monday = today + timedelta(days=(0 - today.weekday() - 1) % 7 + 1)
+    assert _day("Monday") == monday.isoformat() and _day("next Monday") == monday.isoformat()
+    assert _day("tomorrow") == (today + timedelta(days=1)).isoformat()
+    assert _day("2026-11-24") == "2026-11-24" and _day("whenever") is None

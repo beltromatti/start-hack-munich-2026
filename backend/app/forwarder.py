@@ -714,7 +714,25 @@ def _day(text: Any) -> str | None:
     try:
         return datetime.fromisoformat(t[:10]).date().isoformat()
     except ValueError:
-        return None
+        pass
+    # said relative to today ("ready Monday", "tomorrow", "24 November" without a year): the next such day
+    from datetime import date, timedelta
+    today, low = date.today(), t.lower()
+    if low in ("today", "now", "asap", "immediately", "heute", "sofort"):
+        return today.isoformat()
+    if low in ("tomorrow", "morgen"):
+        return (today + timedelta(days=1)).isoformat()
+    names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    word = re.sub(r"^(?:next|this|on)\s+", "", low)
+    if word in names:
+        return (today + timedelta(days=(names.index(word) - today.weekday() - 1) % 7 + 1)).isoformat()
+    for fmt in ("%d %B", "%d %b", "%B %d", "%b %d", "%d.%m."):
+        try:
+            d = datetime.strptime(t, fmt).date().replace(year=today.year)
+            return (d if d >= today else d.replace(year=today.year + 1)).isoformat()
+        except ValueError:
+            continue
+    return None
 
 
 def kg_text(kg: Decimal) -> str:
