@@ -1105,3 +1105,15 @@ def test_one_weight_for_all_lots_is_counted_once():
     r = normalise({**s, "totals": None, "lots": [{"pieces": 8, "weight": q(22, "kg", True),
                                                    "volume": q(0.25, "cbm", True), "dimensions": None}]}, kit.world())
     assert r["weight_kg"] == "176" and r["volume_cbm"] == "2"
+
+
+def test_a_bid_without_a_readable_time_is_marked_and_cannot_be_the_fast_one():
+    """The mark is set where the bid is read, and the options the agent sees use it (round 69)."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    trucker = next(c for c in kit.world().carriers if c.kind == "trucker")
+    read = {"available": True, "total": 176.71, "currency": "EUR", "time_value": None, "time_unit": None, "reference": "TRK-9"}
+    unread = f.offer(read, {"id": 5, "sender": trucker.email, "body": "Our total is 176.71 EUR, we collect once the driver is back."}, trucker)
+    stated = f.offer(read, {"id": 6, "sender": trucker.email, "body": "Our total is 176.71 EUR. Pickup time: 3 hours."}, trucker)
+    assert unread.extra.get("time_unknown") is True and "time_unknown" not in stated.extra and stated.days > 0

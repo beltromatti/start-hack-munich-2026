@@ -284,6 +284,7 @@ class Forwarder:
                   if not (x.source == "sheet" and x.carrier.lower() in declined)]
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
+        air, pickups = pricing.unknown_times_last(air), pricing.unknown_times_last(pickups)
         needs_pickup = bool(req["pickup_zone"])
         premium = pricing.insurance_premium(req.get("insurance"))  # part of the all-in total when they ask for it
         # an option id names one option for the life of the deal: a changed or second shipment prices as B1, B2...,
@@ -314,7 +315,9 @@ class Forwarder:
                              "estimated_arrival": arrives.strftime(pricing.DATE),
                              "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
                              "billed_kg": float(a.billed_kg) if a.billed_kg is not None else None,
-                             "carrier_note": (a.extra or {}).get("note")})
+                             "carrier_note": (a.extra or {}).get("note"),
+                             **({"time_not_stated": [x.carrier for x in (a, p) if x and (x.extra or {}).get("time_unknown")]}
+                                if any(x and (x.extra or {}).get("time_unknown") for x in (a, p)) else {})})
         rec = {}
         for pref in ("cheapest", "fastest", "balanced"):
             cand = [Offer("air", k, Decimal(v["total"]),
@@ -614,13 +617,15 @@ class Forwarder:
         days = language.days(o.get("time_value"), o.get("time_unit"))
         if days is None and trucker:  # a trucker sends one offer: the time its mail states is that offer's
             days = language.time_in(m["body"])
+        unknown = days is None  # no time in the mail that we could read: it must not count as the fastest
         days = days or Decimal(0)
         # a carrier answering for itself is named as in the carrier list (its mail bid and its sheet are one
         # carrier); the rate desk names the airlines it lists
         name = carrier.name if carrier else (o.get("carrier") or m["sender"])
         return Offer("pickup" if trucker else "air", name, total, days, "email", clean_reference(o.get("reference")),
                      reply_mail=m["id"], email=m["sender"] if carrier else None,
-                     extra={"valid_until": o.get("valid_until"), "note": o.get("note")})
+                     extra={"valid_until": o.get("valid_until"), "note": o.get("note"),
+                            **({"time_unknown": True} if unknown else {})})
 
     def total_from_parts(self, o: dict, m: dict) -> Decimal | None:
         """A carrier that quotes per kg, or itemised, without a total: the total for the weight it bills (or the
