@@ -142,7 +142,9 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 
 - **Language is the language of their text,** not of their name, company or country; a two-language sign-off
   ("Viele Gruesse / Many greetings") is a courtesy. Round 29 and three tracking answers went out in German to
-  English mails before this was said (also in the tracking task); since then, round 49 once.
+  English mails before this was said (also in the tracking task); after it, rounds 49 and 69, always German
+  companies writing English. So the agent also gets a fact, counted by code from the mail's own words when clear
+  ("Their own words are in English."): a fact the agent weighs, not a check on what it writes.
 - **Register and warmth mirror the sender.** A friendly opener gets a few words of our own back after the greeting,
   then the business; nothing is added when they wrote none.
 - **Answer what they asked:** a date when they ask when it arrives (from the option, as an estimate); for something
