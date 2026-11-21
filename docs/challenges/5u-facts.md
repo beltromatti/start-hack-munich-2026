@@ -228,3 +228,8 @@ that only 1 / 2 / 3 teams get right multiplies its points by 5 / 3 / 2 (to be co
 **The trucker is the 50/50 pick also for "cheapest" (checked Sun 00:27):** rounds 66, 71 and 80 asked for the
 cheapest with a pickup; we quoted the 50/50 trucker, 7.3 %, 6.3 % and 12.0 % above the same flight with the
 cheapest trucker, and all three got accuracy 45. 5U's best price uses the same trucker rule.
+
+**Arrival dates match 5U's (round 85, Sun 00:31):** "arrive no later than 2026-12-01", ready 27 Nov, the 50/50
+trucker collects in 31 h, Lumen flies 3 days: our schedule (09:00 on the ready date + pickup hours + transit days)
+puts it on 1 Dec 16:00, on the deadline. Quoted as meeting it, accepted (10 of 13). A pickup is not rounded up
+to whole days by 5U.
