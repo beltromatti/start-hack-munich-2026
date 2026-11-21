@@ -786,7 +786,8 @@ class Forwarder:
                "multipliers": dict((before or {}).get("multipliers", {}))}
         # Sun 00:27, 5U: from round 84 a round that only one, two or three teams get right pays them a multiple of
         # accuracy, time and cost, the more the fewer they are. Such a round is worth several: when we lost it, it
-        # is the first one to read. The field's name is not in the spec, so any field named like a multiplier counts.
+        # is the first one to read. On the board (read Sun 00:52): rules.few_winners = {"factors": ["5", "3", "2"],
+        # "from_round": 84} and a `factor` on each public round, null when the round pays no multiple.
         mine = {str(r.get("round_no")): r for r in reqs}
         multiplied = []
         for r in rounds + reqs:
@@ -794,7 +795,8 @@ class Forwarder:
             if not mine.get(n, {}).get("closed"):  # said once, when the round is settled: its multiple and our
                 continue                             # verdict are final then, not while teams are still answering
             for k, v in r.items():
-                if "multipl" in k.lower() and v not in (None, 1, 1.0, "1", "1.0", "x1") and n not in now["multipliers"]:
+                if (k.lower() == "factor" or "multipl" in k.lower()) and v not in (None, 1, 1.0, "1", "1.0", "x1") \
+                        and n not in now["multipliers"]:
                     now["multipliers"][n] = v
                     multiplied.append((n, v, r.get("accepted"), mine.get(n, {})))
         store.kv_set("board_scoring", json.dumps(now))
