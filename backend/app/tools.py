@@ -202,10 +202,12 @@ def _offer_document(ctx: Ctx, option_id: str | None) -> dict | str:
     req, air, pick = d.get("request") or {}, opt["air"], opt.get("pickup")
     ref = f"SM-{d.get('root', ctx.root)}"
     ready, leaves, arrives = pricing.schedule(req.get("ready_date"), float(pick["days"]) * 24 if pick else 0, air["days"])
-    days = f"{pricing.Decimal(str(air['days'])).normalize():f}"  # 2.000 -> 2, as a person writes it
+    def plain(x):  # 2.000 -> 2, 656.310 -> 656.31: a number as a person writes it
+        return f"{pricing.Decimal(str(x)).normalize():f}"
+    days = plain(air["days"])
     goods = ", ".join(x for x in (f"{req['pieces']} pieces" if req.get("pieces") else "",
-                                  f"{req['weight_kg']} kg" if req.get("weight_kg") else "",
-                                  f"{req['volume_cbm']} cbm" if req.get("volume_cbm") else "",
+                                  f"{plain(req['weight_kg'])} kg" if req.get("weight_kg") else "",
+                                  f"{plain(req['volume_cbm'])} cbm" if req.get("volume_cbm") else "",
                                   req.get("commodity") or "") if x)
     lines = [f"{settings.company}, {datetime.now(timezone.utc).strftime('%d %b %Y')}",
              f"For: {d.get('customer') or ''}",
@@ -216,7 +218,7 @@ def _offer_document(ctx: Ctx, option_id: str | None) -> dict | str:
              f"Air freight: {air['carrier']}, {req.get('origin')} to {req.get('destination')}, "
              f"{days} day{'' if days == '1' else 's'} in transit",
              f"Goods: {goods}" if goods else "",
-             f"Chargeable weight: {air.get('billed_kg') or req.get('chargeable_kg')} kg",
+             f"Chargeable weight: {plain(air.get('billed_kg') or req.get('chargeable_kg'))} kg",
              f"Goods ready: {ready.strftime(pricing.DATE)}",
              f"Estimated departure: {leaves.strftime(pricing.DATE)}",
              f"Estimated arrival: {arrives.strftime(pricing.DATE)}", "",

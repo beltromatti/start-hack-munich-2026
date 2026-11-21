@@ -698,3 +698,4 @@ def test_an_offer_asked_as_a_pdf_is_attached_with_the_options_total():
     text = docs.text(att["filename"], base64.b64decode(att["content_base64"]))
     assert text.count("408.55 EUR") == 1 and "279.50" not in text and "129.05" not in text
     assert "Lumen Air Cargo" in text and "Sternmeile Logistik" in text and "Sun 29 Nov 2026" in text
+    assert "0.37 cbm" in text and "1 day in transit" in text
