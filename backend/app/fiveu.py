@@ -55,7 +55,16 @@ class FiveU:
         if time.time() - self._last_poll < self.poll_gap:
             return [], since_id
         self._last_poll = time.time()
-        r = self._req("GET", "/v1/mailbox/messages", params={"since_id": since_id, "limit": 200})
+        # one request, never retried here: a retry sooner than the limit is a second poll (a 429 of our own making);
+        # a failed poll is simply the next tick's poll, one gap later
+        try:
+            r = self.http.request("GET", "/v1/mailbox/messages", params={"since_id": since_id, "limit": 200})
+        except httpx.TransportError as e:
+            store.log("router", "error", f"mailbox poll failed: {e!r}, polling again in {self.poll_gap:g}s")
+            return [], since_id
+        if r.status_code >= 500:
+            store.log("router", "error", f"mailbox {r.status_code}, polling again in {self.poll_gap:g}s")
+            return [], since_id
         if r.status_code == 429:
             try:
                 d = r.json()

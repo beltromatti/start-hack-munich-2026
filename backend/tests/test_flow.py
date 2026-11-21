@@ -472,3 +472,25 @@ def test_a_booking_at_another_price_says_so_and_its_confirmation_stays_quiet():
     rate["total"] = opt["air"]["total"]
     same = f.book_option(deal_id, oid)
     assert "price_changed" not in same and same["amount"] == opt["total_text"]
+
+
+def test_a_mailbox_poll_is_never_retried_sooner_than_5us_limit():
+    """5U allows one poll per 5 seconds per key. The generic retry (0.5 s after a 502 or a dropped connection) made
+    a second poll inside the limit: a 429 of our own making. A failed poll is simply the next tick's poll."""
+    import httpx
+    from app.fiveu import FiveU
+    calls, answers = [], iter([httpx.Response(502), httpx.Response(429, json={"detail": "one poll per 5 seconds"}),
+                               httpx.Response(200, json={"messages": [{"id": 7}], "next_since_id": 8})])
+
+    def handler(request):
+        calls.append(request.url.path)
+        return next(answers)
+    api = FiveU("http://5u.test", "k")
+    api.http = httpx.Client(base_url="http://5u.test", transport=httpx.MockTransport(handler))
+    api._last_poll = 0
+    assert api.poll(3) == ([], 3) and len(calls) == 1  # 502: no retry inside the limit
+    assert api.poll(3) == ([], 3) and len(calls) == 1  # too soon: no request at all
+    api._last_poll = 0
+    assert api.poll(3) == ([], 3) and api.poll_gap == 5.5  # 429 'per 5 seconds': the gap stays 5.5 s
+    api._last_poll = 0
+    assert api.poll(3) == ([{"id": 7}], 8) and len(calls) == 3
