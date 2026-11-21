@@ -909,3 +909,31 @@ def test_places_are_understood_as_their_people_write_them():
     f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
     f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80469", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
     assert "pickup from 80331 Munich" in sent[0] and "pickup from 80469 Munich" in sent[1]
+
+
+def test_a_carriers_price_counts_where_it_is_written_and_a_portal_gap_is_asked_by_mail():
+    """Read from the code and run by an independent reviewer (ergebnis_8_kanten.md, cases 5, 11, 14)."""
+    from decimal import Decimal
+    from app.forwarder import read_in_mail
+    bid = {"available": True, "total": 800, "rate_per_kg": None}
+    assert not read_in_mail(bid, "Transit 2 days. See subject for all-in.")
+    assert read_in_mail(bid, "Re: ASU | all-in EUR 800\nTransit 2 days. See subject for all-in.")      # subject and body
+    itemised = "Air freight EUR 500.00. Documentation EUR 65.00. Transit 2 days."
+    assert read_in_mail({**bid, "total": 565}, itemised) and not read_in_mail({**bid, "total": 5650}, itemised)
+    assert not read_in_mail({**bid, "total": 9408}, "Our total for the pickup is 94.08 EUR. Pickup time: 3 hours.")
+
+    class Gap(FakeFiveU):   # the portal prices the weight asked for and fails at the break above (a limit, a 503)
+        def rate(self, origin, destination, airline, weight_kg, volume_cbm=None):
+            if Decimal(str(weight_kg)) == 300:
+                return {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+            return super().rate(origin, destination, airline, weight_kg, volume_cbm)
+
+    api = Gap()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote CGN to DEL", "Hi, please quote 299 kg, 1 cbm, CGN to DEL, cheapest.")
+    run(f)
+    d = store.get(f"deal-{rfq['id']}")["data"]
+    asked = set(d["asked"].values())
+    portal_airlines = {kit.world().carrier_by_name(a["name"]).email for a in kit.world().portal[("CGN", "DEL")]}
+    assert portal_airlines <= asked                                    # each was asked by mail for what the portal missed

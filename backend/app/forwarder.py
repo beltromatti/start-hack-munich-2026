@@ -345,8 +345,8 @@ class Forwarder:
                 if r.get("error"):
                     store.log("bids", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
                               run_id=deal_id)
-                    if r["status"] in (429, 500, 502, 503, 504) and wt == kg:
-                        failed.add(a["name"])
+                    if r["status"] in (429, 500, 502, 503, 504):  # at either weight: the break above is often
+                        failed.add(a["name"])                        # the cheaper price, the airline is asked by mail
                     continue
                 total = self.eur(Decimal(r["total"]), r["currency"], r.get("fx_eur_per_usd"))
                 if total is None:
@@ -454,16 +454,17 @@ class Forwarder:
             if lanes:
                 store.kv_set(f"lanes:{carrier.email}", json.dumps({"lanes": lanes, "at": time.time()}))
         raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
-        if not all(read_in_mail(x, m["body"]) for x in raw):  # an amount the mail never wrote is a misread
+        seen = f"{m.get('subject') or ''}\n{m['body']}"  # the bid reader reads the subject too: so does the check
+        if not all(read_in_mail(x, seen) for x in raw):  # an amount the mail never wrote is a misread
             store.log("bids", "error", f"{m['sender']}: amount not in the mail, reading it again", {"read": raw},
                       run_id=deal_id)
             raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
             kept = []
             for x in raw:
-                if not read_in_mail(x, m["body"]) and read_in_mail({**x, "total": None}, m["body"]) \
+                if not read_in_mail(x, seen) and read_in_mail({**x, "total": None}, seen) \
                         and x.get("rate_per_kg") is not None:
                     x = {**x, "total": None}  # the rate is in the mail: code computes the total from the parts
-                if read_in_mail(x, m["body"]):
+                if read_in_mail(x, seen):
                     kept.append(x)
                 else:
                     store.log("bids", "error", f"{m['sender']}: amount still not in the mail, offer left out",
@@ -964,9 +965,16 @@ def read_in_mail(x: dict, body: str) -> bool:
     if not x.get("available") or value is None:
         return True
     try:
-        return Decimal(str(value)) in amounts_in(body)
+        value, written = Decimal(str(value)), amounts_in(body)
     except Exception:
         return False
+    if value in written:
+        return True
+    # itemised without a grand total ("Air freight 500.00, documentation 65.00"): the sum of two to four amounts the
+    # mail wrote is a total the mail states, only not in one number. A misplaced decimal is still no such sum.
+    from itertools import combinations
+    parts = sorted(a for a in written if 0 < a < value)[-12:]
+    return x.get("total") is not None and any(sum(c) == value for n in (2, 3, 4) for c in combinations(parts, n))
 
 
 def _num(x: Any) -> str | None:
