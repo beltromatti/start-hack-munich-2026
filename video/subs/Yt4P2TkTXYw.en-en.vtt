@@ -1,0 +1,1248 @@
+WEBVTT
+Kind: captions
+Language: en
+
+00:00:00.080 --> 00:00:08.880
+Mhm. All right. Eric, good to see you. Good to&nbsp;
+see you, Ka. Thanks for having me. We go back a&nbsp;&nbsp;
+
+00:00:08.880 --> 00:00:15.840
+while. I think I was your first intern. It's fair&nbsp;
+to say that. Indeed, I was one intern. One of the&nbsp;&nbsp;
+
+00:00:15.840 --> 00:00:23.680
+first. Exactly. And there was 15 years ago. Um,&nbsp;
+yes. A wonderful startup in uh in Berlin. Um,&nbsp;&nbsp;
+
+00:00:23.680 --> 00:00:31.040
+but since then you've been focusing on the&nbsp;
+logistics industry. uh you have a little bit of a&nbsp;&nbsp;
+
+00:00:31.040 --> 00:00:38.640
+history there. And so today we want to talk about&nbsp;
+how you've spent almost a decade I I think at this&nbsp;&nbsp;
+
+00:00:38.640 --> 00:00:44.960
+point really thinking about how to take the status&nbsp;
+quo of the industry and bring it to structure and&nbsp;&nbsp;
+
+00:00:44.960 --> 00:00:49.760
+platformization and you've done that through&nbsp;
+different things. Maybe we can start by you&nbsp;&nbsp;
+
+00:00:49.760 --> 00:00:55.920
+just describing where you're coming from and then&nbsp;
+I would love to walk through the status quo that&nbsp;&nbsp;
+
+00:00:55.920 --> 00:01:02.720
+you found and how you've gradually learned to that&nbsp;
+industry and how you're transforming it and how&nbsp;&nbsp;
+
+00:01:02.720 --> 00:01:06.640
+you've have been transforming this over the last&nbsp;
+years. But let's start with a quick introduction&nbsp;&nbsp;
+
+00:01:06.640 --> 00:01:13.200
+from your end. Thank you. Well, thanks thanks for&nbsp;
+having me. Um yeah, this year it's um I think 10&nbsp;&nbsp;
+
+00:01:13.200 --> 00:01:18.880
+years that I'm um working in logistics, more&nbsp;
+specifically even in in freight forwarding. Um&nbsp;&nbsp;
+
+00:01:18.880 --> 00:01:24.800
+which means moving things around the world um on&nbsp;
+an airplane or on a vessel that's larger than um&nbsp;&nbsp;
+
+00:01:24.800 --> 00:01:32.080
+a parcel than a shoe box. Um it goes back to uh me&nbsp;
+being co-founder of a company um called Forto in&nbsp;&nbsp;
+
+00:01:32.080 --> 00:01:39.600
+2015 where we had been looking into logistics&nbsp;
+for a while because we were curious about how&nbsp;&nbsp;
+
+00:01:39.600 --> 00:01:45.280
+digitalization would shape that market and we&nbsp;
+felt that it was rather odd that there was very&nbsp;&nbsp;
+
+00:01:45.280 --> 00:01:51.600
+little a very low degree of digitalization in the&nbsp;
+industry in 2015. So to make that very concrete,&nbsp;&nbsp;
+
+00:01:51.600 --> 00:01:56.400
+there were transport management systems, but&nbsp;
+a a really fair share of the market was still&nbsp;&nbsp;
+
+00:01:56.400 --> 00:02:01.680
+using AS400 green screen systems with people&nbsp;
+saying, "Hey, this is a fantastic system. I can&nbsp;&nbsp;
+
+00:02:01.680 --> 00:02:07.280
+just hotk really fast to my customers submission&nbsp;
+here." And we were thinking, let's build software&nbsp;&nbsp;
+
+00:02:07.280 --> 00:02:12.080
+to help trade for waters on the one side be&nbsp;
+more productive and on the other side deliver&nbsp;&nbsp;
+
+00:02:12.080 --> 00:02:16.880
+better customer service because they can provide&nbsp;
+more visibility, maybe a self-service portal. At&nbsp;&nbsp;
+
+00:02:16.880 --> 00:02:21.680
+that time you already of course booked an Uber via&nbsp;
+an app, ordered business other business services&nbsp;&nbsp;
+
+00:02:21.680 --> 00:02:27.040
+online and with freckle boarding that just wasn't&nbsp;
+the prevalent situation. Um we we we built the&nbsp;&nbsp;
+
+00:02:27.040 --> 00:02:32.560
+first version of our software tried to sell it to&nbsp;
+Fred for baters but we had basically one um owner&nbsp;&nbsp;
+
+00:02:32.560 --> 00:02:37.120
+of a big fret for borders say hey boys go back to&nbsp;
+Berlin this is a pickle business digitalization&nbsp;&nbsp;
+
+00:02:37.120 --> 00:02:42.640
+doesn't make sense here and um that was us&nbsp;
+thinking okay well if if the industry and there&nbsp;&nbsp;
+
+00:02:42.640 --> 00:02:50.640
+was a maybe um that was an actual quote but also&nbsp;
+in a way um sort of the average of what we heard&nbsp;&nbsp;
+
+00:02:50.640 --> 00:02:55.120
+at that time and so we thought okay if the people&nbsp;
+in the industry don't believe digitalization will&nbsp;&nbsp;
+
+00:02:55.120 --> 00:02:59.600
+will happen or will shape reshape the business.&nbsp;
+We should just become a freight for water and do&nbsp;&nbsp;
+
+00:02:59.600 --> 00:03:03.600
+it ourselves and so much easier said than done.&nbsp;
+So we built a freight for watering company. We&nbsp;&nbsp;
+
+00:03:03.600 --> 00:03:08.320
+started to ship containers airf freight from A to&nbsp;
+B in the beginning for Amazon marketplace sellers,&nbsp;&nbsp;
+
+00:03:08.320 --> 00:03:12.720
+small customers that were digitally native. We&nbsp;
+had an online platform for them where you could&nbsp;&nbsp;
+
+00:03:12.720 --> 00:03:20.000
+get quotes, book a shipment. We we digitalized&nbsp;
+many processes in the background and in I did&nbsp;&nbsp;
+
+00:03:20.000 --> 00:03:24.640
+that for almost 10 years. we we we were close to&nbsp;
+a thousand people when I left one and a half years&nbsp;&nbsp;
+
+00:03:24.640 --> 00:03:30.080
+ago and handed over operational responsibilities&nbsp;
+and I think maybe as an intro also to I guess our&nbsp;&nbsp;
+
+00:03:30.080 --> 00:03:36.720
+discussion one last thing I want to say these&nbsp;
+10 years in logistics I felt um I'm on the&nbsp;&nbsp;
+
+00:03:36.720 --> 00:03:40.080
+one side proud about what we achieved but on&nbsp;
+the other side I also have to say especially&nbsp;&nbsp;
+
+00:03:40.080 --> 00:03:47.840
+when it comes to automating processes structuring&nbsp;
+workflows organizing data it felt many times like&nbsp;&nbsp;
+
+00:03:47.840 --> 00:03:55.840
+pushing a stone uphill and still Today so much&nbsp;
+crucial data lives in Excel sheets, word files,&nbsp;&nbsp;
+
+00:03:55.840 --> 00:04:01.520
+emails because it's a heavily fragmented industry.&nbsp;
+No freight forwarder owns trucks in China, trucks&nbsp;&nbsp;
+
+00:04:01.520 --> 00:04:07.120
+in Europe, terminals, vessels, airplanes. You have&nbsp;
+to work with others around the world and everyone&nbsp;&nbsp;
+
+00:04:07.120 --> 00:04:11.680
+just loves to communicate via email also because&nbsp;
+there's lots of things that go wrong. The Houthies&nbsp;&nbsp;
+
+00:04:11.680 --> 00:04:16.160
+shoot their rockets and you have to divert the&nbsp;
+ships. There's a port congestion in Hamburg.&nbsp;&nbsp;
+
+00:04:16.160 --> 00:04:20.480
+Customs wants to inspect the goods. You need to&nbsp;
+unload them in a bonded warehouse. the customer&nbsp;&nbsp;
+
+00:04:20.480 --> 00:04:24.240
+calls you, everything is organized and says,&nbsp;
+"Hey, I need to have the goods one day later.&nbsp;&nbsp;
+
+00:04:24.240 --> 00:04:28.000
+Our warehouse is full. You need to reorganize&nbsp;
+everything. The trucker is not available,&nbsp;&nbsp;
+
+00:04:28.000 --> 00:04:34.400
+etc., etc." So, in a way, that's still how the how&nbsp;
+the industry works. It's um yeah, it's fascinating&nbsp;&nbsp;
+
+00:04:34.400 --> 00:04:40.320
+sometimes to see how everything around us probably&nbsp;
+80% has been in a container still arrives. Yeah,&nbsp;&nbsp;
+
+00:04:40.320 --> 00:04:44.960
+that's crazy. I saw a post you that you that you&nbsp;
+made on LinkedIn announcing how things are going&nbsp;&nbsp;
+
+00:04:44.960 --> 00:04:50.240
+at your new company and I think you said you the&nbsp;
+the size of the logistics industry in comparison&nbsp;&nbsp;
+
+00:04:50.240 --> 00:04:57.840
+to the GDP is enormous right? Yes. 10% almost I&nbsp;
+think 9%. Um which is you're an economist so it&nbsp;&nbsp;
+
+00:04:57.840 --> 00:05:04.320
+just means in every um euro we spend you pay one&nbsp;
+10 cents to logistics because most of the things&nbsp;&nbsp;
+
+00:05:04.320 --> 00:05:10.800
+we buy are goods and then they've been transported&nbsp;
+from somewhere um to somewhere else. Yeah,&nbsp;&nbsp;
+
+00:05:10.800 --> 00:05:16.560
+it's a massive problem. And the thing that makes&nbsp;
+logistics particularly interesting from a platform&nbsp;&nbsp;
+
+00:05:16.560 --> 00:05:22.240
+engineering perspective is that and you just&nbsp;
+mentioned this, you have these unforeseen&nbsp;&nbsp;
+
+00:05:22.240 --> 00:05:28.560
+situations where you probably still need, let's&nbsp;
+call it, you know, as an sort of as hopefully AI&nbsp;&nbsp;
+
+00:05:28.560 --> 00:05:34.240
+natives at this point, the human will remain in&nbsp;
+the loop for a while. Um which which means is is&nbsp;&nbsp;
+
+00:05:34.240 --> 00:05:44.160
+it fair to say that um you have a situation where&nbsp;
+the human steers the process but will hand off to&nbsp;&nbsp;
+
+00:05:44.160 --> 00:05:50.080
+specialized systems and other things and store&nbsp;
+data somewhere. Is that is that something you&nbsp;&nbsp;
+
+00:05:50.080 --> 00:05:54.720
+know that that resembles what you're seeing&nbsp;
+on the ground? Like how do you think about&nbsp;&nbsp;
+
+00:05:54.720 --> 00:06:01.920
+essentially turning a freight forwarder that has&nbsp;
+done that for centuries probably into something&nbsp;&nbsp;
+
+00:06:01.920 --> 00:06:08.480
+that is able to associate the data come up with&nbsp;
+structured processes and all of that? How how&nbsp;&nbsp;
+
+00:06:08.480 --> 00:06:14.400
+how is that how do you where do you start? How do&nbsp;
+you do that? Yeah, that's a very good question. I&nbsp;&nbsp;
+
+00:06:14.400 --> 00:06:21.440
+think it is very very hard to say where AI will&nbsp;
+take us over the next 5 years. I think if the&nbsp;&nbsp;
+
+00:06:21.440 --> 00:06:27.280
+scaling laws continue like they continue at&nbsp;
+the moment then you might get significantly&nbsp;&nbsp;
+
+00:06:27.280 --> 00:06:33.200
+more intelligent models that can solve even more&nbsp;
+complex classes of problems almost perfectly and&nbsp;&nbsp;
+
+00:06:33.200 --> 00:06:37.680
+that means probably autonomously if we and there's&nbsp;
+some bosses in the market as well don't continue&nbsp;&nbsp;
+
+00:06:37.680 --> 00:06:42.880
+like this then maybe there's a smaller share of&nbsp;
+things where um AI can run processes completely&nbsp;&nbsp;
+
+00:06:42.880 --> 00:06:46.640
+autonomously and you need to have a higher degree&nbsp;
+of human in the loop. I think down the road what&nbsp;&nbsp;
+
+00:06:46.640 --> 00:06:54.800
+we imagine is that yes an operator is still&nbsp;
+or like a human rather is still in the loop um&nbsp;&nbsp;
+
+00:06:54.800 --> 00:06:59.760
+and is still at the high level orchestrating the&nbsp;
+process but not each single process individually&nbsp;&nbsp;
+
+00:06:59.760 --> 00:07:07.840
+but is rather maybe an orchestrator that sits&nbsp;
+in a control tower and AI will try AI agents AI&nbsp;&nbsp;
+
+00:07:07.840 --> 00:07:14.160
+workflows however you want to call it AI workforce&nbsp;
+will try to do as much autonomously as possible&nbsp;&nbsp;
+
+00:07:14.160 --> 00:07:20.720
+and if there is sit situations um where the system&nbsp;
+cannot autonomously move on or there's exceptions&nbsp;&nbsp;
+
+00:07:20.720 --> 00:07:24.880
+or there's the stereotypical container that falls&nbsp;
+off the ship which doesn't happen as often as&nbsp;&nbsp;
+
+00:07:24.880 --> 00:07:29.840
+people say but let's say 100 times a year just for&nbsp;
+this example and maybe in that case you don't have&nbsp;&nbsp;
+
+00:07:29.840 --> 00:07:34.800
+you haven't trained an AI system to handle that&nbsp;
+situation and you'll just take a really smart&nbsp;&nbsp;
+
+00:07:34.800 --> 00:07:40.000
+really good high ownership human um who will&nbsp;
+sort of then creatively creatively as in with&nbsp;&nbsp;
+
+00:07:40.000 --> 00:07:46.240
+human intelligence and creativity to drive such a&nbsp;
+process solve those processes Today we start with&nbsp;&nbsp;
+
+00:07:46.240 --> 00:07:52.480
+um more discrete use cases and don't fully solve&nbsp;
+the end to- end journey yet just because as you&nbsp;&nbsp;
+
+00:07:52.480 --> 00:07:57.440
+say you have to start somewhere and so what we&nbsp;
+do is automatically create quotes accept orders&nbsp;&nbsp;
+
+00:07:57.440 --> 00:08:02.160
+check them for completeness check documents&nbsp;
+check whether they make sense automate tons of&nbsp;&nbsp;
+
+00:08:02.160 --> 00:08:06.480
+data entry stuff etc and what we're seeing is&nbsp;
+to our earlier point of how much is the human&nbsp;&nbsp;
+
+00:08:06.480 --> 00:08:13.520
+involved already today November 2025 you have&nbsp;
+intelligence saturation for a set of small and&nbsp;&nbsp;
+
+00:08:13.520 --> 00:08:18.000
+mid-level tasks asks why you really don't need&nbsp;
+a human anymore because the error margin that&nbsp;&nbsp;
+
+00:08:18.000 --> 00:08:26.320
+the AI model has on the problem is probably five&nbsp;
+to x smaller so almost an order of magnitude than&nbsp;&nbsp;
+
+00:08:26.320 --> 00:08:30.480
+um what a human does and so so then you clearly&nbsp;
+take an AI model and that's true for all the data&nbsp;&nbsp;
+
+00:08:30.480 --> 00:08:34.480
+entry stuff clearly and whereas there's other&nbsp;
+other classes of problems like really complex&nbsp;&nbsp;
+
+00:08:34.480 --> 00:08:40.000
+quotations which in CN freight are rather complex&nbsp;
+because it has like trucking in China and Europe&nbsp;&nbsp;
+
+00:08:40.000 --> 00:08:43.760
+and customs clearance and you need to check&nbsp;
+a bunch of things there you probably want to&nbsp;&nbsp;
+
+00:08:43.760 --> 00:08:51.520
+have human in the loop um still still today. So&nbsp;
+is it fair to say if we look at the the yeah if&nbsp;&nbsp;
+
+00:08:51.520 --> 00:08:58.000
+in this case very particular value stream from the&nbsp;
+customer orders I want this container shipped from&nbsp;&nbsp;
+
+00:08:58.000 --> 00:09:04.320
+Beijing to Hamburg and the container arrives and&nbsp;
+the the customer is happy. That's a clear value&nbsp;&nbsp;
+
+00:09:04.320 --> 00:09:11.040
+stream with a clear outcome. My customer wants&nbsp;
+something and then in the end it's delivered. Um,&nbsp;&nbsp;
+
+00:09:11.040 --> 00:09:17.840
+do you is it correct to say that you essentially&nbsp;
+have that human supervising that value stream and&nbsp;&nbsp;
+
+00:09:17.840 --> 00:09:24.080
+the human needs specific things and requests&nbsp;
+to systems essentially paths that the human&nbsp;&nbsp;
+
+00:09:24.080 --> 00:09:29.360
+can follow to then do specific things? Can you&nbsp;
+describe such a value stream and where you're&nbsp;&nbsp;
+
+00:09:29.360 --> 00:09:33.520
+essentially slotting in capabilities?&nbsp;
+Yeah, that's a very good question. Um,&nbsp;&nbsp;
+
+00:09:33.520 --> 00:09:39.600
+that's very good a very good very good point.&nbsp;
+So, how does it work at the moment? Um I think&nbsp;&nbsp;
+
+00:09:39.600 --> 00:09:43.440
+the right user experience is being figured out&nbsp;
+but how it works at the moment is the following.&nbsp;&nbsp;
+
+00:09:43.440 --> 00:09:47.680
+Maybe you are let's say you're a Kaspar you&nbsp;
+work at a Fred for water um called Meridian&nbsp;&nbsp;
+
+00:09:47.680 --> 00:09:51.360
+Freight that doesn't really exist but I always use&nbsp;
+that company for demo purposes. So you're Kasper,&nbsp;&nbsp;
+
+00:09:51.360 --> 00:09:55.360
+you work at Meridian Freight and you handle you're&nbsp;
+in the seaf freight team and so you get a request&nbsp;&nbsp;
+
+00:09:55.360 --> 00:09:59.680
+from a customer saying hey Kaspera can you give me&nbsp;
+up-to-date rates for the next months um from these&nbsp;&nbsp;
+
+00:09:59.680 --> 00:10:04.800
+origins to these destinations please see freight&nbsp;
+20 foot and 40 foot high cube containers and then&nbsp;&nbsp;
+
+00:10:04.800 --> 00:10:09.360
+um you know in the past what you have to do is do&nbsp;
+I know Kaspar do we serve these trade lanes do I&nbsp;&nbsp;
+
+00:10:09.360 --> 00:10:14.720
+ship these goods then you know first that's more&nbsp;
+like I check a bunch of things um then do I have&nbsp;&nbsp;
+
+00:10:14.720 --> 00:10:18.800
+everything I need to create a quotation maybe I'm&nbsp;
+missing addresses I'm missing other information um&nbsp;&nbsp;
+
+00:10:18.800 --> 00:10:24.480
+then you need to find the um you need to check do&nbsp;
+I have trucking prices in China for this or in at&nbsp;&nbsp;
+
+00:10:24.480 --> 00:10:29.280
+wherever the origin is and mostly it's of course&nbsp;
+Asia do I have um destination site local trucking&nbsp;&nbsp;
+
+00:10:29.280 --> 00:10:33.840
+charges do I know what the ship or the the air&nbsp;
+freight rate is do I need to offer customs as&nbsp;&nbsp;
+
+00:10:33.840 --> 00:10:38.880
+well if I don't have it where do I get it from and&nbsp;
+so it's quite a actually quite a heavy process to&nbsp;&nbsp;
+
+00:10:38.880 --> 00:10:45.600
+organize that and now in the future you basically&nbsp;
+just hand over that email to your AI colleague&nbsp;&nbsp;
+
+00:10:45.600 --> 00:10:50.800
+um we call that sort of an AI co-pilot or AI&nbsp;
+colleague you forward Right? And then that sort&nbsp;&nbsp;
+
+00:10:50.800 --> 00:10:56.000
+of AI will take over the job and might tell you,&nbsp;
+hey, something is missing. We need this, we need&nbsp;&nbsp;
+
+00:10:56.000 --> 00:11:00.480
+that. Or could even on behalf of yours send an&nbsp;
+email back to the customer that you can decide&nbsp;&nbsp;
+
+00:11:00.480 --> 00:11:05.040
+if you want to still review it or uh then you just&nbsp;
+get a draft in your inbox and you can review it,&nbsp;&nbsp;
+
+00:11:05.040 --> 00:11:10.560
+send it out or um you automatically send it out&nbsp;
+and then the AI takes over the job. And most of&nbsp;&nbsp;
+
+00:11:10.560 --> 00:11:15.120
+the times our customers choose that they do&nbsp;
+a final review before the quote gets sent&nbsp;&nbsp;
+
+00:11:15.120 --> 00:11:19.360
+out. sometimes because they want to do a sanity&nbsp;
+check. Maybe they know something specific about&nbsp;&nbsp;
+
+00:11:19.360 --> 00:11:24.480
+this customer where they say, "Hey, honestly, they&nbsp;
+ship, I don't know, really high value items. Um,&nbsp;&nbsp;
+
+00:11:24.480 --> 00:11:33.920
+let's say uh uh solar panels. Let's just add&nbsp;
+20% more markup." Yeah. Um or um uh you know,&nbsp;&nbsp;
+
+00:11:33.920 --> 00:11:37.360
+you might want to add, hey, and say hi to your&nbsp;
+children. Yeah. To give it a bit of a human touch&nbsp;&nbsp;
+
+00:11:37.360 --> 00:11:43.200
+because this is in the end still sort of also, I&nbsp;
+think, um an enterprise sales environment. Um and&nbsp;&nbsp;
+
+00:11:43.200 --> 00:11:46.720
+that's why humans often review it. We have other&nbsp;
+customers where they say, "Hey, it's a bit more&nbsp;&nbsp;
+
+00:11:46.720 --> 00:11:51.280
+anonymous. It's it's more like in especially in&nbsp;
+Asia, fast turnaround." They accept that there's a&nbsp;&nbsp;
+
+00:11:51.280 --> 00:11:56.000
+1% error rate maybe. Yeah. But they just prefer to&nbsp;
+send quotes really really quickly because that's&nbsp;&nbsp;
+
+00:11:56.000 --> 00:12:02.880
+more an advantage. Okay. So if if we now think&nbsp;
+about this value stream zooming in that's sort of&nbsp;&nbsp;
+
+00:12:02.880 --> 00:12:10.320
+the the the substream of I have an order coming&nbsp;
+in, I am creating that and then I'm responding&nbsp;&nbsp;
+
+00:12:10.320 --> 00:12:16.800
+to this. And it's again the human orchestrating&nbsp;
+collecting the information intersecting with the&nbsp;&nbsp;
+
+00:12:16.800 --> 00:12:22.560
+the systems underneath and then once that order&nbsp;
+stream is done with the final outcome the user&nbsp;&nbsp;
+
+00:12:22.560 --> 00:12:28.880
+has an an order we're moving on to the next value&nbsp;
+stream of okay let's book this thing now reach out&nbsp;&nbsp;
+
+00:12:28.880 --> 00:12:35.280
+to some sort of third party system to book a truck&nbsp;
+uh that's going from some very large Asian city&nbsp;&nbsp;
+
+00:12:35.280 --> 00:12:42.160
+to Beijing and then exactly and that that again is&nbsp;
+that you know that stream is and the human against&nbsp;&nbsp;
+
+00:12:42.160 --> 00:12:47.120
+some sort of third party system. Is that a good&nbsp;
+way of thinking about it? Exactly. Right. The the&nbsp;&nbsp;
+
+00:12:47.120 --> 00:12:51.120
+what you're mentioning the booking step is exactly&nbsp;
+like always it's always the same thing. I think in&nbsp;&nbsp;
+
+00:12:51.120 --> 00:12:55.600
+favor of boarding it's particularly interesting&nbsp;
+and fits your model really well because it's very&nbsp;&nbsp;
+
+00:12:55.600 --> 00:13:01.440
+like very often you see a request you often work&nbsp;
+triggered by emails. A customer sends a booking.&nbsp;&nbsp;
+
+00:13:01.440 --> 00:13:05.120
+Customer sends a request. The ship's coming&nbsp;
+late. Someone's confirming something and then&nbsp;&nbsp;
+
+00:13:05.120 --> 00:13:09.360
+you do something based on that. And I think what&nbsp;
+I noticed at for is very often people know what to&nbsp;&nbsp;
+
+00:13:09.360 --> 00:13:14.880
+do. the execution, the typing, the entering in a&nbsp;
+system that takes a lot of time. But the decision&nbsp;&nbsp;
+
+00:13:14.880 --> 00:13:21.360
+itself I think humans are mostly really really&nbsp;
+good at but the execution really also takes time.&nbsp;&nbsp;
+
+00:13:21.360 --> 00:13:26.720
+Okay, makes sense, right? So then actually fits&nbsp;
+really well into this uh platform model of saying&nbsp;&nbsp;
+
+00:13:26.720 --> 00:13:33.520
+hey in the end the user is consuming a platform&nbsp;
+with capabilities and they need the platform in a&nbsp;&nbsp;
+
+00:13:33.520 --> 00:13:38.880
+certain situation. The platform offers paths that&nbsp;
+they can take like it's the order booking path,&nbsp;&nbsp;
+
+00:13:38.880 --> 00:13:45.760
+it's the request prices path, it's the give me&nbsp;
+a truck uh from city A to city B. And you are&nbsp;&nbsp;
+
+00:13:45.760 --> 00:13:51.360
+offering interfaces and capabilities that augment&nbsp;
+those humans and do all of the nitty-gritty work&nbsp;&nbsp;
+
+00:13:51.360 --> 00:13:56.480
+allowing the human to then actually focus on&nbsp;
+the value adding thing that the human is good&nbsp;&nbsp;
+
+00:13:56.480 --> 00:14:02.240
+good at which is taking decisions making sure to&nbsp;
+read signals correctly and then handing over. So&nbsp;&nbsp;
+
+00:14:02.240 --> 00:14:07.840
+do freight forwarders do you think freight&nbsp;
+forwarders should think about the process&nbsp;&nbsp;
+
+00:14:07.840 --> 00:14:13.200
+itself as a product? Because and I'm saying this&nbsp;
+because I've just looked at you know Henry Ford&nbsp;&nbsp;
+
+00:14:13.200 --> 00:14:18.000
+for instance like what was the key thing that&nbsp;
+Henry Ford delivered he didn't come up with a&nbsp;&nbsp;
+
+00:14:18.000 --> 00:14:23.680
+combustion engine right like he didn't re like he&nbsp;
+didn't invent assembly work really but what made&nbsp;&nbsp;
+
+00:14:23.680 --> 00:14:30.080
+him so special is that he took a step back and he&nbsp;
+said well the artisal way of building a a a a car&nbsp;&nbsp;
+
+00:14:30.080 --> 00:14:37.600
+right takes a 100 hours leads to tribal knowledge&nbsp;
+it leads to codependencies it leads to low degrees&nbsp;&nbsp;
+
+00:14:37.600 --> 00:14:42.720
+of standardization all of those things. Let's&nbsp;
+take a step back. Let's actually understand that&nbsp;&nbsp;
+
+00:14:42.720 --> 00:14:49.360
+the process of manufacturing a car in itself is a&nbsp;
+product which we need to iterate on which we need&nbsp;&nbsp;
+
+00:14:49.360 --> 00:14:54.400
+to enhance all the time. Is that a do you think&nbsp;
+freight forwarders should should think about this&nbsp;&nbsp;
+
+00:14:54.400 --> 00:14:59.520
+this way? Look, I mean they're thinking about&nbsp;
+this definitely since 20 years massively as a&nbsp;&nbsp;
+
+00:14:59.520 --> 00:15:08.800
+product already. Mhm. However, only in the real&nbsp;
+world, how things get done versus what someone&nbsp;&nbsp;
+
+00:15:08.800 --> 00:15:14.720
+thinks of what the ideal process is is a very&nbsp;
+very different reality. So in historically you&nbsp;&nbsp;
+
+00:15:14.720 --> 00:15:17.920
+have the situation if you have global process&nbsp;
+teams, a global head of process excellence,&nbsp;&nbsp;
+
+00:15:17.920 --> 00:15:23.200
+logistics excellence, global BPM, something like&nbsp;
+that and they draw these nice charts, you know,&nbsp;&nbsp;
+
+00:15:23.200 --> 00:15:28.480
+with these great BPMN tools and you can, if you&nbsp;
+really like it, you put them as a tapestry on your&nbsp;&nbsp;
+
+00:15:28.480 --> 00:15:36.800
+wall and they can easily fit like a 500 m house.&nbsp;
+But then you know when you go into the engine room
+
+00:15:36.800 --> 00:15:41.680
+most people I would say don't do it like that.&nbsp;
+You know sometimes now when I have customers and&nbsp;&nbsp;
+
+00:15:41.680 --> 00:15:45.760
+um I work with someone like who has that function&nbsp;
+and we do a shadowing of what the operations&nbsp;&nbsp;
+
+00:15:45.760 --> 00:15:49.840
+people do they they get shocked by how little the&nbsp;
+process is being followed. I interviewed myself&nbsp;&nbsp;
+
+00:15:49.840 --> 00:15:54.320
+still at for when we tried to build an automation&nbsp;
+around delivery of containers from the port to&nbsp;&nbsp;
+
+00:15:54.320 --> 00:15:58.800
+the customer on the final mile basically what we&nbsp;
+consider the final mile. interviewed customers.&nbsp;&nbsp;
+
+00:15:58.800 --> 00:16:05.840
+I interviewed operations clerks um that we had&nbsp;
+and one person said, "I always um schedule the&nbsp;&nbsp;
+
+00:16:05.840 --> 00:16:10.240
+truck first and then I ask the customer if he&nbsp;
+if they have time." And another person said, "I&nbsp;&nbsp;
+
+00:16:10.240 --> 00:16:13.680
+always ask the customer first when I want to have&nbsp;
+the container and then I schedule the truck." And&nbsp;&nbsp;
+
+00:16:13.680 --> 00:16:17.360
+the third person would do it even differently. And&nbsp;
+I said, "Why do you do it like that?" I'm like,&nbsp;&nbsp;
+
+00:16:17.360 --> 00:16:20.000
+"That's how I always did it. I mean, that's&nbsp;
+how it's being done." Another person said,&nbsp;&nbsp;
+
+00:16:20.000 --> 00:16:26.160
+"That's how I learned it." And so there's usually,&nbsp;
+you know, um a lot of personal interpretation for&nbsp;&nbsp;
+
+00:16:26.160 --> 00:16:32.720
+the process. Um also because there was not necess&nbsp;
+if it works there wasn't necessarily a need to&nbsp;&nbsp;
+
+00:16:32.720 --> 00:16:37.360
+follow the process. I think the future will be&nbsp;
+very different. Why? Because in the future we&nbsp;&nbsp;
+
+00:16:37.360 --> 00:16:45.360
+will do more things with AI and AI will follow a&nbsp;
+process not a super hard-coded process like in the&nbsp;&nbsp;
+
+00:16:45.360 --> 00:16:49.680
+old no code low code days where everything had to&nbsp;
+be almost a touring complete deterministic graph.&nbsp;&nbsp;
+
+00:16:49.680 --> 00:16:54.400
+I think it just doesn't work for an industry like&nbsp;
+freight forwarding um or logistics because things&nbsp;&nbsp;
+
+00:16:54.400 --> 00:16:59.680
+are much more dynamic. But still what I realized&nbsp;
+today when we roll out our product is you need to&nbsp;&nbsp;
+
+00:16:59.680 --> 00:17:05.680
+think really in detail about your process because&nbsp;
+this time there is actually a workforce quote&nbsp;&nbsp;
+
+00:17:05.680 --> 00:17:11.280
+unquote which takes your process and executes&nbsp;
+it. Right? is not that you hire somebody,&nbsp;&nbsp;
+
+00:17:11.280 --> 00:17:14.800
+you tell them this how you should do it and if&nbsp;
+they do it differently but they get the job done.&nbsp;&nbsp;
+
+00:17:14.800 --> 00:17:19.760
+It's great and this time it will really be taken&nbsp;
+and that's a massive opportunity but also a big&nbsp;&nbsp;
+
+00:17:19.760 --> 00:17:23.520
+risk if you don't understand the details and what&nbsp;
+we realize is that there are some customers who&nbsp;&nbsp;
+
+00:17:23.520 --> 00:17:27.520
+have a high degree of process excellence um and&nbsp;
+some not and then for them I think it will be more&nbsp;&nbsp;
+
+00:17:27.520 --> 00:17:31.440
+challenging to go through the AI transformation. I&nbsp;
+think there's ways to bridge that through systems&nbsp;&nbsp;
+
+00:17:31.440 --> 00:17:36.960
+that learn themselves. But I think the bottom line&nbsp;
+is the process becomes much more important in the&nbsp;&nbsp;
+
+00:17:36.960 --> 00:17:41.520
+future because things get more centralized with&nbsp;
+AI because obviously AI relies more on a single&nbsp;&nbsp;
+
+00:17:41.520 --> 00:17:45.920
+template that can still be highly individualized&nbsp;
+to customers but still you know rather a single&nbsp;&nbsp;
+
+00:17:45.920 --> 00:17:51.680
+template than swarm intelligence. Well, and you're&nbsp;
+solving something that I think has consistently&nbsp;&nbsp;
+
+00:17:51.680 --> 00:17:57.920
+been the problem in artisal setups. Um I would&nbsp;
+frame that as the external effects problem. So I&nbsp;&nbsp;
+
+00:17:57.920 --> 00:18:03.520
+flew to I flew um four or five times to Las Vegas&nbsp;
+last year. Not because I like gambling because all&nbsp;&nbsp;
+
+00:18:03.520 --> 00:18:09.360
+of the conferences you like driving exactly which&nbsp;
+is great for me, great for my the the companies&nbsp;&nbsp;
+
+00:18:09.360 --> 00:18:14.160
+that I I work for, but it's sort of terrible for&nbsp;
+the planet. So sort of typical external effects&nbsp;&nbsp;
+
+00:18:14.160 --> 00:18:18.000
+situation. Um what affects the what's good for&nbsp;
+the individual doesn't necessarily need to be&nbsp;&nbsp;
+
+00:18:18.000 --> 00:18:21.840
+good for the organization. And we're seeing&nbsp;
+this all the time in these setups like there&nbsp;&nbsp;
+
+00:18:21.840 --> 00:18:26.400
+are these process maps. So congratulations. But&nbsp;
+for the individual, you know, they don't really&nbsp;&nbsp;
+
+00:18:26.400 --> 00:18:32.640
+care about standardization. They don't really care&nbsp;
+about, you know, causing couple hundred euros of&nbsp;&nbsp;
+
+00:18:32.640 --> 00:18:38.640
+loss. That's okay for them, right? But it's still&nbsp;
+terrible externally for the organization. So,&nbsp;&nbsp;
+
+00:18:38.640 --> 00:18:44.400
+and that's obviously something that in the age of&nbsp;
+agents and in the age of well-crafted platforms,&nbsp;&nbsp;
+
+00:18:44.400 --> 00:18:49.120
+you don't have that problem anymore because the&nbsp;
+agent is essentially paid by the organization and&nbsp;&nbsp;
+
+00:18:49.120 --> 00:18:57.200
+there is no external effect going on. So I'm like&nbsp;
+sure that that's going to be like a wild change.&nbsp;&nbsp;
+
+00:18:57.200 --> 00:19:03.120
+Before we go into the social implications,&nbsp;
+what's the um one of the things that that I&nbsp;&nbsp;
+
+00:19:03.120 --> 00:19:08.560
+for instance observe in the IT industry where all&nbsp;
+of that platform engineering thing originated is&nbsp;&nbsp;
+
+00:19:08.560 --> 00:19:15.760
+that the the productive use of something like&nbsp;
+AI or pretty much any process human-driven or&nbsp;&nbsp;
+
+00:19:15.760 --> 00:19:23.360
+agent driven is directly dependent on how well&nbsp;
+the back-end systems are designed. Like if you&nbsp;&nbsp;
+
+00:19:23.360 --> 00:19:28.560
+don't have an API interface to your data, right,&nbsp;
+you probably have more problems than if there's&nbsp;&nbsp;
+
+00:19:28.560 --> 00:19:34.720
+well doumented systems that agents can act on&nbsp;
+and humans know how to use. And the paths are&nbsp;&nbsp;
+
+00:19:34.720 --> 00:19:39.760
+designed in a way of leading to standardization&nbsp;
+by design. It's the least the least uncomfortable&nbsp;&nbsp;
+
+00:19:39.760 --> 00:19:45.200
+thing for agent or human is to follow that thing&nbsp;
+because it's designed that way. Do you see that&nbsp;&nbsp;
+
+00:19:45.200 --> 00:19:49.680
+as well? Like how do you make sense of all of&nbsp;
+those disintegrated systems and data sets that&nbsp;&nbsp;
+
+00:19:49.680 --> 00:19:54.880
+you just Good question. Incredibly good question&nbsp;
+and very important topic. I think that in general&nbsp;&nbsp;
+
+00:19:54.880 --> 00:20:00.720
+you're right. I think if today you still haven't&nbsp;
+arrived at an organization any kind of industry&nbsp;&nbsp;
+
+00:20:00.720 --> 00:20:06.880
+where your systems are open to be connected by&nbsp;
+third party systems or you are very old school&nbsp;&nbsp;
+
+00:20:06.880 --> 00:20:11.120
+from a compliance perspective still cannot go for&nbsp;
+cloud or whatever. I have seen that I think you&nbsp;&nbsp;
+
+00:20:11.120 --> 00:20:14.480
+have a problem because it's going to be super&nbsp;
+hard for you to adopt anything uh any new kind&nbsp;&nbsp;
+
+00:20:14.480 --> 00:20:21.120
+of technology that automates um auto obviously.&nbsp;
+However, the reality is also a bit more nuanced.&nbsp;&nbsp;
+
+00:20:21.120 --> 00:20:29.040
+Um, and why? So, in the pre- AI, but the pre-Gen&nbsp;
+AI yet in the AI machine learning days 5 to 10&nbsp;&nbsp;
+
+00:20:29.040 --> 00:20:33.680
+years ago, right, when we all did predictive&nbsp;
+stuff and analytics and classifications, there&nbsp;&nbsp;
+
+00:20:33.680 --> 00:20:38.000
+you had a real problem if your data was [&nbsp;__&nbsp;]&nbsp;
+Pardon my friends, but if your data wasn't great,&nbsp;&nbsp;
+
+00:20:38.000 --> 00:20:42.800
+um, because you would need to be basing everything&nbsp;
+on good data, otherwise the models don't don't&nbsp;&nbsp;
+
+00:20:42.800 --> 00:20:50.800
+train well. Um, now I personally see Genai&nbsp;
+actually as an on-ramp to great data quality&nbsp;&nbsp;
+
+00:20:50.800 --> 00:20:57.200
+because in reality you don't really need to have&nbsp;
+humans anymore entering your data. This fantastic&nbsp;&nbsp;
+
+00:20:57.200 --> 00:21:03.520
+new use case which is already so easy to deploy&nbsp;
+for all industries from sales stuff to logistics&nbsp;&nbsp;
+
+00:21:03.520 --> 00:21:07.760
+operational processes is hey an AI enters all the&nbsp;
+data from your emails into your system and it's&nbsp;&nbsp;
+
+00:21:07.760 --> 00:21:13.680
+going to be perfect. It cleans it. it looks up if&nbsp;
+that customer is still whatever on the internet&nbsp;&nbsp;
+
+00:21:13.680 --> 00:21:17.920
+it it will do that all automatically for you. So&nbsp;
+I think you can get to clearer data and better&nbsp;&nbsp;
+
+00:21:17.920 --> 00:21:23.760
+data better master data better operational data&nbsp;
+with Genai. Um and that also means that you know&nbsp;&nbsp;
+
+00:21:23.760 --> 00:21:29.200
+I think you can do more with it down the road.&nbsp;
+However again if your systems you can't integrate&nbsp;&nbsp;
+
+00:21:29.200 --> 00:21:32.800
+them then that's a problem. I've recently seen a&nbsp;
+transport management system provider, for example,&nbsp;&nbsp;
+
+00:21:32.800 --> 00:21:40.400
+in our industry say every API call costs um 25&nbsp;
+cents, which is of course a data pricing model&nbsp;&nbsp;
+
+00:21:40.400 --> 00:21:48.640
+from probably even before the '90s. Um so um that&nbsp;
+yeah, that's prohibitive to innovation and I think&nbsp;&nbsp;
+
+00:21:48.640 --> 00:21:52.960
+you need to think about whether you still want&nbsp;
+to be around in that case in 10 years, probably&nbsp;&nbsp;
+
+00:21:52.960 --> 00:21:58.560
+even five. Well, not only not only this, you also&nbsp;
+need to make damn sure as the person responsible&nbsp;&nbsp;
+
+00:21:58.560 --> 00:22:03.680
+for choosing the provider, right, that they are&nbsp;
+actually ready for that age, the pricing models,&nbsp;&nbsp;
+
+00:22:03.680 --> 00:22:10.160
+the the the way they're thinking about this, are&nbsp;
+they designing AI first or or are they not like&nbsp;&nbsp;
+
+00:22:10.160 --> 00:22:15.040
+that's a fascinating I think most incumbents&nbsp;
+are not yet. And I think it's okay because&nbsp;&nbsp;
+
+00:22:15.040 --> 00:22:19.280
+um if you have a big software, you you're a bit&nbsp;
+slower with things naturally because you have&nbsp;&nbsp;
+
+00:22:19.280 --> 00:22:23.280
+lots of surface area. And I also think it's&nbsp;
+okay because it's not yet 100% clear what the&nbsp;&nbsp;
+
+00:22:23.280 --> 00:22:28.880
+systems of record, what the platforms will look&nbsp;
+like. I was in San Francisco recently and I saw&nbsp;&nbsp;
+
+00:22:28.880 --> 00:22:35.360
+a really really fantastic innovative design&nbsp;
+of a system of record which was purely text&nbsp;&nbsp;
+
+00:22:35.360 --> 00:22:38.880
+based. So really purely text based. You&nbsp;
+had sort of it was a transfer management&nbsp;&nbsp;
+
+00:22:38.880 --> 00:22:44.400
+system for customers of freight forwarders that&nbsp;
+ship things. Let's say um a big manufacturing&nbsp;&nbsp;
+
+00:22:44.400 --> 00:22:48.480
+company that has lots of transports and you'd&nbsp;
+have your key entities, transports, bookings,&nbsp;&nbsp;
+
+00:22:48.480 --> 00:22:55.440
+etc. um maybe clients and so on, but every single&nbsp;
+item in this collection is just a text file. And&nbsp;&nbsp;
+
+00:22:55.440 --> 00:23:00.880
+I like that a lot because in reality we crammed&nbsp;
+everything into relational databases. So, Excel&nbsp;&nbsp;
+
+00:23:00.880 --> 00:23:07.120
+style, right? Data models, tables. But very often&nbsp;
+I see that the notes field, the comments field&nbsp;&nbsp;
+
+00:23:07.120 --> 00:23:11.920
+is the most beloved and most used field because&nbsp;
+you just no matter how good your data model is,&nbsp;&nbsp;
+
+00:23:11.920 --> 00:23:17.120
+you cannot put things like yeah, the truck's&nbsp;
+going to go to gutting but then unlock 10% in.&nbsp;&nbsp;
+
+00:23:17.120 --> 00:23:22.560
+Yeah. you cannot put that into there's no data&nbsp;
+model that supports that. Um and now that was&nbsp;&nbsp;
+
+00:23:22.560 --> 00:23:29.760
+a really innovative design and maybe it's going&nbsp;
+to look like that but we also don't know. Um so
+
+00:23:29.760 --> 00:23:38.080
+the future is going to be super exciting. Yeah,&nbsp;
+that's a good for sure. Um with with with Saaba&nbsp;&nbsp;
+
+00:23:38.080 --> 00:23:48.080
+you're essentially providing the tools that allow&nbsp;
+freight forwarders to um really structure the&nbsp;&nbsp;
+
+00:23:48.080 --> 00:23:56.080
+things along the value stream that were formally&nbsp;
+you know errorprone human operations. It I is that&nbsp;&nbsp;
+
+00:23:56.080 --> 00:24:05.120
+a way good way of summarizing the tower of Tawa?&nbsp;
+We are yes in a way yes yes you can say that we&nbsp;&nbsp;
+
+00:24:05.120 --> 00:24:09.920
+are automate we I think you know we think that&nbsp;
+automation in this business we don't do it for&nbsp;&nbsp;
+
+00:24:09.920 --> 00:24:14.320
+the sake of automation we do it because we think&nbsp;
+that you can offer better customer service when&nbsp;&nbsp;
+
+00:24:14.320 --> 00:24:20.560
+you do when you run your best process every time&nbsp;
+you can retain customers longer you can win more&nbsp;&nbsp;
+
+00:24:20.560 --> 00:24:24.480
+business if you respond really really quickly and&nbsp;
+really excellent every single time I mean think&nbsp;&nbsp;
+
+00:24:24.480 --> 00:24:30.080
+about calling telecom and every time someone would&nbsp;
+be motivated happy that you're calling competent&nbsp;&nbsp;
+
+00:24:30.080 --> 00:24:35.040
+And how crazy would that be? We'd all be telecom&nbsp;
+customers. Um, and um, not saying that it's not&nbsp;&nbsp;
+
+00:24:35.040 --> 00:24:38.960
+that people in teleporting are not, but I mean&nbsp;
+there's just typically I find that people are&nbsp;&nbsp;
+
+00:24:38.960 --> 00:24:42.960
+really happy with their jobs and they love their&nbsp;
+jobs, but they're also sometimes just overwhelmed,&nbsp;&nbsp;
+
+00:24:42.960 --> 00:24:48.240
+right? There's times of crunch. Um, there's um,&nbsp;
+you know, sometimes language barriers, time zone&nbsp;&nbsp;
+
+00:24:48.240 --> 00:24:54.560
+differences. In China, people are already in the&nbsp;
+pub. Um, well earned it's it's it's 9:00 p.m. So,&nbsp;&nbsp;
+
+00:24:54.560 --> 00:24:59.440
+we can't get anything done there anymore. And so&nbsp;
+I think automation will help a lot along customer&nbsp;&nbsp;
+
+00:24:59.440 --> 00:25:03.760
+service, productivity, also margin retention&nbsp;
+and and revenue management and and that's&nbsp;&nbsp;
+
+00:25:03.760 --> 00:25:10.480
+why we believe that AI is a big opportunity&nbsp;
+in logistics. Last question. This does have&nbsp;&nbsp;
+
+00:25:10.480 --> 00:25:17.760
+implications on how people do their job, right?&nbsp;
+Like it will no longer be dependent on the artisal&nbsp;&nbsp;
+
+00:25:17.760 --> 00:25:23.360
+knowledge and mastery of somebody who's done it&nbsp;
+for for a decade. Um, I wouldn't say, you know,&nbsp;&nbsp;
+
+00:25:23.360 --> 00:25:31.600
+you're turning the person that has before built&nbsp;
+the car in a 100hour fight between that human and&nbsp;&nbsp;
+
+00:25:31.600 --> 00:25:36.240
+the machines into factory lines, right? So,&nbsp;
+you know, it's not we're not talking about&nbsp;&nbsp;
+
+00:25:36.240 --> 00:25:42.400
+digital factories, but it will have political&nbsp;
+implications. I presume people needed to change&nbsp;&nbsp;
+
+00:25:42.400 --> 00:25:48.880
+the job functions change. What does that do to&nbsp;
+the organizations that are taking that serious?&nbsp;&nbsp;
+
+00:25:49.840 --> 00:25:55.120
+Yeah, that's a point we would all should all&nbsp;
+think about more and um I think many things&nbsp;&nbsp;
+
+00:25:55.120 --> 00:25:59.520
+we'll we'll we'll have to see. I'm not convinced&nbsp;
+at this point. These are just my hypothesis,&nbsp;&nbsp;
+
+00:25:59.520 --> 00:26:04.800
+but I'm not convinced at this point that you will&nbsp;
+necessarily see job loss. Why? Because the human&nbsp;&nbsp;
+
+00:26:04.800 --> 00:26:10.080
+nature has always been such that we always wanted&nbsp;
+more. We wanted to eat more, ship more. Um I mean,&nbsp;&nbsp;
+
+00:26:10.080 --> 00:26:14.800
+you know, buy better products, buy better&nbsp;
+healthcare, fly further for vacation, and&nbsp;&nbsp;
+
+00:26:14.800 --> 00:26:19.280
+have longer vacation. And so, you know, I think we&nbsp;
+will always find more things to do because there's&nbsp;&nbsp;
+
+00:26:19.280 --> 00:26:26.240
+an endless appetite in human nature for economic&nbsp;
+growth. I do think that roles will change to that&nbsp;&nbsp;
+
+00:26:26.240 --> 00:26:33.280
+same point because you do just don't have to type&nbsp;
+15 pack items from a packing list or commercial&nbsp;&nbsp;
+
+00:26:33.280 --> 00:26:38.720
+invoice into your TMS anymore. And you will have&nbsp;
+probably more the more creative, more high stakes&nbsp;&nbsp;
+
+00:26:38.720 --> 00:26:45.040
+task to do in the future than that. And I think&nbsp;
+that people who are not willing unfortunately to&nbsp;&nbsp;
+
+00:26:45.040 --> 00:26:52.000
+adapt their work from that perspective, I think&nbsp;
+they will probably face at one point challenges&nbsp;&nbsp;
+
+00:26:52.000 --> 00:26:58.160
+because um there that then they will be under&nbsp;
+pressure. Yeah, that's that's that's I think what&nbsp;&nbsp;
+
+00:26:58.160 --> 00:27:02.080
+what I'm what I'm convinced of. Um and also, you&nbsp;
+know, I think what we can learn from lessons from&nbsp;&nbsp;
+
+00:27:02.080 --> 00:27:07.840
+the past. Um we probably have a higher employment&nbsp;
+rate than you know, at the four days. Um and&nbsp;&nbsp;
+
+00:27:07.840 --> 00:27:14.160
+um and and and at the same time I think there&nbsp;
+will be will be shifts you know. Lastly, I think&nbsp;&nbsp;
+
+00:27:14.160 --> 00:27:20.320
+what we need to say is because to a degree,&nbsp;
+you know, I live in Europe um and and I know&nbsp;&nbsp;
+
+00:27:20.320 --> 00:27:24.000
+probably people that listen to you are global,&nbsp;
+but I think, you know, because we live here,&nbsp;&nbsp;
+
+00:27:24.000 --> 00:27:31.040
+I think it's super important that um you know, we&nbsp;
+there's going to be a next industrial revolution&nbsp;&nbsp;
+
+00:27:31.040 --> 00:27:35.520
+and I think the US and and China, they're very&nbsp;
+much at the forefront of it and requires massive&nbsp;&nbsp;
+
+00:27:35.520 --> 00:27:44.000
+uh capital expenditure. I don't see the same level&nbsp;
+of um awareness um at a societal level in Europe&nbsp;&nbsp;
+
+00:27:44.000 --> 00:27:50.960
+or probably other parts of the world um around&nbsp;
+the fact that it it will happen what's happening&nbsp;&nbsp;
+
+00:27:50.960 --> 00:27:56.800
+what will happen what we could do or need to do&nbsp;
+in order to defend our economy in that sense also&nbsp;&nbsp;
+
+00:27:56.800 --> 00:28:02.640
+defend our society and the values we we live for&nbsp;
+and I would wish that maybe that's something we&nbsp;&nbsp;
+
+00:28:02.640 --> 00:28:06.640
+imminently take a bit more seriously here in&nbsp;
+Europe and and where people act a bit harder&nbsp;&nbsp;
+
+00:28:08.080 --> 00:28:12.800
+Yeah, that's a gloomy way of um you know&nbsp;
+coming to an end here. But I I would I agree,&nbsp;&nbsp;
+
+00:28:12.800 --> 00:28:18.160
+right? like we are we're sailing into an massive&nbsp;
+storm and you it feels a little bit like Titanic&nbsp;&nbsp;
+
+00:28:18.160 --> 00:28:22.880
+where you know the jazz band keeps playing&nbsp;
+and everybody thinks it's okay to talk about&nbsp;&nbsp;
+
+00:28:22.880 --> 00:28:28.720
+in Germany the current way they're thinking&nbsp;
+about retirement age and packages and it feels&nbsp;&nbsp;
+
+00:28:28.720 --> 00:28:33.840
+like there are a lot more things they should talk&nbsp;
+about rather to continue the metaphor maybe people&nbsp;&nbsp;
+
+00:28:33.840 --> 00:28:39.200
+already feel that something might be happening&nbsp;
+maybe that they feel we've struck an iceberg but&nbsp;&nbsp;
+
+00:28:39.200 --> 00:28:42.880
+um they decide to fight over the last bottles&nbsp;
+of champagne at the bar rather than focusing&nbsp;&nbsp;
+
+00:28:42.880 --> 00:28:46.800
+about what really matters. That's at least how&nbsp;
+sort of politics feels like at the moment when&nbsp;&nbsp;
+
+00:28:46.800 --> 00:28:59.680
+you see the polls for the right-wing parties.&nbsp;
+Good vibes only. Eric, thank you very much.
+

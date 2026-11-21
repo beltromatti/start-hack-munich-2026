@@ -1,0 +1,16 @@
+import puppeteer from "puppeteer-core";
+const [out, w] = [process.argv[2], Number(process.argv[3] || 1440)];
+const browser = await puppeteer.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true, args: ["--hide-scrollbars"], defaultViewport: { width: w, height: w < 700 ? 844 : 1000 } });
+const page = await browser.newPage();
+const errors = [];
+page.on("pageerror", (e) => errors.push(String(e)));
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+await page.goto("http://127.0.0.1:8791/", { waitUntil: "networkidle2" });
+await new Promise((r) => setTimeout(r, 2500));
+await page.screenshot({ path: `${out}-requests.jpg`, type: "jpeg", quality: 80 });
+await page.click('button[data-tab="standings"]');
+await new Promise((r) => setTimeout(r, 800));
+await page.screenshot({ path: `${out}-race.jpg`, type: "jpeg", quality: 80, fullPage: true });
+const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+console.log(JSON.stringify({ w, overflow, errors }));
+await browser.close();
