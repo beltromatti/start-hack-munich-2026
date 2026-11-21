@@ -78,6 +78,12 @@ def use_connection(c: sqlite3.Connection) -> None:
     _conn = c
 
 
+def _q(sql: str, args: Any = ()) -> list[sqlite3.Row]:
+    """Every read goes through the lock: one connection is shared by the loop and the worker threads."""
+    with _lock:
+        return conn().execute(sql, args).fetchall()
+
+
 def new_id(prefix: str = "") -> str:
     return f"{prefix}{uuid.uuid4().hex[:10]}"
 
@@ -101,14 +107,14 @@ def events(since_id: int = 0, run_id: str | None = None, limit: int = 300) -> li
     if run_id:
         q += " AND run_id = ?"
         args.append(run_id)
-    rows = conn().execute(q + " ORDER BY id DESC LIMIT ?", [*args, limit]).fetchall()
+    rows = _q(q + " ORDER BY id DESC LIMIT ?", [*args, limit])
     return [_row(r, "data") for r in reversed(rows)]
 
 
 def usage(run_id: str | None = None) -> dict:
     q = ("SELECT COALESCE(SUM(tokens_in),0) tin, COALESCE(SUM(tokens_out),0) tout, "
          "COUNT(*) FILTER (WHERE kind='llm') calls, COALESCE(SUM(cost_usd),0) cost FROM events")
-    r = conn().execute(q + (" WHERE run_id = ?" if run_id else ""), (run_id,) if run_id else ()).fetchone()
+    r = _q(q + (" WHERE run_id = ?" if run_id else ""), (run_id,) if run_id else ())[0]
     return {"tokens_in": r["tin"], "tokens_out": r["tout"], "llm_calls": r["calls"], "cost_usd": round(r["cost"], 6)}
 
 
@@ -130,17 +136,16 @@ def save_mail(m: dict, direction: str, kind: str | None = None, handled: bool = 
 
 
 def mail(mail_id: int) -> dict | None:
-    r = conn().execute("SELECT * FROM mails WHERE id = ?", (mail_id,)).fetchone()
+    r = next(iter(_q("SELECT * FROM mails WHERE id = ?", (mail_id,))), None)
     return _row(r, "attachments") if r else None
 
 
 def thread(root: int) -> list[dict]:
-    return [_row(r, "attachments") for r in conn().execute("SELECT * FROM mails WHERE root = ? ORDER BY id", (root,))]
+    return [_row(r, "attachments") for r in _q("SELECT * FROM mails WHERE root = ? ORDER BY id", (root,))]
 
 
 def unhandled() -> list[dict]:
-    return [_row(r, "attachments") for r in
-            conn().execute("SELECT * FROM mails WHERE direction='in' AND handled=0 ORDER BY id")]
+    return [_row(r, "attachments") for r in _q("SELECT * FROM mails WHERE direction='in' AND handled=0 ORDER BY id")]
 
 
 def mark_handled(mail_id: int, kind: str) -> None:
@@ -150,7 +155,7 @@ def mark_handled(mail_id: int, kind: str) -> None:
 
 
 def mails(limit: int = 200) -> list[dict]:
-    return [_row(r, "attachments") for r in conn().execute("SELECT * FROM mails ORDER BY id DESC LIMIT ?", (limit,))]
+    return [_row(r, "attachments") for r in _q("SELECT * FROM mails ORDER BY id DESC LIMIT ?", (limit,))]
 
 
 # ---- records -----------------------------------------------------------------------------------------------
@@ -166,7 +171,7 @@ def put(id_: str, type_: str, status: str, data: dict) -> None:
 
 
 def get(id_: str) -> dict | None:
-    r = conn().execute("SELECT * FROM records WHERE id = ?", (id_,)).fetchone()
+    r = next(iter(_q("SELECT * FROM records WHERE id = ?", (id_,))), None)
     return _row(r, "data") if r else None
 
 
@@ -189,11 +194,11 @@ def records(type_: str | None = None, status: str | None = None, limit: int = 50
         q, args = q + " AND type = ?", [*args, type_]
     if status:
         q, args = q + " AND status = ?", [*args, status]
-    return [_row(r, "data") for r in conn().execute(q + " ORDER BY updated_at DESC LIMIT ?", [*args, limit])]
+    return [_row(r, "data") for r in _q(q + " ORDER BY updated_at DESC LIMIT ?", [*args, limit])]
 
 
 def kv_get(k: str, default: str | None = None) -> str | None:
-    r = conn().execute("SELECT v FROM kv WHERE k = ?", (k,)).fetchone()
+    r = next(iter(_q("SELECT v FROM kv WHERE k = ?", (k,))), None)
     return r["v"] if r else default
 
 

@@ -149,7 +149,7 @@ class Forwarder:
                 "started": time.time()}
         if req["missing"]:
             store.put(rid, "rfq", "waiting_customer", data)
-            body = language.write("question", {"customer_name": p.get("customer_name"), "language": p.get("language"),
+            body = language.write("question", {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
                                                "missing": req["missing"], "their_request": p.get("notes")}, rid)
             self.reply_customer(rid, m, body)
             return
@@ -245,14 +245,14 @@ class Forwarder:
             if time.time() - d["started"] < 3 * settings.bid_wait_seconds:  # nothing yet: give carriers more time
                 store.update(rid, lambda r: ("collecting", {**r["data"], "deadline": time.time() + 15}))
                 return
-            body = language.write("decline", {"customer_name": p.get("customer_name"), "language": p.get("language"),
+            body = language.write("decline", {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
                                               "reason": f"no carrier offers {req['origin']} to {req['destination']}"},
                                   rid)
             self.reply_customer(rid, m, body)
             store.update(rid, lambda r: ("lost", {**r["data"], "reason": "no offer"}))
             return
         amount = pricing.fmt(Decimal(q["total"]), q["currency"])
-        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"),
+        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
                  "route": f"{req['origin']} to {req['destination']}", "airline": q["air"]["carrier"],
                  "transit_days": q["transit_days"], "preference": req["preference"],
                  "cargo": f"{req.get('pieces') or ''} pcs {Decimal(req['weight_kg']):.0f} kg".strip(),
@@ -283,7 +283,7 @@ class Forwarder:
         if p["intent"] == "decline":
             store.update(rid, lambda r: ("lost", {**r["data"], "reason": p.get("notes") or "declined"}))
             return
-        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"),
+        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
                  "their_message": p.get("notes"), "status": rec["status"], "our_quote": d.get("amount"),
                  "airline": (d.get("quote") or {}).get("air", {}).get("carrier"),
                  "transit_days": (d.get("quote") or {}).get("transit_days"),
@@ -333,7 +333,7 @@ class Forwarder:
         store.update(rid, lambda r: ("booked" if booking["status"] != "failed" else "quoted",
                                      {**r["data"], "booking": booking}))
         p = d["parsed"]
-        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"),
+        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
                  "booking_reference": booking.get("booking_reference") or ref, "our_reference": ref,
                  "airline": booking["airline"], "route": booking["route"], "transit_days": booking["transit_days"],
                  "pickup_by": (booking.get("pickup") or {}).get("carrier")}
@@ -532,6 +532,10 @@ def thread_text(root: int) -> str:
         who = "US (the forwarder)" if x["direction"] == "out" else x["sender"]
         out.append(f"--- mail {x['id']} from {who} at {x['received_at'] or ''}\nSubject: {x['subject']}\n\n{x['body']}")
     return "\n\n".join(out)[-12000:]
+
+
+def _body(m: dict | None) -> str:
+    return ((m or {}).get("body") or "")[:1500]
 
 
 def _run(m: dict) -> str:
