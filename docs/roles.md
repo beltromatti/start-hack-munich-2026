@@ -27,6 +27,21 @@ per the brief, check timestamps from 16:00).
 - **Autonomous overnight and competitive.** Human in the loop only where something suddenly changes.
 - Look and feel: strong UX/UI combined with a well-thought-out, competitive pricing system.
 
+## Moat and pitch lines (summary for alignment)
+
+1. **AI reads, code prices.** No LLM in the price. Hits accuracy (45) and cost (40) at once: 85 of 100 points.
+2. **LLM only for outliers.** Green / yellow / red triage: spend goes where the risk is, routine requests stay near $0.
+3. **We solve disruptions, not just prices.** 5U changes the setup hourly without warning; we are built for that.
+4. **We learn from the whole field.** Leaderboard (every team's score and bookings per mail) + rate sheets feed
+   simulation and learning. Most teams only look at their own results.
+5. **Jan's prediction engine as the watcher.** An asset no other team has. Caveat: trained on residual values;
+   what it predicts here must be checked with Jan before we pitch it as the core.
+6. **Human mail and strong UX.** `human.md` tone (jury criterion + bonus) and a sessions UI built on Sempli patterns.
+
+Core sentence: *"How does an autonomous forwarder stay right at 2 a.m. when the world changes without warning?"*
+
+Still open: wait for all carriers or send after a fixed time; what yellow and red do at night; Mattia's role.
+
 ## Roles
 
 | Who | Owns | Notes |
