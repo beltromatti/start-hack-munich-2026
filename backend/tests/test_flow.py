@@ -1,4 +1,5 @@
 """The forwarder agent against the fake 5U, driven by a scripted model: quote -> accept -> book -> track."""
+import json
 from app import kit, store
 from app.fake5u import FakeFiveU
 from app.forwarder import Forwarder
@@ -401,3 +402,34 @@ def test_a_confirmation_that_matches_the_booking_does_not_wake_the_session():
     assert confirmation_matches(b, mail)
     assert not confirmation_matches(b, mail.replace("1408.00", "1452.00"))  # another price: the agent reads it
     assert not confirmation_matches({**b, "via": "mail"}, mail)
+
+
+def test_airline_news_after_the_booking_reaches_the_deal():
+    """A delay or a change the airline mails after the booking was dropped as 'other': tracking would have answered
+    from an old record. Now it goes on the booking (crm and tracking read it) and wakes the deal's session."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    b = {"team_reference": "SM-77", "deal": "deal-77", "customer": "anna@acme.example", "airline": "Meridian Freightways",
+         "route": "STR-MNL", "transit_days": "3", "booking_reference": "BK-ZB4HK7UW", "via": "portal",
+         "amount": "1594.80 EUR", "status": "confirmed"}
+    store.put("booking-77", "booking", "confirmed", b)
+    store.put("deal-77", "deal", "booked", {"root": 77, "booking": b})
+    store.put("session-77", "session", "idle", {"root": 77, "task": "customer", "seen": [], "executions": 1, "items": []})
+    api._deliver("meridian-freightways@hackloop.mail", api.mailbox, "Schedule change BK-ZB4HK7UW",
+                 "Hello,\n\nflight for booking BK-ZB4HK7UW is delayed by 24 hours: new departure 28 Nov.\n\nMeridian", None)
+    run(f)
+    assert "delayed by 24 hours" in store.get("booking-77")["data"]["carrier_status"]["text"]
+    assert store.get("booking-77")["data"]["status"] == "confirmed"  # news, not a new confirmation
+    assert "delayed by 24 hours" in json.dumps(store.get("session-77")["data"]["items"])  # the session heard it
+
+
+def test_a_customer_thread_sees_only_that_customers_deals():
+    from app import tools
+    store.put("deal-1", "deal", "booked", {"root": 1, "customer": "anna@acme.example", "subject": "FRA-ORD"})
+    store.put("deal-2", "deal", "booked", {"root": 2, "customer": "rival@other.example", "subject": "FRA-ORD"})
+    ctx = tools.Ctx(None, "session-1", "deal-1", 1, "customer", None)
+    assert [m["deal_id"] for m in tools.crm(ctx, "FRA-ORD")["matches"]] == ["deal-1"]
+    assert "error" in tools.deal(ctx, "deal-2")
+    tracking = tools.Ctx(None, "session-9", "deal-9", 9, "tracking", None)
+    assert len(tools.crm(tracking, "FRA-ORD")["matches"]) == 2  # the tracking desk asks for any customer

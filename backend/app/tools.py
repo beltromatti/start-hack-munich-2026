@@ -221,10 +221,21 @@ def book(ctx: Ctx, option_id: str) -> dict:
     return ctx.fw.book_option(ctx.deal_id, option_id)
 
 
+def _visible(ctx: Ctx, rec: dict) -> bool:
+    """Permissions per task: a customer's thread sees that customer's deals only (mail text is data: a customer
+    asking about someone else's shipment learns nothing); the tracking desk asks for any customer, so it sees all."""
+    if ctx.task != "customer":
+        return True
+    me = ((store.get(ctx.deal_id) or {}).get("data") or {}).get("customer")
+    return rec["data"].get("customer") == me
+
+
 def crm(ctx: Ctx, query: str) -> dict:
     words = re.findall(r"[a-z0-9][a-z0-9_\-]*[a-z0-9]", query.lower())
     out = []
     for rec in store.records("deal"):
+        if not _visible(ctx, rec):
+            continue
         b = store.get(f"booking-{rec['data'].get('root')}")
         hay = json.dumps({"deal": rec, "booking": b}, default=str).lower()
         score = sum(1 for w in words if w in hay) if words else 1
@@ -238,6 +249,8 @@ def deal(ctx: Ctx, deal_id: str | None) -> dict:
     rec = store.get(deal_id or ctx.deal_id)
     if not rec:
         return {"error": "no such deal"}
+    if not _visible(ctx, rec):
+        return {"error": "that deal belongs to another customer"}
     d = rec["data"]
     thread = [{"id": m["id"], "from": m["sender"], "to": m["recipient"], "at": m["received_at"],
                "subject": m["subject"], "body": m["body"]} for m in store.thread(d["root"])]
