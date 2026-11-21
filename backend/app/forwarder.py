@@ -149,6 +149,8 @@ class Forwarder:
                 deal["data"]["request"].get(k) == req.get(k)
                 for k in ("origin", "destination", "chargeable_kg", "pickup_zone", "volume_cbm"))
             if not same:
+                if deal and deal["data"].get("request"):  # another shipment in this deal: its options get a new
+                    store.update(deal_id, lambda r: (r["status"], {**r["data"], "option_set": r["data"].get("option_set", 0) + 1}))
                 self._ask_everyone(deal_id, req)
         deal = store.get(deal_id)
         if not deal or not deal["data"].get("request"):
@@ -234,6 +236,10 @@ class Forwarder:
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
         needs_pickup = bool(req["pickup_zone"])
+        # an option id names one option for the life of the deal: a changed or second shipment prices as B1, B2...,
+        # and what was quoted before stays bookable under its own id (Sam's probe: two shipments in one mail, the
+        # second pricing renamed A1 and book("A1") would have booked it)
+        letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[min(int(d.get("option_set", 0)), 25)]
         table: dict[str, dict] = {}
         rows = []
         variants = pickup_variants(pickups, preference) if needs_pickup else [("", None)]
@@ -241,7 +247,7 @@ class Forwarder:
             for tag, p in variants:
                 if needs_pickup and p is None:
                     continue
-                oid = f"A{i}{tag}"
+                oid = f"{letter}{i}{tag}"
                 total = pricing.money(a.total + (p.total if p else 0))
                 table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
                               "total_text": pricing.fmt(total)}
@@ -261,7 +267,8 @@ class Forwarder:
             best = pricing.pick(cand, pref if pref != "balanced" else "unspecified", settings.balance_rule)
             if best:
                 rec[pref] = best.carrier
-        store.update(deal_id, lambda r: (r["status"], {**r["data"], "options": table}))
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "options": {
+            **{k: v for k, v in (r["data"].get("options") or {}).items() if not k.startswith(letter)}, **table}}))
         waiting = waiting_for(d)
         pref_key = preference if preference in ("cheapest", "fastest") else settings.unspecified_rule
         result = {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",

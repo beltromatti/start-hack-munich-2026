@@ -816,3 +816,30 @@ def test_an_import_is_named_out_of_our_service_not_asked_back():
     assert any("not one of our departure airports" in x for x in r["missing"])
     r = normalise({**s, "origin_airport": "FRA", "destination_airport": "LOS"}, kit.world())
     assert not r["missing"]
+
+
+def test_an_option_id_names_one_option_for_the_life_of_the_deal():
+    """Sam's probe, Sun 00:30: two shipments in one mail, two quotes; the second pricing renamed A1 and book("A1")
+    would have booked it. Rounds 86-87: the goods changed after the quote. A changed shipment prices as B1, B2...,
+    and the option quoted first stays bookable under its own id."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("ana@ana.example", "Two shipments", "320 kg FRA to ORD, and 900 kg FRA to ORD, cheapest")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = lambda kg: {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+                       "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+                       "lots": [{"pieces": 1, "weight": q(kg, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}]}
+    first = tools.get_offers(ctx, ship(320), "cheapest", 5)
+    a = first["options"][0]
+    assert a["option"].startswith("A")
+    second = tools.get_offers(ctx, ship(900), "cheapest", 5)
+    assert all(o["option"].startswith("B") for o in second["options"])
+    opts = store.get(ctx.deal_id)["data"]["options"]
+    assert opts[a["option"]]["total_text"] == a["total"]  # the first quote's option is still the one it was
+    again = tools.get_offers(ctx, None, "cheapest", 0)  # waiting again does not start a new set
+    assert all(o["option"].startswith("B") for o in again["options"])
