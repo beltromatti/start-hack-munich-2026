@@ -73,3 +73,11 @@ def test_money_check_other_kinds():
     assert language.money_ok("Your 900.00 EUR quote is booked.", "900.00 EUR", required=False)
     assert not language.money_ok("Booked for 950.00 EUR.", "900.00 EUR", required=False)
     assert not language.money_ok("All good.", "900.00 EUR", required=True)
+
+
+def test_live_bid_beats_stale_sheet():
+    sheet = Offer("air", "Yellowtail Air Freight", D(800), D(4), "sheet")
+    mail = Offer("air", "Yellowtail Air Freight", D(850), D(4), "email", "R-1")
+    only_sheet = Offer("air", "Orion Cargo Air", D(900), D(2), "sheet")
+    best = {o.carrier: o for o in pricing.best_by_carrier([sheet, mail, only_sheet])}
+    assert best["Yellowtail Air Freight"].total == 850 and best["Orion Cargo Air"].total == 900

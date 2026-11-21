@@ -92,10 +92,14 @@ def pick(offers: list[Offer], preference: str) -> Offer | None:
 
 
 def best_by_carrier(offers: list[Offer]) -> list[Offer]:
-    """Several prices for the same carrier (email bid, sheet, portal at two weights): keep its cheapest."""
+    """One offer per carrier. What a carrier quotes now (portal, mail) beats its sheet, which may be stale;
+    the sheet only stands in for a carrier that did not answer. Several live prices (two weights): the cheapest."""
+    live = {(o.leg, o.carrier.lower()) for o in offers if o.source != "sheet"}
     best: dict[tuple[str, str], Offer] = {}
     for o in offers:
         k = (o.leg, o.carrier.lower())
+        if o.source == "sheet" and k in live:
+            continue
         # equal price: prefer the offer that carries a reference we can book with
         if k not in best or (o.total, o.rate_id is None) < (best[k].total, best[k].rate_id is None):
             best[k] = o
