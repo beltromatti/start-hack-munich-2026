@@ -92,6 +92,8 @@ def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> 
                                "output": json.dumps(result, default=str, ensure_ascii=False)})
             store.put(sid, "session", "running", s)
         failing = 0 if ok else failing + 1
+        if ctx.done and (mail is None or ctx.outcome):  # the model said it is done, and the mail is answered:
+            break  # no closing call (each one costs points); the journal already shows what it did
         if failing >= SPINNING:
             store.log("forwarder", "error", f"stopped: {SPINNING} turns without progress", run_id=deal_id)
             break

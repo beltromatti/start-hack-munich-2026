@@ -354,3 +354,50 @@ def test_portal_down_asks_its_airlines_by_mail_also_at_the_break(monkeypatch):
     run(f)
     subjects = [m["subject"] for m in to(api, email)]
     assert f"Rate request {lane[0]}-{lane[1]} 280 kg" in subjects and f"Rate request {lane[0]}-{lane[1]} 300 kg" in subjects
+
+
+def test_done_closes_the_turn_without_another_model_call():
+    """The model marks the reply done: the turn ends there (a closing message is one more paid call)."""
+    from app import llm
+    from tests.conftest import call
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    calls = []
+
+    def agent_turn(items, tools):
+        calls.append(len(items))
+        return call("no_reply", reason="only a thank-you", done=True)
+    llm.use_fake_turn(agent_turn)
+    api.customer("anna@acme.example", "Thanks", "Thanks for your help!")
+    run(f)
+    assert len(calls) == 1
+
+
+def test_an_airline_that_told_us_its_lanes_is_not_asked_for_another_lane():
+    """Live: 28 of 74 bid readings in an hour were 'we do not serve this lane'. A carrier's own list of lanes is
+    kept for two hours; the agent still sees who was not asked and can ask with mail_carrier."""
+    import json as _json, time as _time
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    w = kit.world()
+    lane, airline = next(((o, d), c) for c in w.carriers if c.kind == "airline"
+                         for (o, d) in [(l["origin"], l["destination"]) for l in w.sheet_lanes if l["airline"] == c.name]
+                         if c in w.email_airlines(o, d))
+    store.kv_set(f"lanes:{airline.email}", _json.dumps({"lanes": ["XXX-YYY"], "at": _time.time()}))
+    req = {"origin": lane[0], "destination": lane[1], "weight_kg": "300", "volume_cbm": None, "chargeable_kg": "300",
+           "pieces": 1, "pickup_zone": None, "pickup_postcode": None, "ready_date": None}
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req})
+    f._ask_everyone("deal-1", req)
+    assert not [m for m in api.outbox if m["to"] == airline.email]
+    assert f.options("deal-1", "cheapest")["not_asked"][0]["carrier"] == airline.name
+
+
+def test_a_confirmation_that_matches_the_booking_does_not_wake_the_session():
+    from app.forwarder import confirmation_matches
+    b = {"booking_reference": "BK-ZB4HK7UW", "via": "portal", "amount": "1594.80 EUR", "pickup": {"total": "186.80"}}
+    mail = "Booking BK-ZB4HK7UW confirmed\nBooking reference: BK-ZB4HK7UW\nPrice: 1408.00 EUR\nStatus: booked"
+    assert confirmation_matches(b, mail)
+    assert not confirmation_matches(b, mail.replace("1408.00", "1452.00"))  # another price: the agent reads it
+    assert not confirmation_matches({**b, "via": "mail"}, mail)

@@ -176,8 +176,15 @@ class Forwarder:
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "request": req, "offers": [x.as_dict() for x in offers],
                                                        "asked": {}, "replied": [], "declined": [], "asked_at": time.time()}))
         asked: dict[str, str] = {}
+        not_asked: list[dict] = []
         with_sheet = {l["airline"] for l in w.sheet_lanes}
         for c in w.email_airlines(o, d):  # carriers that quote by mail
+            told = lanes_told(c.email)
+            if told is not None and f"{o}-{d}" not in told["lanes"]:
+                not_asked.append({"carrier": c.name, "email": c.email,
+                                  "why": f"told us at {time.strftime('%H:%M', time.localtime(told['at']))} "
+                                         f"the lanes it flies, {o}-{d} not among them"})
+                continue
             weights = [next((x.billed_kg for x in offers if x.carrier == c.name), cw)]
             if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
                 weights += pricing.breaks_to_try(cw)
@@ -186,7 +193,8 @@ class Forwarder:
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
                 asked[str(self.ask_trucker(deal_id, c, req))] = c.email
-        store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked}}))
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
+                                                       "not_asked": not_asked}))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
         for name in failed:  # portal down or over the limit for this airline: ask the airline by mail, also at the
             c = w.carrier_by_name(name)  # break above when it can bill cheaper there (as for every mail airline)
@@ -254,6 +262,9 @@ class Forwarder:
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
                                            if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
+        if d.get("not_asked"):  # the agent can still ask one of them (mail_carrier) when it judges it useful
+            result["not_asked"] = [{"carrier": x["carrier"], "email": x["email"], "why": x["why"]}
+                                   for x in d["not_asked"]]
         if not rows:  # nothing to quote: say why, with everything the carriers wrote (round 15 showed neither)
             result["no_options_because"] = ("no trucker has priced the pickup" if needs_pickup and air
                                             else "no airline has priced this route")
@@ -383,6 +394,11 @@ class Forwarder:
         if rec and rec["data"].get("booking") and re.search(r"\bconfirm|\bbooked\b", m["body"], re.I):
             self.on_booking_mail(m)
         carrier = kit.world().carrier_by_email(m["sender"])
+        told = re.search(r"\bwe fly\b([^\n]*)", m["body"], re.I)  # "We fly CGN-DEL, FRA-JFK, ..." in a decline
+        if told and carrier:
+            lanes = re.findall(r"\b[A-Z]{3}-[A-Z]{3}\b", told.group(1))
+            if lanes:
+                store.kv_set(f"lanes:{carrier.email}", json.dumps({"lanes": lanes, "at": time.time()}))
         raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
         if not all(read_in_mail(x, m["body"]) for x in raw):  # an amount the mail never wrote is a misread
             store.log("bids", "error", f"{m['sender']}: amount not in the mail, reading it again", {"read": raw},
@@ -476,6 +492,10 @@ class Forwarder:
                 store.put(rec["id"], "booking", "confirmed", b)
                 store.update(b["deal"], lambda r: (r["status"], {**r["data"], "booking": b}))
                 store.log("booking", "info", f"confirmed {b.get('booking_reference')}", run_id=b["deal"])
+                if confirmation_matches(b, text):  # same reference, same price: nothing new for the deal
+                    store.log("booking", "info", f"{b.get('booking_reference')}: the airline's confirmation matches "
+                              "the booking, the session is not woken", run_id=b["deal"])
+                    return
                 # news from the world for this deal: its session hears it (and decides whether the customer should)
                 agent.notify(f"session-{store.get(b['deal'])['data']['root']}",
                              f"The airline confirmed the booking (their mail {m['id']}): booking reference "
@@ -640,6 +660,31 @@ def _day(text: Any) -> str | None:
         return datetime.fromisoformat(t[:10]).date().isoformat()
     except ValueError:
         return None
+
+
+def confirmation_matches(b: dict, text: str) -> bool:
+    """The airline confirms what we booked: our booking reference and the air price we booked at are both in its
+    mail. Anything else (another price, no reference, a booking we made by mail) is news the agent should read."""
+    try:
+        amount = Decimal(str(b.get("amount", "")).split()[0])
+        air = amount - Decimal(str((b.get("pickup") or {}).get("total") or 0))
+    except Exception:
+        return False
+    return bool(b.get("booking_reference")) and b["booking_reference"] in text and \
+        b.get("via") == "portal" and air in amounts_in(text)
+
+
+LANES_FRESH = 2 * 3600  # what a carrier told us about its lanes holds this long; then it is asked again
+
+
+def lanes_told(email: str) -> dict | None:
+    """The lanes a carrier told us it flies (its own 'We fly ...'), if it told us lately. 5U changes the setup
+    about once an hour, so this knowledge expires and the carrier is asked again."""
+    raw = store.kv_get(f"lanes:{email}")
+    if not raw:
+        return None
+    told = json.loads(raw)
+    return told if time.time() - told.get("at", 0) < LANES_FRESH else None
 
 
 def amounts_in(text: str) -> set[Decimal]:

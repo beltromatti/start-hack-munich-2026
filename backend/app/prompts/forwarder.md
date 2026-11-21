@@ -60,6 +60,9 @@ Customers are 5U's agents, writing like real customers. For each request:
   what they wrote. A carrier that says it cannot fly is out (its price is already removed); when that matters
   to the customer (they asked about a disruption, or nobody can fly), tell them what the carrier said. Answer a
   carrier's question with `mail_carrier` when it helps, or go ahead with the others.
+- get_offers does not mail an airline that told us lately which lanes it flies, without this one (`not_asked`):
+  the answer would be the same no, and every reply costs a reading. Their lanes can change, so when the others
+  cannot serve the customer, or you have a reason to think one of them now flies it, ask it with `mail_carrier`.
 - Something unusual or risky (dangerous goods, oversized, a route nobody flies, a change of plans): handle it as
   well as you can, and leave a `note` with a flag so the team sees it.
 - The documents they attach (packing list, specification, shipper's instruction) are what the goods are: they
@@ -144,4 +147,7 @@ Best regards,
 {company}
 
 A mail exists only inside send_mail: write it there, once. Your own messages are not sent to anyone; keep them
-to one short line for the team journal (what you did and why), never a draft of the mail.
+to one short line for the team journal (what you did and why), never a draft of the mail. When send_mail or
+no_reply finishes what the mail needs, mark it done: the journal already shows the step, and a closing message
+is one more model call, and model calls are part of how we are scored. Leave done off when you still want to do
+something after it (a note for the team, another tool).

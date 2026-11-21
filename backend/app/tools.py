@@ -15,6 +15,8 @@ from .config import settings
 from .kit import RATEDESK, TRACKING
 
 S, N, I = {"type": ["string", "null"]}, {"type": ["number", "null"]}, {"type": ["integer", "null"]}
+DONE = {"type": "boolean", "description": "true when this finishes what the mail needs: the turn closes here, "
+        "without another model call (each one costs). false when you still want to do something after it."}
 
 
 def obj(props: dict, desc: str | None = None) -> dict:
@@ -79,7 +81,7 @@ TOOLS = [
        {"kind": {"type": "string", "enum": ["quote", "question", "reply", "booking_confirmation", "tracking_answer",
                                             "decline", "other"]},
         "body": {"type": "string", "description": "the whole mail body, plain text"},
-        "option_id": S, "to": S}),
+        "option_id": S, "to": S, "done": DONE}),
     fn("book",
        "Book an option of this deal with the carrier: by its rate reference on the portal (a fresh rate if it "
        "expired), otherwise by mail to the airline. Returns the booking with its reference and status.",
@@ -111,7 +113,7 @@ TOOLS = [
        {"text": {"type": "string"}, "flag": {"type": "string", "enum": ["none", "yellow", "red"]}}),
     fn("no_reply",
        "Nothing needs to be sent for the mail you are handling (for example a thank-you after the booking). Say why.",
-       {"reason": {"type": "string"}}),
+       {"reason": {"type": "string"}, "done": DONE}),
 ]
 
 
@@ -124,6 +126,7 @@ class Ctx:
     task: str
     mail: dict | None                     # the mail this execution handles (None: a person wrote in the session)
     outcome: list[str] = field(default_factory=list)
+    done: bool = False  # the model said this turn finishes the mail: no further call
 
 
 def run(ctx: Ctx, name: str, args: dict) -> dict:
@@ -147,7 +150,8 @@ def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: f
     return out
 
 
-def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | None) -> dict:
+def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | None, done: bool = False) -> dict:
+    ctx.done = ctx.done or bool(done)
     m = ctx.mail or _last_inbound(ctx.root)
     if m is None:
         return {"error": "no mail in this thread to answer"}
@@ -307,7 +311,8 @@ def note(ctx: Ctx, text: str, flag: str) -> dict:
     return {"ok": True}
 
 
-def no_reply(ctx: Ctx, reason: str) -> dict:
+def no_reply(ctx: Ctx, reason: str, done: bool = False) -> dict:
+    ctx.done = ctx.done or bool(done)
     ctx.outcome.append("no_reply")
     store.log("forwarder", "decision", f"no reply: {reason[:160]}", run_id=ctx.deal_id)
     return {"ok": True}
