@@ -53,8 +53,9 @@ TOOLS = [
        "portal and our rate sheets, waits for the answers and returns the priced options, all-in totals computed by "
        "code (chargeable weight, cheaper weight breaks, minimums, surcharges, pickup leg), with the option that fits "
        "each preference. Pass the shipment as the customer described it, units as written. With shipment null it "
-       "only waits for the replies still missing and returns the options again. Carriers answer in 15-50 s; "
-       "wait_seconds is how long to wait at most (it returns as soon as everyone answered).",
+       "only waits for the replies still missing and returns the options again. Carriers answer in 15-60 s (live, "
+       "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. "
+       "wait_seconds is how long to wait at most: it returns as soon as everyone answered.",
        {"shipment": nullable(SHIPMENT),
         "preference": {"type": "string", "enum": ["cheapest", "fastest", "unspecified"]},
         "wait_seconds": {"type": "number"}}),
