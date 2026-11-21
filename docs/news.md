@@ -1,0 +1,24 @@
+# News and times (from Discord, Hack League app, 5U)
+
+Newest on top. Source in brackets.
+
+- **Sat 13:2x** Allocated: **5U AI "Build the Forwarder"** (Hack League app, Cases).
+- **Sat 12:55** 5U posted the official brief + deep-dive slides: `docs/challenges/5u-official-brief.pdf`,
+  `docs/challenges/5u-deep-dive-slides.pdf` (Discord #5u-ai).
+- **Sat 12:53** First 5U mail (RFQ) planned for **16:00** (fehmi, Discord #5u-ai).
+- **Sat 12:29** OpenAI credits by email: $50 ChatGPT/Codex + $20 API, subject "START Hack Munich vouchers",
+  redeem by Sun 23:59 (announcements).
+- **Sat 11:45** 5U: every team can pitch to them at the end and compete for the top 3 (Discord #5u-ai).
+
+## Fixed times
+| When | What |
+| --- | --- |
+| Sat 16:00 | 5U: first RFQ, then one every 6 min all night |
+| Sat 16:00–17:00 | Recruiting hour |
+| Sat 19:00–21:30 | Dinner |
+| Sun 12:00–12:45 | Submission form open, **hard cutoff 12:45** |
+| Sun 13:15–14:45 | Demos, one room per challenge: 3 min pitch, 2 min Q&A |
+| Sun 15:30 | Challenge winners; 16:45 overall awards |
+
+Prizes 5U: 1. fly an ultralight plane yourself (Jochen Schweizer) + €300, 2. Hans Zimmer concert tickets + €200,
+3. founders dinner + €100.
