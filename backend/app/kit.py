@@ -121,7 +121,14 @@ def load(api=None) -> World:
                      for l in kit_tariffs["lanes"]]
     _apply_ingested(w)
     if api is not None:
-        refresh_portal(api, w)
+        try:
+            refresh_portal(api, w)
+        except Exception as e:  # portal down at (re)start: answer mail from sheets and carriers, with the last lane map
+            saved = json.loads(store.kv_get("portal") or "{}")
+            w.portal = {tuple(k.split("-")): v for k, v in saved.get("lanes", {}).items()}
+            w.brackets = saved.get("brackets", {})
+            store.log("kit", "error", f"portal not readable at start ({e!r}): running with the last known "
+                                      f"{len(w.portal)} lanes")
     global _world
     with _lock:
         _world = w
@@ -137,6 +144,8 @@ def refresh_portal(api, w: World | None = None) -> None:
         if b:
             w.brackets[code] = b
     w.portal_at = time.time()
+    store.kv_set("portal", json.dumps({"lanes": {f"{o}-{d}": a for (o, d), a in w.portal.items()},
+                                       "brackets": w.brackets}))
     store.log("kit", "info", f"portal: {len(w.portal)} lanes, {len(w.brackets)} airlines")
 
 

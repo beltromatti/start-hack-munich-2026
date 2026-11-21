@@ -274,3 +274,65 @@ def test_a_bid_quoted_per_kg_gets_its_total_from_code():
     m = {"id": 42, "in_reply_to": 41, "sender": "yellowtail-air-freight@hackloop.mail"}
     off = f.offer(o, m, kit.world().carrier_by_email(m["sender"]))
     assert str(off.total) == "982.00"  # 300 x 2.42 + 300 x 0.77 + 25
+
+
+# ---- likely changes that would stop us before a quote fails (docs/likely-changes.md 3, 5, 9, 10) ---------------
+
+def test_the_forwarder_starts_while_the_portal_is_down():
+    """A restart during a portal outage must not stop the mailbox: sheets and carriers still price."""
+    class Down(FakeFiveU):
+        def ports(self):
+            raise RuntimeError("503 portal unavailable")
+    kit.load(FakeFiveU())                                   # a normal start remembers the lane map in the register
+    lanes = dict(kit.world().portal)
+    assert lanes
+    api = Down()
+    kit.load(api)                                           # the restart: no exception
+    assert kit.world().portal == lanes and kit.world().brackets
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    assert store.get(f"deal-{rfq['id']}")["status"] == "quoted"
+
+
+def test_one_mail_that_cannot_be_sent_does_not_strand_the_pricing_run():
+    """5U lowers a limit, or one send fails: that carrier is missing, everything else is priced."""
+    class OneFails(FakeFiveU):
+        def send(self, to, subject, body, in_reply_to=None):
+            if to == "taunusfracht@hackloop.mail":
+                raise RuntimeError("send to taunusfracht@hackloop.mail failed: 429")
+            return super().send(to, subject, body, in_reply_to)
+    api = OneFails()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("bob@beta.example", "Pickup in 60311", "Pickup at 60311 Frankfurt, 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f, 4)
+    deal = store.get(f"deal-{rfq['id']}")
+    assert deal["status"] == "quoted" and deal["data"]["quote"]["pickup"]["carrier"]
+    assert deal["data"]["not_asked"] == ["taunusfracht@hackloop.mail"]
+    assert any(o["source"] == "portal" for o in deal["data"]["offers"]), "the portal was still read"
+    assert "taunusfracht@hackloop.mail" not in deal["data"]["asked"].values()
+
+
+def test_a_price_without_a_time_is_not_the_fastest_offer():
+    """A trucker's new wording ("we collect next working day") leaves pickup_hours empty. Counted as zero hours it
+    would win every fastest and every 50/50 pick."""
+    from decimal import Decimal as D
+    from app.pricing import Offer
+    f = Sync(FakeFiveU())
+    req = {"origin": "FRA", "destination": "ORD", "weight_kg": "320", "volume_cbm": None, "chargeable_kg": "320",
+           "pieces": 1, "pickup_zone": "60", "pickup_postcode": "60311"}
+    air = [Offer("air", "Slow", D(700), D(5), "sheet")]
+    trucks = [Offer("pickup", "Bodenseefracht", D("88.60"), D("1.083"), "email"),
+              Offer("pickup", "Taunusfracht", D("177.40"), D("0.125"), "email"),
+              Offer("pickup", "Neuer Text Spedition", D("260.00"), D(0), "email", extra={"time_unknown": True})]
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req, "offers": [o.as_dict() for o in air + trucks]})
+    out = f.options("deal-1", "cheapest")
+    row = next(o for o in out["options"] if o["option"] == out["recommended"])
+    assert row["pickup"]["trucker"] == "Taunusfracht"          # the 50/50 pick among what we know
+    unknown = next(p for p in out["pickup_alternatives"] if p["trucker"] == "Neuer Text Spedition")
+    assert unknown["pickup_hours"] is None                      # shown as unknown, not as 0 h
+    m = {"id": 9, "sender": "taunusfracht@hackloop.mail"}
+    o = f.offer({"available": True, "total": 120.0, "currency": "EUR", "pickup_hours": None, "transit_days": None,
+                 "reference": "TRK-1"}, m, kit.world().carrier_by_email("taunusfracht@hackloop.mail"))
+    assert o.extra["time_unknown"] is True

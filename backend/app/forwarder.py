@@ -69,7 +69,7 @@ class Forwarder:
         for box in store.records("inbox", "pending"):  # a person, or news from the world, for a session
             self.submit(f"thread:{box['data']['root']}", agent.resume_inbox, self, box["id"])
         now = time.time()
-        if now - self._last_portal > 900:
+        if now - self._last_portal > (900 if kit.world().portal_at else 60):  # never read yet: try every minute
             self._last_portal = now
             self.submit("portal", kit.refresh_portal, self.api)
         if now - self._last_board > 30:
@@ -176,23 +176,39 @@ class Forwarder:
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "request": req, "offers": [x.as_dict() for x in offers],
                                                        "asked": {}, "replied": [], "declined": [], "asked_at": time.time()}))
         asked: dict[str, str] = {}
+        not_asked: list[str] = []
+
+        def ask(email: str, send: Callable[[], int]) -> None:
+            """One mail to a carrier. A mail that cannot be sent (5U's limit, an outage) costs that carrier's
+            answer, never the rest of the run: it is recorded and the agent sees it (`not_asked`)."""
+            try:
+                mid = send()
+            except Exception as e:
+                not_asked.append(email)
+                store.log("bids", "error", f"could not ask {email}: {e!r}"[:300], run_id=deal_id)
+                return
+            asked[str(mid)] = email
+            store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], str(mid): email}}))
+
+        # the asks a quote cannot do without go first: truckers (no pickup, no door-to-port total), then the
+        # airlines we have a sheet lane for, then the rest
+        if req["pickup_zone"]:
+            for c in w.truckers(req["pickup_zone"]):
+                ask(c.email, lambda c=c: self.ask_trucker(deal_id, c, req))
         with_sheet = {l["airline"] for l in w.sheet_lanes}
-        for c in w.email_airlines(o, d):  # carriers that quote by mail
+        on_lane = {x.carrier for x in offers}
+        for c in sorted(w.email_airlines(o, d), key=lambda c: (c.name not in on_lane, c.name in with_sheet)):
             weights = [next((x.billed_kg for x in offers if x.carrier == c.name), cw)]
             if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
                 weights += pricing.breaks_to_try(cw)
             for wt in weights:
-                asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
-        if req["pickup_zone"]:
-            for c in w.truckers(req["pickup_zone"]):
-                asked[str(self.ask_trucker(deal_id, c, req))] = c.email
-        store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked}}))
+                ask(c.email, lambda c=c, wt=wt: self.ask_airline(deal_id, c, o, d, wt, cbm, req))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
         for name in failed:  # portal down or over the limit for this airline: ask the airline by mail
             c = w.carrier_by_name(name)
             if c and c.email not in asked.values():
-                asked[str(self.ask_airline(deal_id, c, o, d, cw, cbm, req))] = c.email
-        store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
+                ask(c.email, lambda c=c: self.ask_airline(deal_id, c, o, d, cw, cbm, req))
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "not_asked": not_asked,
                                                        "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
         store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",
                   run_id=deal_id)
@@ -204,6 +220,7 @@ class Forwarder:
         declined = {n.lower() for n in d.get("declined", [])}
         offers = [x for x in (Offer.of(x) for x in d.get("offers", []))
                   if not (x.source == "sheet" and x.carrier.lower() in declined)]
+        _unknown_times_count_as_slowest(offers)
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
         needs_pickup = bool(req["pickup_zone"])
@@ -218,8 +235,10 @@ class Forwarder:
                 total = pricing.money(a.total + (p.total if p else 0))
                 table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
                               "total_text": pricing.fmt(total)}
-                rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
-                             "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
+                rows.append({"option": oid, "airline": a.carrier,
+                             "transit_days": None if a.extra.get("time_unknown") else float(a.days),
+                             "pickup": {"trucker": p.carrier, "pickup_hours": None if p.extra.get("time_unknown")
+                                        else round(float(p.days) * 24, 1)} if p else None,
                              "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
                              "billed_kg": float(a.billed_kg) if a.billed_kg is not None else None,
                              "carrier_note": (a.extra or {}).get("note")})
@@ -239,8 +258,11 @@ class Forwarder:
                 "options": rows, "recommended": rec.get(pref_key), "recommended_for": pref_key,
                 "recommended_by_preference": rec,
                 "pickup_alternatives": [{"trucker": p.carrier, "total": pricing.fmt(p.total),
-                                         "pickup_hours": round(float(p.days) * 24, 1)} for p in pickups],
+                                         "pickup_hours": None if p.extra.get("time_unknown")
+                                         else round(float(p.days) * 24, 1)} for p in pickups],
                 "still_waiting_for": waiting,
+                # carriers our request did not reach (a send failed): ask them with mail_carrier if they matter
+                "not_asked": d.get("not_asked", []),
                 # answers that change the picture: a carrier we had a price for says no, or a carrier asks back
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
@@ -394,14 +416,16 @@ class Forwarder:
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
-        days = (Decimal(str(o["pickup_hours"])) / 24).quantize(Decimal("0.001")) \
-            if trucker and o.get("pickup_hours") is not None else Decimal(str(o.get("transit_days") or 0))
+        time_given = o.get("pickup_hours") if trucker else o.get("transit_days")
+        days = Decimal(0) if time_given is None else \
+            (Decimal(str(time_given)) / 24).quantize(Decimal("0.001")) if trucker else Decimal(str(time_given))
         # a carrier answering for itself is named as in the carrier list (its mail bid and its sheet are one
         # carrier); the rate desk names the airlines it lists
         name = carrier.name if carrier else (o.get("carrier") or m["sender"])
         return Offer("pickup" if trucker else "air", name, total, days, "email", o.get("reference"),
                      reply_mail=m["id"], email=m["sender"] if carrier else None,
-                     extra={"valid_until": o.get("valid_until"), "note": o.get("note")})
+                     extra={"valid_until": o.get("valid_until"), "note": o.get("note"),
+                            "time_unknown": time_given is None})
 
     def total_from_parts(self, o: dict, m: dict) -> Decimal | None:
         """A carrier that quotes per kg, or itemised, without a total: the total for the weight it bills (or the
@@ -514,6 +538,17 @@ class Forwarder:
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
+
+def _unknown_times_count_as_slowest(offers: list[Offer]) -> None:
+    """A carrier that gave a price but no transit or pickup time (a new wording the reader missed) is not a
+    zero-time offer: counted as zero it wins every "fastest" and every 50/50 pick. It keeps its price and is
+    taken to be no faster than the slowest answer of its leg; the option shows the time as unknown (null)."""
+    for leg in ("air", "pickup"):
+        known = [x.days for x in offers if x.leg == leg and not x.extra.get("time_unknown")]
+        for x in offers:
+            if x.leg == leg and x.extra.get("time_unknown") and known:
+                x.days = max(known)
+
 
 def waiting_for(d: dict) -> list[str]:
     """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""
