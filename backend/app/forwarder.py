@@ -924,8 +924,9 @@ def _day(text: Any, nearest: bool = False) -> str | None:
     A day without a year is the next such day (a ready date lies ahead), or with `nearest` the closest one, behind
     or ahead (a tariff's validity: "valid from 1 November" read on 22 November began three weeks ago)."""
     from datetime import datetime
-    t = str(text or "").strip()
-    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d %b %Y", "%d %B %Y", "%B %d, %Y", "%b %d, %Y"):
+    t = _in_english(str(text or "").strip())
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d %b %Y", "%d %B %Y", "%B %d, %Y", "%b %d, %Y", "%B %d %Y",
+                "%b %d %Y", "%d.%m.%y"):
         try:
             return datetime.strptime(t[:len(t)], fmt).date().isoformat()
         except ValueError:
@@ -937,9 +938,9 @@ def _day(text: Any, nearest: bool = False) -> str | None:
     # said relative to today ("ready Monday", "tomorrow", "24 November" without a year): the next such day
     from datetime import date, timedelta
     today, low = date.today(), t.lower()
-    if low in ("today", "now", "asap", "immediately", "heute", "sofort"):
+    if low in ("today", "now", "asap", "immediately", "heute", "sofort", "ab sofort", "aujourd'hui", "oggi", "hoy"):
         return today.isoformat()
-    if low in ("tomorrow", "morgen"):
+    if low in ("tomorrow", "morgen", "demain", "domani", "manana"):
         return (today + timedelta(days=1)).isoformat()
     names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
     word = re.sub(r"^(?:next|this|on)\s+", "", low)
@@ -955,6 +956,36 @@ def _day(text: Any, nearest: bool = False) -> str | None:
         except ValueError:
             continue
     return None
+
+
+_MONTHS = ("january januar janvier gennaio enero", "february februar fevrier febbraio febrero",
+           "march maerz marz mars marzo", "april avril aprile abril", "may mai maggio mayo", "june juni juin giugno junio",
+           "july juli juillet luglio julio", "august aout agosto", "september septembre settembre septiembre",
+           "october oktober octobre ottobre octubre", "november novembre noviembre",
+           "december dezember decembre dicembre diciembre")
+_DAYS = ("monday montag lundi lunedi lunes", "tuesday dienstag mardi martedi martes",
+         "wednesday mittwoch mercredi mercoledi miercoles", "thursday donnerstag jeudi giovedi jueves",
+         "friday freitag vendredi venerdi viernes", "saturday samstag sonnabend samedi sabato sabado",
+         "sunday sonntag dimanche domenica domingo")
+
+
+def _in_english(t: str) -> str:
+    """A date as its writer wrote it, in the words the parser knows: "1. Dezember 2026", "le 24 novembre",
+    "December 1st, 2026", "Montag", "am 24.11." -> "1 December 2026", "24 November", "December 1, 2026", "Monday",
+    "24.11."."""
+    low = kit.fold(t.replace(".", ". ")) if re.search(r"[^\W\d_]{3}", t) else t   # words in it: fold them; digits only: as is
+    if low is t:
+        return re.sub(r"^(?:am|den|le|il|el|on|the)\s+", "", t.strip(), flags=re.I)
+    words = []
+    for w in low.split():
+        if w in ("am", "den", "dem", "der", "le", "il", "el", "de", "del", "di", "of", "the", "on", "ab", "from", "vom", "du"):
+            continue
+        w = re.sub(r"^(\d{1,2})(?:st|nd|rd|th|er|e)$", r"\1", w)
+        m = next((names.split()[0] for names in _MONTHS + _DAYS if w in names.split() or (len(w) == 3 and any(
+            n.startswith(w) for n in names.split()))), None)
+        words.append(m.capitalize() if m else w)
+    out = " ".join(words)
+    return re.sub(r"^([A-Z][a-z]+ \d{1,2}) (\d{4})$", r"\1, \2", out)
 
 
 def kg_text(kg: Decimal) -> str:

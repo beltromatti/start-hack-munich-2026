@@ -1197,3 +1197,57 @@ def test_places_are_understood_as_their_people_write_them():
     f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
     f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80469", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
     assert "pickup from 80331 Munich" in sent[0] and "pickup from 80469 Munich" in sent[1]
+
+
+
+
+def test_a_carriers_price_counts_where_it_is_written_and_a_portal_gap_is_asked_by_mail():
+    """Read from the code and run by an independent reviewer (ergebnis_8_kanten.md, cases 5, 11, 14)."""
+    from decimal import Decimal
+    from app.forwarder import read_in_mail
+    bid = {"available": True, "total": 800, "rate_per_kg": None}
+    assert not read_in_mail(bid, "Transit 2 days. See subject for all-in.")
+    assert read_in_mail(bid, "Re: ASU | all-in EUR 800\nTransit 2 days. See subject for all-in.")      # subject and body
+    itemised = "Air freight EUR 500.00. Documentation EUR 65.00. Transit 2 days."
+    assert read_in_mail({**bid, "total": 565}, itemised) and not read_in_mail({**bid, "total": 5650}, itemised)
+    assert not read_in_mail({**bid, "total": 9408}, "Our total for the pickup is 94.08 EUR. Pickup time: 3 hours.")
+
+    class Gap(FakeFiveU):   # the portal prices the weight asked for and fails at the break above (a limit, a 503)
+        def rate(self, origin, destination, airline, weight_kg, volume_cbm=None):
+            if Decimal(str(weight_kg)) == 300:
+                return {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+            return super().rate(origin, destination, airline, weight_kg, volume_cbm)
+
+    api = Gap()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote CGN to DEL", "Hi, please quote 299 kg, 1 cbm, CGN to DEL, cheapest.")
+    run(f)
+    d = store.get(f"deal-{rfq['id']}")["data"]
+    asked = set(d["asked"].values())
+    portal_airlines = {kit.world().carrier_by_name(a["name"]).email for a in kit.world().portal[("CGN", "DEL")]}
+    assert portal_airlines <= asked                                    # each was asked by mail for what the portal missed
+
+
+def test_dates_units_and_text_files_as_people_write_them():
+    """A date in German, French, Italian or Spanish, or with an ordinal, was not a date: the ready date fell back to
+    today and the dates in the quote were wrong. cm³ and dm³ were unknown units (no price, a question instead). A
+    csv saved as UTF-16 without its mark came back as "binary attachment". (ergebnis_8_kanten.md, cases 13, 15, 22)"""
+    from datetime import date, timedelta
+    from decimal import Decimal
+    from app import docs, language
+    from app.forwarder import _day
+    assert [_day(t) for t in ("1. Dezember 2026", "December 1st, 2026", "le 1 décembre 2026", "il 1 dicembre 2026",
+                              "1 de diciembre de 2026", "1 Dec 2026", "01.12.2026", "01.12.26")] == ["2026-12-01"] * 8
+    today = date.today()
+    monday = (today + timedelta(days=(0 - today.weekday() - 1) % 7 + 1)).isoformat()
+    assert _day("Montag") == monday == _day("lundi") == _day("Monday") and _day("morgen") == _day("tomorrow")
+    assert _day("KW 48") is None and _day("whenever") is None                 # not guessed: it stays the customer's words
+    lots = [{"pieces": 2, "weight": {"value": 25, "unit": "kg", "per_piece": True},
+             "volume": {"value": 500000, "unit": "cm³", "per_piece": True}}]
+    assert language.unknown_units(lots) == [] and language.volume_cbm(lots[0]["volume"], [], 2) == Decimal("1.000000")
+    assert language.volume_cbm({"value": 1000, "unit": "dm³", "per_piece": False}, [], 1) == 1
+    assert language.unit("Kubikmeter") in language.VOLUME and language.unit("mètres cubes") in language.VOLUME
+    wide = "Gross weight kg;320\nVolume cbm;1,5\nDestination;São Paulo".encode("utf-16-le")
+    assert docs.text("details.csv", wide) == "Gross weight kg;320\nVolume cbm;1,5\nDestination;São Paulo"
+    assert docs.text("details.csv", b"Gross weight kg;320\nVolume cbm;1,5") == "Gross weight kg;320\nVolume cbm;1,5"

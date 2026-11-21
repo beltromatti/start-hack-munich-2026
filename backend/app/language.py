@@ -52,22 +52,34 @@ def to_decimal(x) -> Decimal | None:
 def unit(u: str | None) -> str:
     """A unit as written, in the form the tables use: 'KGS.', 'cu. ft', 'm³', 'Metric Tons' -> 'kgs', 'cuft', 'm3',
     'metrictons'."""
-    return re.sub(r"[\s.^]", "", (u or "").lower()).replace("³", "3")
+    import unicodedata
+    u = "".join(c for c in unicodedata.normalize("NFKD", (u or "").lower().replace("³", "3"))
+                if not unicodedata.combining(c))
+    return re.sub(r"[\s.^]", "", u)
 
 
 _LB, _CFT = Decimal("0.45359237"), Decimal("0.0283168")
-WEIGHT = {**dict.fromkeys(("kg", "kgs", "kilo", "kilos", "kilogram", "kilograms", "kilogramme", "kilogrammes"), 1),
-          **dict.fromkeys(("t", "ton", "tons", "tonne", "tonnes", "mt", "metricton", "metrictons"), 1000),
+WEIGHT = {**dict.fromkeys(("kg", "kgs", "kilo", "kilos", "kilogram", "kilograms", "kilogramme", "kilogrammes",
+                           "kilogramm", "chilogrammi", "kilogramos"), 1),
+          **dict.fromkeys(("t", "to", "ton", "tons", "tonne", "tonnes", "tonnen", "mt", "metricton", "metrictons",
+                           "tonnellate", "toneladas"), 1000),
           **dict.fromkeys(("lb", "lbs", "pound", "pounds"), _LB),
           **dict.fromkeys(("g", "gram", "grams", "gramme", "grammes"), Decimal("0.001"))}
-VOLUME = {**dict.fromkeys(("cbm", "m3", "cum", "cubicmeter", "cubicmeters", "cubicmetre", "cubicmetres"), 1),
+VOLUME = {**dict.fromkeys(("cbm", "m3", "cum", "cubicmeter", "cubicmeters", "cubicmetre", "cubicmetres", "kubikmeter",
+                           "metrecube", "metrescubes", "metricubi", "metroscubicos"), 1),
+          **dict.fromkeys(("dm3", "cdm", "cubicdecimeter", "cubicdecimeters", "cubicdecimetre", "cubicdecimetres"),
+                          Decimal("0.001")),
+          **dict.fromkeys(("cm3", "ccm", "cc", "cubiccentimeter", "cubiccentimeters", "cubiccentimetre",
+                           "cubiccentimetres", "kubikzentimeter"), Decimal("0.000001")),
           **dict.fromkeys(("cft", "ft3", "cuft", "cubicfoot", "cubicfeet"), _CFT),
-          **dict.fromkeys(("l", "ltr", "liter", "liters", "litre", "litres"), Decimal("0.001")),
+          **dict.fromkeys(("l", "ltr", "liter", "liters", "litre", "litres", "litri", "litros"), Decimal("0.001")),
           **dict.fromkeys(("in3", "cuin", "cubicinch", "cubicinches"), Decimal("0.000016387064"))}
-LENGTH = {**dict.fromkeys(("cm", "cms", "centimeter", "centimeters", "centimetre", "centimetres"), Decimal("0.01")),
+LENGTH = {**dict.fromkeys(("cm", "cms", "centimeter", "centimeters", "centimetre", "centimetres", "zentimeter",
+                           "centimetri", "centimetros"), Decimal("0.01")),
+          **dict.fromkeys(("dm", "decimeter", "decimeters", "decimetre", "decimetres", "dezimeter"), Decimal("0.1")),
           **dict.fromkeys(("mm", "millimeter", "millimeters", "millimetre", "millimetres"), Decimal("0.001")),
           **dict.fromkeys(("m", "meter", "meters", "metre", "metres"), Decimal(1)),
-          **dict.fromkeys(("in", "inch", "inches", '"'), Decimal("0.0254")),
+          **dict.fromkeys(("in", "inch", "inches", '"', "zoll", "pouces", "pollici", "pulgadas"), Decimal("0.0254")),
           **dict.fromkeys(("ft", "foot", "feet", "'"), Decimal("0.3048"))}
 
 
