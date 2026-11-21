@@ -11,11 +11,13 @@ import difflib
 import json
 import math
 import re
+import time
 from datetime import date
 
 from . import store
 
 GENERIC = {"gmbh", "kg", "ag", "co", "ltd", "inc", "se", "the", "and", "und", "hackloop", "mail"}
+ALL = 1_000_000  # the register's default page is 500 deals: a search must see the whole night
 FOLD = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "é": "e", "è": "e", "á": "a", "ó": "o"})
 
 
@@ -53,7 +55,7 @@ def _near(word: str, vocab: set[str]) -> bool:
 def find(reference=None, customer=None, origin=None, destination=None, weight_kg=None, ready_date=None,
          text=None) -> list[dict]:
     """Every deal with at least one fitting field, best first: {rec, booking, score, matched, differs}."""
-    deals = store.records("deal")
+    deals = store.records("deal", limit=ALL)
     rows = []
     for rec in deals:
         d = rec["data"]
@@ -110,4 +112,39 @@ def find(reference=None, customer=None, origin=None, destination=None, weight_kg
         if score or not given:
             out.append({"rec": rec, "booking": b, "score": round(score, 2), "matched": matched, "differs": differs})
     out.sort(key=lambda x: (-x["score"], -x["rec"]["updated_at"]))
+    return out
+
+
+def history(customer: str | None, exclude: str | None = None, n: int = 3) -> list[str]:
+    """This sender's earlier deals, newest first, one short line each, so the agent can remember them for about 60
+    tokens instead of a search: "2026-11-21 CGN-SGN 410 kg, booked Meridian, arrives 2026-11-24"."""
+    from .tools import _ts, timeline  # the dates the quote and the tracking answer use (tools imports this module)
+    if not customer:
+        return []
+    who = customer.strip().lower()
+    out = []
+    for rec in store.records("deal", limit=ALL):
+        d = rec["data"]
+        if rec["id"] == exclude or (d.get("customer") or "").strip().lower() != who:
+            continue
+        req, bd = d.get("request") or {}, d.get("booking") or {}
+        if not req.get("destination"):
+            continue  # a mail that never became a shipment is nothing to remember
+        when = time.strftime("%a %d %b %Y", time.gmtime((_ts(d.get("received_at")) if d.get("received_at") else 0)
+                                                     or rec["updated_at"]))
+        kg = f" {req['weight_kg']} kg" if req.get("weight_kg") else ""
+        if bd:
+            what = f"booked {bd.get('airline') or ''}".strip()
+            t = timeline(bd)
+            if t.get("expected_stage_now") == "arrived":
+                what += f", arrived {t['estimated_arrival']}"
+            elif t:
+                what += f", arrives {t['estimated_arrival']}"
+        elif d.get("quote"):
+            what = f"quoted {d['quote'].get('amount')} EUR, not booked"
+        else:
+            what = "not quoted"
+        out.append(f"{when} {req.get('origin') or '?'}-{req['destination']}{kg}, {what}")
+        if len(out) == n:
+            break
     return out

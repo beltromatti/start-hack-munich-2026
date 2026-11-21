@@ -4,7 +4,7 @@ The cases are the ones the old substring count lost at 98 deals (Sat 21 Nov prob
 of another, the weight in tonnes, a city instead of a code, a date as "25 Nov", one customer on one lane twice.
 The model translates the words into fields (that is its job); these tests check the comparison the code does.
 """
-from app import store, tools
+from app import lookup, store, tools
 
 FIRST = 1795273200.0  # 2026-11-21 13:00 UTC
 
@@ -73,3 +73,21 @@ def test_no_fields_gives_the_latest_deals():
     world()
     out = tools.crm(None, "")
     assert out["total_matches"] == 64 and len(out["matches"]) == 10
+
+
+def test_a_returning_customer_brings_their_last_shipments_into_the_quote():
+    world()
+    lines = lookup.history("Rheintal-Praezision@hackloop.mail", exclude="deal-123")
+    assert len(lines) == 1 and "CGN-EZE 410 kg, booked Meridian, arrives " in lines[0]
+    assert lookup.history("new-customer@hackloop.mail") == []
+
+
+def test_history_is_cheap_on_a_full_night():
+    import time
+    for n in range(1000, 1600):  # 600 deals, more than the register's default page of 500
+        deal(n, "busy@hackloop.mail" if n == 1000 else f"c{n}@hackloop.mail", "FRA", "SGN", 300, "2026-11-22",
+             f"BK-Y{n}", f"SM-{n}")
+    t = time.perf_counter()
+    lines = lookup.history("busy@hackloop.mail")
+    assert lines and (time.perf_counter() - t) < 0.5            # the oldest deal is still seen
+    assert len(" ".join(lines)) < 300                            # a few dozen tokens in the tool result

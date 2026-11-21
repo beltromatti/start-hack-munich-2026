@@ -152,6 +152,9 @@ def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: f
     store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" and shipment is not None else r["status"],
                                          {**r["data"], "preference": preference}))
     out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds)
+    before = lookup.history((store.get(ctx.deal_id) or {}).get("data", {}).get("customer"), exclude=ctx.deal_id)
+    if before:
+        out["this_customer_before"] = before
     if out.get("missing"):
         store.update(ctx.deal_id, lambda r: ("waiting_customer", r["data"]))
     return out
