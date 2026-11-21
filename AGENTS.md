@@ -9,6 +9,7 @@ Ship a working, demoable agent system. Speed and a clean demo beat completeness.
 Read `docs/challenges/5u.md` before building anything. The other challenge files are background only.
 How to reach 5U (mailbox, rate portal, LLM gateway, endpoints, `.env` names): `docs/challenges/5u-kit.md`.
 API spec: `docs/challenges/5u-api/openapi.json`. Rate sheets, carrier list, pickup zones: `docs/challenges/5u-kit/start-kit/`.
+Counted facts for decisions (lanes, rate limit, email-only airlines, weight breaks, trucker zones): `docs/challenges/5u-facts.md`.
 The team key never goes into the repo. It lives only in each person's `.env`.
 
 ## Architecture (keep it this simple)

@@ -56,8 +56,9 @@ A quote without any gateway call earns no cost points. Cost points land on the b
 
 ## Start kit (`5u-kit/start-kit/`)
 
-- **11 rate sheets** in 6 formats: pdf (Cobalt, Helix, Orion), jpg in two pages (Danube Wings), xlsx (Elbflug, Kestrel,
-  Vega, Wayzata), docx (Quetzal), txt (Yellowtail). Tariff month 2026-11.
-- `carrier-list.csv` (`name, kind, email, serves`): 51 carriers, 22 of them truckers. `serves` lists destination airports.
+- **10 rate sheets in 11 files**, 5 formats: pdf (Cobalt, Helix, Orion), jpg in two pages (Danube Wings), xlsx (Elbflug,
+  Kestrel, Vega, Wayzata), docx (Quetzal), txt (Yellowtail). Tariff month 2026-11.
+- `carrier-list.csv` (`name, kind, email, serves`): 51 carriers, 29 airlines and 22 truckers. `serves` lists destination
+  airports for airlines and pickup zones for truckers. Counted facts: `5u-facts.md`.
 - `pickup_zones.csv` (`zone, area, airport`): German postcode prefix → origin airport (FRA, MUC, DUS, HAM, STR, CGN).
   This is the door-to-port leg.
