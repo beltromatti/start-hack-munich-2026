@@ -11,6 +11,9 @@ whole system together.
 **simulate** more data as we go and learn from our own mistakes.
 Simulation data: the 10 rate sheets (and variants of them) **and** the leaderboard (per mail: every team's
 score and who booked what).
+**Flow on a disruption:** we go with our prediction and calculation engine. The code pricing engine prices every
+request. Only for outliers does an LLM reason about the request and sort it into **green / yellow / red**;
+each bucket is handled differently.
 
 - **AI reads, code prices.** The funnel (routing, reading RFQs, bids, tariff sheets) is AI-led.
   The price itself comes from our own pricing engine, in code, no LLM.
