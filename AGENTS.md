@@ -10,6 +10,9 @@ Read `docs/challenges/5u.md` before building anything. The other challenge files
 How to reach 5U (mailbox, rate portal, LLM gateway, endpoints, `.env` names): `docs/challenges/5u-kit.md`.
 API spec: `docs/challenges/5u-api/openapi.json`. Rate sheets, carrier list, pickup zones: `docs/challenges/5u-kit/start-kit/`.
 Counted facts for decisions (lanes, rate limit, email-only airlines, weight breaks, trucker zones): `docs/challenges/5u-facts.md`.
+The 10 rate sheets as one checked table (158 lanes, EUR per kg, minimum, surcharges): `docs/challenges/5u-kit/tariffs.json`.
+Read it instead of the raw pdf/xlsx/jpg files. Pricing: also price the next weight break up and take the cheaper
+(299 kg cost more than 300 kg on the portal, see `5u-facts.md`).
 The team key never goes into the repo. It lives only in each person's `.env`.
 
 ## Architecture (keep it this simple)
