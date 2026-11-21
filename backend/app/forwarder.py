@@ -559,10 +559,11 @@ def normalise(s: dict, w: kit.World) -> dict:
     dest = kit.destination_code(s.get("destination_airport"))  # a city name is its airport in our network
     missing = []
     if pickup and (postcode or pickup.get("city")) and not zone:
-        missing.append(f"a pickup postcode inside our pickup zones (they start with {', '.join(sorted(w.zones))})")
-    elif pickup and len(postcode) < 5:  # truckers price a collection by postcode (live rounds 15-18)
-        missing.append("the pickup postcode: truckers price the collection by postcode, and a town alone (or the one "
-                       "in a signature) is not enough")
+        missing.append(f"a pickup postcode or town inside our pickup zones (postcodes start with "
+                       f"{', '.join(sorted(w.zones))})")
+    elif pickup and not zone:  # a pickup asked for, no place given at all (rounds 15-18)
+        missing.append("where to collect: the pickup postcode, or at least the town")
+    # A town is enough: it is its zone, and the zone prices the truck (round 20: "All I have is Augsburg").
     if (not origin or origin not in w.origins()) and not missing:
         missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
                        f"pickup postcodes start with {', '.join(sorted(w.zones))})")
