@@ -189,10 +189,13 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **Where to collect is what they say about the pickup.** A signature town is where they write from (round 15).
 - **A wish for future inquiries outlives the thread** (round 42; 5U corrected its verdict by hand, +120).
 - **Tracking comes from our own records;** the airlines answer status questions with their quote form.
-- **A carrier's mail is its body and its attachments** (round 63: truckers priced in a PDF, a Word letter and a
-  voice message, and a body-only reader saw no price). Every carrier and rate desk mail is read with its
-  attachments; a voice message cannot be read (the gateway takes no audio), so it is named and the carrier
-  can be asked in writing. A trucker's time is the time until it collects, however it is put.
+- **A mail is its body and its attachments, whatever their form** (round 63: truckers priced in a PDF, a Word
+  letter and a voice message; round 65: the request itself was a voice message; 5U said stranger formats are
+  coming). One reader (`docs.text`) serves customers, carriers and the rate desk: pdf (scanned pages read as
+  pictures), xlsx, docx, text in any common encoding, zip and eml opened, pictures read through the gateway
+  (`llm.look`), voice messages transcribed with a call of our own (the gateway takes no audio; 5U said to do so),
+  prices said aloud accepted by the amount check. Units are read however written and never guessed: an unknown
+  one goes back to the agent by name. A trucker's time is the time until it collects, however it is put.
 - **A mail to the customer without a price is a decline** (round 63, `declined_in_scope`): when a carrier has
   not priced yet, wait for it or ask it; the customer cannot help.
 - **Prices can move between the quote and the booking** (rounds 48-50): the customer hears it from us, in the
@@ -292,4 +295,5 @@ Then:
   document-wins rule needs. Only a pathological size breaks us: past the 1.05 million-token context the request is
   refused and the round is lost. SIEVER's answer (§2.3, §13.6 of its vision) is pages the agent reads on demand;
   not built, because for real documents it would add calls, not save them. Decide again if a document ever runs
-  to more than a few dozen pages.
+  to more than a few dozen pages. (Since 22:43 pictures and scanned pages are read too: each is one gateway call,
+  about 0.0004 USD.)
