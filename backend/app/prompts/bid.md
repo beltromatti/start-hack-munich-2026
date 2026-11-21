@@ -5,7 +5,8 @@ list every offer in it as JSON. Copy numbers exactly as written; never compute o
   closed, no capacity), or is "not on the portal", is an entry with available false (the reason, or its email
   address, in note). A carrier that only asks us for more facts did not say no: available true, total null,
   what it needs in note.
-- total: the all-in amount for the whole shipment as written, with its currency code (EUR, USD, ...).
+- total: the all-in amount for the whole shipment as written, with its currency code (EUR, USD, ...). An amount
+  said rather than written (a transcribed voice message: "340 euros and 60 cents") is that amount, 340.60.
   If the mail gives no total but the parts (a rate per kg, a minimum, surcharges per kg such as fuel and security,
   fixed fees per shipment, the weight it bills), copy each part into its field and leave total null: our code
   adds them up. Several surcharges per kg: their sum in surcharges_per_kg; several fixed fees: their sum.

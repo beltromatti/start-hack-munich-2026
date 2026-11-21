@@ -152,6 +152,48 @@ def structured(name: str, system: str, user: str, schema: dict, *, model: str, r
     return json.loads(res.choices[0].message.content or "{}")
 
 
+def look(mime: str, raw: bytes, *, run_id: str | None = None) -> str:
+    """What a picture says, as text (a scanned packing list, a photo of an offer, a label): through the gateway,
+    with the tariff reader's model. The text then goes wherever the mail goes (the agent, the bid reader)."""
+    if _fake is not None:
+        return "[picture read by the fake model]"
+    model = settings.model_tariff
+    args: dict[str, Any] = {"model": model, "messages": [{"role": "user", "content": _content(prompt("look"),
+                                                                                             [(mime, raw)])}]}
+    e = settings.effort_for(model)
+    if e:
+        args["reasoning_effort"] = e
+    res = _call(args, "look", run_id, "docs")
+    return res.choices[0].message.content or ""
+
+
+def transcribe(raw: bytes, filename: str, *, run_id: str | None = None) -> str:
+    """Speech to text. The gateway takes no audio (probed Sat 22:40: no audio model, chat takes text and images
+    only); 5U said to transcribe with a call of our own and use the text through the gateway as usual. So this is
+    OpenAI directly, and never part of the gateway spend."""
+    if _fake is not None:
+        return "[voice message transcribed by the fake model]"
+    c = direct()
+    if c is None:
+        raise RuntimeError("no OpenAI key for transcription")
+    import io
+    for attempt in range(3):
+        try:
+            f = io.BytesIO(raw)
+            f.name = filename or "voice.mp3"
+            t = time.time()
+            text = c.audio.transcriptions.create(model="gpt-4o-mini-transcribe", file=f).text
+            store.log("docs", "llm", f"gpt-4o-mini-transcribe [transcribe] {time.time() - t:.1f}s DIRECT, not gateway",
+                      {"chars": len(text)}, run_id=run_id)
+            return text
+        except (openai.BadRequestError, openai.UnprocessableEntityError):
+            raise
+        except Exception as e:
+            store.log("docs", "error", f"transcribe attempt {attempt + 1}: {e!r}"[:300], run_id=run_id)
+            time.sleep(2 * (attempt + 1))
+    raise RuntimeError("transcription unavailable")
+
+
 def _content(text: str, images: list[tuple[str, bytes]] | None) -> Any:
     if not images:
         return text

@@ -150,8 +150,8 @@ def _mail_event(fw: Any, m: dict) -> str:
             f"Subject: {m['subject']}\n\n{m['body']}")
     for a in m.get("attachments") or []:
         try:
-            text += f"\n\n[attachment {a.get('filename')}]\n" + docs.text(a.get("filename", ""),
-                                                                          fw.api.attachment(m["id"], a.get("id")))
+            text += f"\n\n[attachment {a.get('filename')}]\n" + docs.text(
+                a.get("filename", ""), fw.api.attachment(m["id"], a.get("id")), run_id=f"deal-{m.get('root')}")
         except Exception as e:
             text += f"\n\n[attachment {a.get('filename')}: could not be read: {e!r}]"
     return text

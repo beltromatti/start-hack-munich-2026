@@ -573,7 +573,7 @@ def test_a_carrier_price_in_an_attachment_is_read():
     m = {"id": 5, "sender": "elbkante-logistik@hackloop.mail", "subject": "Re: Pickup", "body": "See the attachment.",
          "attachments": [{"id": 1, "filename": "price-offer.txt"}, {"id": 2, "filename": "voice-message.mp3"}]}
     body = f.with_attachments(m)["body"]
-    assert "Total: 165.70 EUR" in body and "[audio attachment voice-message.mp3: not read as text]" in body
+    assert "Total: 165.70 EUR" in body and "[voice message voice-message.mp3, transcribed]" in body
     assert docs.text("blob.bin", bytes(range(256)) * 50).startswith("[binary attachment")
     assert f.with_attachments({**m, "attachments": []}) == {**m, "attachments": []}
 
@@ -586,3 +586,30 @@ def test_the_ready_date_is_a_date_however_it_was_written():
     s = {"origin_airport": "FRA", "destination_airport": "ORD", "lots": [{"pieces": 1, "weight": {"value": 100, "unit": "kg"}}]}
     for written in ("24 November 2026", "2026-11-24", "24.11.2026", "Nov 24, 2026"):
         assert normalise({**s, "cargo": {"ready_date": written}}, kit.world())["ready_date"] == "2026-11-24"
+
+
+def test_any_attachment_becomes_what_a_person_would_read():
+    """5U sends files in more and more forms (round 63: offers as PDF, Word and a voice message; round 65: the
+    request itself as a voice message). One reader turns each into text, or says why it cannot."""
+    import io, zipfile
+    from email.message import EmailMessage
+    from app import docs
+    from app.forwarder import amounts_in
+    from decimal import Decimal
+    assert docs.text("voice-message.mp3", b"ID3...").startswith("[voice message voice-message.mp3, transcribed]")
+    assert docs.text("scan.JPG", b"\xff\xd8...").startswith("[picture scan.JPG, as read]")
+    assert docs.text("offer.txt", "Total: 340,60 €".encode("utf-16")) == "Total: 340,60 €"
+    assert docs.text("offer.csv", "Gewicht;Preis\n1.410;340,60 €".encode("cp1252")).endswith("340,60 €")
+    z = io.BytesIO()
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("offer.txt", "Total: 165.70 EUR")
+        f.writestr("photo.png", b"\x89PNG...")
+    out = docs.text("documents.zip", z.getvalue())
+    assert "Total: 165.70 EUR" in out and "[picture photo.png, as read]" in out
+    msg = EmailMessage()
+    msg["From"], msg["Subject"] = "shipper@example.com", "Packing list"
+    msg.set_content("See the list attached.")
+    msg.add_attachment(b"3 pallets, 212 kg each", maintype="text", subtype="plain", filename="list.txt")
+    out = docs.text("forwarded.eml", bytes(msg))
+    assert "Packing list" in out and "3 pallets, 212 kg each" in out
+    assert Decimal("340.60") in amounts_in("the total is 340 euros and 60 cents")

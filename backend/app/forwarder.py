@@ -406,8 +406,8 @@ class Forwarder:
         parts = [m["body"] or ""]
         for a in m.get("attachments") or []:
             try:
-                parts.append(f"[attachment {a.get('filename')}]\n" + docs.text(a.get("filename", ""),
-                                                                           self.api.attachment(m["id"], a.get("id"))))
+                parts.append(f"[attachment {a.get('filename')}]\n" + docs.text(
+                    a.get("filename", ""), self.api.attachment(m["id"], a.get("id")), run_id=f"deal-{m.get('root')}"))
             except Exception as e:
                 parts.append(f"[attachment {a.get('filename')}: could not be read: {e!r}]")
         return {**m, "body": "\n\n".join(parts)} if len(parts) > 1 else m
@@ -809,6 +809,11 @@ def amounts_in(text: str) -> set[Decimal]:
             out.add(Decimal(t.replace(",", "")))
         if re.fullmatch(r"\d{1,3}(\.\d{3})*(,\d+)?|\d+(,\d+)?", t):  # 1.234,50  3,71
             out.add(Decimal(t.replace(".", "").replace(",", ".")))
+    # said rather than written (a transcribed voice message): "340 euros and 60 cents"
+    for whole, cents in re.findall(r"(\d[\d,.']*)\s*(?:euros?|eur|dollars?|usd)\s*(?:and\s*)?(\d{1,2})\s*(?:cents?|ct)\b",
+                                   text, re.I):
+        for w in amounts_in(whole):
+            out.add(w + Decimal(cents) / 100)
     return out
 
 
