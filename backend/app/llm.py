@@ -3,6 +3,7 @@ strict JSON schema output, tokens and USD cost logged per call.
 
 The model reads and writes language. It never decides a number that reaches a customer (see pricing.py).
 """
+import base64
 import json
 import os
 import time
@@ -68,15 +69,15 @@ def cost(model: str, usage: Any) -> float | None:
 
 
 def structured(name: str, system: str, user: str, schema: dict, *, model: str, run_id: str | None = None,
-               agent: str = "llm") -> dict:
-    """One call, one JSON object that matches `schema` (strict)."""
+               agent: str = "llm", images: list[tuple[str, bytes]] | None = None) -> dict:
+    """One call, one JSON object that matches `schema` (strict). `images`: (mime, bytes), e.g. a scanned tariff."""
     if _fake is not None:
         out = _fake(name, system, user, schema)
         store.log(agent, "llm", f"fake [{name}]", {"out": out}, run_id=run_id)
         return out
     args: dict[str, Any] = {
         "model": model,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": _content(user, images)}],
         "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}},
     }
     effort = next((v for k, v in EFFORT.items() if model.startswith(k)), None)
@@ -101,6 +102,14 @@ def structured(name: str, system: str, user: str, schema: dict, *, model: str, r
             last = e
             store.log(agent, "error", f"{model} [{name}] failed: {e!r}"[:400], run_id=run_id)
     raise RuntimeError(f"model call {name} failed: {last!r}")
+
+
+def _content(text: str, images: list[tuple[str, bytes]] | None) -> Any:
+    if not images:
+        return text
+    return [{"type": "text", "text": text}] + [
+        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}
+        for mime, raw in images]
 
 
 def strict(properties: dict, required: list[str] | None = None) -> dict:

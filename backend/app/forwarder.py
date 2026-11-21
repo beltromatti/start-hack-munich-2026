@@ -470,23 +470,29 @@ class Forwarder:
 
     def on_tariff(self, m: dict) -> None:
         carrier = kit.world().carrier_by_email(m["sender"])
-        parts = [m["body"]]
+        parts, images = [m["body"]], []
         for a in m.get("attachments") or []:
+            name = (a.get("filename") or "").lower()
             try:
                 raw = self.api.attachment(m["id"], a.get("id"))
-                parts.append(docs.text(a.get("filename", ""), raw))
+                if name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):  # a scanned sheet: the model looks at it
+                    images.append(("image/png" if name.endswith(".png") else "image/jpeg", raw))
+                else:
+                    parts.append(f"[{a.get('filename')}]\n" + docs.text(name, raw))
             except Exception as e:
                 store.log("tariff", "error", f"attachment {a.get('filename')}: {e!r}")
-        out = language.read_tariff("\n\n".join(parts)[:60000], run_id=f"tariff-{m['id']}")
+        out = language.read_tariff("\n\n".join(parts)[:60000], run_id=f"tariff-{m['id']}", images=images or None)
         airline = carrier.name if carrier else (out.get("airline") or m["sender"])
         lanes = []
         for l in out["lanes"]:
-            if len(l["breaks_kg"]) != len(l["rates_per_kg"]) or not l["breaks_kg"]:
+            rates = [_num(x) for x in l["rates_per_kg"]]
+            fixed = [_num(l["minimum"]), _num(l["fuel_per_kg"]), _num(l["security_per_kg"])]
+            if not l["breaks_kg"] or len(l["breaks_kg"]) != len(rates) or None in rates + fixed:
                 continue
             lanes.append({"airline": airline, "origin": l["origin"].upper(), "destination": l["destination"].upper(),
-                          "transit_days": l["transit_days"] or 0, "minimum_eur": l["minimum"],
-                          "breaks_kg": [int(b) for b in l["breaks_kg"]], "rates_eur_per_kg": l["rates_per_kg"],
-                          "fuel_eur_per_kg": l["fuel_per_kg"], "security_eur_per_kg": l["security_per_kg"]})
+                          "transit_days": l["transit_days"] or 0, "minimum_eur": fixed[0],
+                          "breaks_kg": [int(b) for b in l["breaks_kg"]], "rates_eur_per_kg": rates,
+                          "fuel_eur_per_kg": fixed[1], "security_eur_per_kg": fixed[2]})
         if lanes and (out.get("currency") or "EUR").upper() == "EUR":
             kit.replace_sheet(airline, lanes, f"mail {m['id']}")
         store.log("tariff", "info", f"{airline}: {len(lanes)} lanes ingested", {"notes": out.get("notes")},
@@ -560,6 +566,19 @@ def thread_text(root: int, api: Any = None) -> str:
                 store.log("rfq", "error", f"attachment {a.get('filename')}: {e!r}")
         out.append(text)
     return "\n\n".join(out)[-16000:]
+
+
+def _num(x: Any) -> str | None:
+    """'EUR 1,234.50' / '3,71' -> '1234.50' / '3.71' (amounts from a sheet, read by the model)."""
+    t = re.sub(r"[^\d.,]", "", str(x or ""))
+    if "," in t and "." in t:
+        t = t.replace(",", "")
+    elif "," in t:
+        t = t.replace(",", ".")
+    try:
+        return str(Decimal(t))
+    except Exception:
+        return None
 
 
 def _body(m: dict | None) -> str:

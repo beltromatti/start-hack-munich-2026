@@ -59,9 +59,9 @@ def read_bid(sender: str, subject: str, body: str, run_id: str) -> list[dict]:
     return out["offers"]
 
 
-def read_tariff(text: str, run_id: str) -> dict:
+def read_tariff(text: str, run_id: str, images: list[tuple[str, bytes]] | None = None) -> dict:
     return llm.structured("tariff", llm.prompt("tariff"), text, TARIFF, model=settings.model_parse,
-                          run_id=run_id, agent="tariff")
+                          run_id=run_id, agent="tariff", images=images)
 
 
 # ---- writing -----------------------------------------------------------------------------------------------

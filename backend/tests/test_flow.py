@@ -63,3 +63,23 @@ def test_door_to_port_waits_for_truckers_and_adds_pickup(monkeypatch):
     assert rec["status"] == "quoted"
     assert rec["data"]["quote"]["pickup"]["carrier"]
     assert rec["data"]["request"]["pickup_zone"] == "60"
+
+
+def test_tariff_mail_replaces_the_airlines_sheet():
+    from decimal import Decimal
+    from app import llm
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    lane = {"origin": "FRA", "destination": "ORD", "transit_days": 3, "minimum": "EUR 99.00",
+            "breaks_kg": [0, 45, 100, 250, 500, 1000, 2000], "rates_per_kg": ["9", "8", "7", "6", "5", "4", "3"],
+            "fuel_per_kg": "1,00", "security_per_kg": "0.10"}
+    prev = llm._fake
+    llm.use_fake(lambda name, *a: {"airline": None, "currency": "EUR", "valid_from": None, "valid_to": None,
+                                   "notes": None, "lanes": [lane]} if name == "tariff" else prev(name, *a))
+    api._deliver("yellowtail-air-freight@hackloop.mail", api.mailbox, "Tariff December 2026", "New rates attached.")
+    run(f, 2)
+    yl = [l for l in kit.world().sheet("FRA", "ORD") if l["airline"] == "Yellowtail Air Freight"]
+    assert len(yl) == 1 and yl[0]["minimum_eur"] == "99.00" and yl[0]["fuel_eur_per_kg"] == "1.00"
+    assert [l for l in kit.world().sheet_lanes if l["airline"] == "Yellowtail Air Freight"] == yl
+    assert store.get("tariff-yellowtail-air-freight")["status"] == "active"
