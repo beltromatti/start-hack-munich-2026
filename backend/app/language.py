@@ -118,8 +118,27 @@ UNITS_PER_DAY = {"h": Decimal(24), "hr": Decimal(24), "hrs": Decimal(24), "hour"
 
 
 def days(value, unit) -> Decimal | None:
-    """A duration as written (8, "hours") in days, by code: the model never converts units."""
+    """A duration as written (8, "hours") in days, by code: the model never converts units. The unit is its first
+    word ("hours from order to collection" is hours); a unit we do not know is None, never taken as days (round 67's
+    reader gave 28 with that unit: 28 days of pickup)."""
     v = to_decimal(value)
     if v is None:
         return None
-    return (v / UNITS_PER_DAY.get((unit or "days").strip().lower().rstrip("."), Decimal(1))).quantize(Decimal("0.001"))
+    words = re.findall(r"[a-zäöü]+", (unit or "days").lower()) or ["days"]
+    per_day = next((UNITS_PER_DAY[w] for w in words if w in UNITS_PER_DAY), None)  # "business days" is days
+    return None if per_day is None else (v / per_day).quantize(Decimal("0.001"))
+
+
+_TIME = (r"(?:lead|pickup|pick-up|collection|transit)\s*time\s*[:\-]?\s*(?:is\s*)?(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|days?)\b",
+         r"(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|days?)\s*(?:from|after)\s*(?:your\s*|the\s*)?order",
+         r"(?:collection|pickup|collect(?:ed)?)\s*in\s*(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|days?)\b")
+
+
+def time_in(text: str) -> Decimal | None:
+    """A trucker's time as its mail states it, by code, when the reader missed it (round 63: three of three
+    attachment offers came back without a time, and a slow trucker looked instant in the 50/50 pick)."""
+    for pattern in _TIME:
+        m = re.search(pattern, text or "", re.I)
+        if m:
+            return days(m.group(1).replace(",", "."), m.group(2))
+    return None

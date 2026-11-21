@@ -629,3 +629,16 @@ def test_units_are_read_however_written_and_never_guessed():
          "lots": [{"pieces": 1, "weight": {"value": 3, "unit": "stone"}, "volume": {"value": 1, "unit": "cbm"}}]}
     n = normalise(s, kit.world())
     assert n["weight_kg"] is None and "weight unit 'stone'" in " ".join(n["missing"])
+
+
+def test_a_truckers_time_is_read_by_code_when_the_reader_misses_it():
+    from app import language
+    from decimal import Decimal
+    assert language.days(28, "hours from order to collection") == Decimal("1.167")
+    assert language.days(28, "parsecs") is None and language.days(4, None) == 4
+    assert language.days(3, "business days") == 3
+    assert language.time_in("Lead time           28 hours from order to collection") == Decimal("1.167")
+    assert language.time_in("Our driver can be at the pickup address 13 hours after your order.") == Decimal("0.542")
+    assert language.time_in("We need 12 hours from your order to the collection.") == Decimal("0.5")
+    assert language.time_in("Collection in 7 hours") == Decimal("0.292")
+    assert language.time_in("waiting time after the first 30 minutes, 45.00 EUR for each hour") is None

@@ -472,7 +472,10 @@ class Forwarder:
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
-        days = language.days(o.get("time_value"), o.get("time_unit")) or Decimal(0)
+        days = language.days(o.get("time_value"), o.get("time_unit"))
+        if days is None and trucker:  # a trucker sends one offer: the time its mail states is that offer's
+            days = language.time_in(m["body"])
+        days = days or Decimal(0)
         # a carrier answering for itself is named as in the carrier list (its mail bid and its sheet are one
         # carrier); the rate desk names the airlines it lists
         name = carrier.name if carrier else (o.get("carrier") or m["sender"])
