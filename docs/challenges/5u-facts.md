@@ -208,4 +208,6 @@ order". The gateway has no audio model and its chat API takes only text and imag
 our purchasing department needs it for filing." We quoted in the body and wrote that we could not attach a PDF; the
 customer answered "I asked for the offer as a PDF and did not get one with your price in it, so we will not go
 ahead with it." 5U's send API takes attachments (at most 5, 10 MB each; pdf, xlsx, xls, csv, txt, png, jpg, docx).
-Since 23:40 `send_mail` attaches our offer as a PDF made by code from the option (`offer_pdf`).
+The verdict: `rejected no_pdf_offer` (2 of 13 teams accepted), on the first quote, so a PDF sent later would not
+count. Since 23:42 `send_mail` attaches our offer as a PDF made by code from the option (`offer_pdf`), text not a
+picture, the total written once as in the mail.
