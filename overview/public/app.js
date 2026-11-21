@@ -15,6 +15,7 @@ const now = () => Date.now() / 1000;
 
 async function get(path) {
   const r = await fetch("/api/5u" + path, { cache: "no-store" });
+  if (r.status === 401) { location.href = "/login"; throw new Error("login required"); }
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();
 }
@@ -192,6 +193,7 @@ document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("cli
 }));
 $("q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
 
+fetch("/api/me").then((r) => r.ok ? r.json() : null).then((m) => { if (m?.email) $("who").textContent = `Read-only · ${m.email}`; }).catch(() => {});
 tick();
 setInterval(tick, 10000);
 setInterval(renderHeader, 1000);
