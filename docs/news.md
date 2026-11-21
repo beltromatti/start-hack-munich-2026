@@ -2,7 +2,10 @@
 
 Newest on top. Source in brackets.
 
-- **Sat 14:12** Asked 5U whether the +10 tracking bonus counts per correct answer or once (Discord #5u-ai, waiting).
+- **Sat 14:37** Only models through the 5U gateway count (list in Swagger). Other models / local GPUs: cost can't be
+  measured, those quotes get zero points ("on time", likely meant cost). 5U is working on more models (taci).
+- **Sat 14:13** Tracking bonus is **per shipment**: every booked shipment can get a tracking question later, each
+  correct answer up to +10, only the first answer counts, unbooked shipments get no tracking question (fehmi).
 - **Sat 13:47–14:05** 5U mailed **kit cards** (API key + Base URL) from fehmi@5u.ai to each team's registered
   email. "START Milan" was on the missing list at 13:47, gone from it at 13:49. Without the card: no API key.
 - **Sat 13:44** Scoring confirmed **45-40-15** (accuracy / LLM cost / time); an older doc showed 30 for cost (taci).
