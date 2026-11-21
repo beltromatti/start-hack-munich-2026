@@ -1,0 +1,19 @@
+[project]
+name = "hack-backend"
+version = "0.1.0"
+description = "START Hack Munich 2026: shared agent foundation"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "openai>=1.50",
+  "httpx>=0.27",
+  "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

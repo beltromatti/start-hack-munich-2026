@@ -1,0 +1,36 @@
+:root {
+  --bg: #f6f6f4; --panel: #ffffff; --ink: #15171a; --muted: #6b7076; --line: #e4e4e0;
+  --accent: #2f5fd0; --bad: #c2412d; --ok: #2f7d4f;
+  font-family: ui-sans-serif, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink); background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111315; --panel: #181b1e; --ink: #e9eaeb; --muted: #9aa0a6; --line: #2a2e33; --accent: #7fa2ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+.page { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+.meta { display: flex; gap: 16px; color: var(--muted); font-size: 13px; }
+.bad { color: var(--bad); }
+main { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+aside, section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+aside { display: flex; flex-direction: column; gap: 6px; max-height: 80vh; overflow: auto; }
+aside button { text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 8px; color: inherit; cursor: pointer; display: grid; gap: 2px; font: inherit; }
+aside button:hover { border-color: var(--line); }
+aside button.active { border-color: var(--accent); }
+aside span { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+aside small { color: var(--muted); font-size: 12px; }
+ol { list-style: none; margin: 0; padding: 0; }
+li { display: grid; grid-template-columns: 72px 90px 70px 1fr auto; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; align-items: baseline; }
+li time, .tok { color: var(--muted); font-variant-numeric: tabular-nums; }
+.agent { font-weight: 600; }
+.kind { color: var(--muted); }
+.k-error .kind, .k-error .text { color: var(--bad); }
+.k-done .kind { color: var(--ok); }
+.k-tool .kind { color: var(--accent); }
+.empty { color: var(--muted); font-size: 14px; }
+@media (max-width: 760px) { li { grid-template-columns: 64px 1fr; } li .kind, li .tok { display: none; } }
