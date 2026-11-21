@@ -143,6 +143,12 @@ def test_balanced_ratio_trucker_matches_the_scored_rounds():
     assert pricing.balanced(r1, "ratio").carrier == "Westfalenroute"
     assert pricing.balanced(r2, "ratio").carrier == "Bodenseefracht"
     assert pricing.pick(r1, "cheapest").carrier != "Westfalenroute" and pricing.balanced(r2, "minmax").carrier != "Bodenseefracht"
+    # round 4: the customer asked for the CHEAPEST and the full 60 points still came with the ratio trucker
+    r4 = t([("Elbkante Logistik", "115.98", 29), ("Westfalenroute", "187.97", 11),
+            ("Maintal Transport Logistik", "192.97", 13), ("Bodenseefracht", "226.96", 12)])
+    air = [Offer("air", "Xenon Cargo Airlines", D("1483.43"), D(3), "portal", "R-1")]
+    q = pricing.quote(air, r4, "cheapest", True)
+    assert q["pickup"]["carrier"] == "Westfalenroute" and q["total"] == "1671.40"   # what we quoted and 5U scored in full
 
 
 def test_timeline_starts_when_the_goods_are_ready():

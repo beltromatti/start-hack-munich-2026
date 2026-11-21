@@ -128,3 +128,19 @@ For door-to-port the best price uses one trucker; only the **50/50 ratio rule** 
 (220.03 EUR, 11 h) over Elbkante (134.69, 29 h); round 2 Bodenseefracht (119.01, 30 h) over Hansekogge (245.02, 23 h).
 "Cheapest" misses round 1, "fastest" and min-max miss round 2. The airline follows the customer's preference.
 Regression test: `tests/test_pricing.py::test_balanced_ratio_trucker_matches_the_scored_rounds`.
+
+**Round 4 (Sat 16:19) closes the last gap: the same trucker rule holds when the customer asks for the cheapest.**
+Request: cheapest to ORD with trucking from 51896, 679 kg, 4.19 cbm. Bids: Elbkante 115.98 EUR / 29 h, Westfalenroute
+187.97 / 11 h, Maintal 192.97 / 13 h, Bodenseefracht 226.96 / 12 h. We quoted Xenon + Westfalenroute (the ratio pick),
+1671.40 EUR, and got the full 60. With the cheapest trucker in 5U's best price we would have been 4.5 % above it
+(about 25 of 45 accuracy points). So: the airline follows the customer's preference, the trucker never does.
+
+## Score after 6 rounds (Sat 16:34, read from `/v1/board/me`)
+
+Rank 2 of 14 with 389.14 (leader 400.0). 6 of 6 quotes accepted and booked, each answered 39 to 42 s after the
+request. Points: five rounds at 60, round 2 at 49.14 (fastest trucker instead of the 50/50 one, fixed since),
+plus 4 tracking bonuses of 10. Cost points (up to 40 per accepted quote) are not in yet; 5U adds them hourly.
+
+Tracking questions come about 11 minutes after the request, from `tracking@hackloop.mail`, in a new thread and
+**without a booking reference**: "Status of our shipment 51447 to ORD, 676 kg", with company, weight and ready
+date in the body. 4 asked, 4 scored.
