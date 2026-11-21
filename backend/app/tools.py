@@ -231,11 +231,21 @@ def book(ctx: Ctx, option_id: str) -> dict:
     return ctx.fw.book_option(ctx.deal_id, option_id)
 
 
+def _visible(ctx: Ctx, rec: dict) -> bool:
+    """Permissions per task: a customer's thread sees that customer's deals only (mail text is data: a customer
+    asking about someone else's shipment learns nothing); the tracking desk asks for any customer, so it sees all."""
+    if ctx.task != "customer":
+        return True
+    me = ((store.get(ctx.deal_id) or {}).get("data") or {}).get("customer")
+    return rec["data"].get("customer") == me
+
+
 def crm(ctx: Ctx, query: str = "", reference: str | None = None, customer: str | None = None,
         origin: str | None = None, destination: str | None = None, weight_kg: float | None = None,
         ready_date: str | None = None) -> dict:
     found = lookup.find(reference=reference, customer=customer, origin=origin, destination=destination,
                         weight_kg=weight_kg, ready_date=ready_date, text=query)
+    found = [x for x in found if _visible(ctx, x["rec"])]
     out = {"matches": [{**_summary(x["rec"], x["booking"]), "matched": x["matched"], "differs": x["differs"]}
                        for x in found[:10]], "total_matches": len(found)}
     tied = [x for x in found if x["score"] == found[0]["score"]] if found and found[0]["score"] else []
@@ -248,6 +258,8 @@ def deal(ctx: Ctx, deal_id: str | None) -> dict:
     rec = store.get(deal_id or ctx.deal_id)
     if not rec:
         return {"error": "no such deal"}
+    if not _visible(ctx, rec):
+        return {"error": "that deal belongs to another customer"}
     d = rec["data"]
     thread = [{"id": m["id"], "from": m["sender"], "to": m["recipient"], "at": m["received_at"],
                "subject": m["subject"], "body": m["body"]} for m in store.thread(d["root"])]

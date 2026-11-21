@@ -27,8 +27,11 @@ def world():
              f"BK-X{n}", f"SM-{n}")
 
 
+DESK = tools.Ctx(None, "session-t", "deal-t", 0, "tracking", None)  # the tracking desk sees every customer
+
+
 def first(**kw):
-    return tools.crm(None, kw.pop("query", ""), **kw)["matches"][0]
+    return tools.crm(DESK, kw.pop("query", ""), **kw)["matches"][0]
 
 
 def test_a_reference_is_a_whole_word_sm_12_is_not_sm_123():
@@ -64,14 +67,14 @@ def test_a_typo_in_the_company_still_finds_it():
 
 def test_equal_fits_say_so():
     world()  # customer and lane only: both Rheintal deals fit
-    out = tools.crm(None, "", customer="Rheintal", destination="EZE")
+    out = tools.crm(DESK, "", customer="Rheintal", destination="EZE")
     assert {m["deal_id"] for m in out["matches"][:2]} == {"deal-12", "deal-123"}
     assert out["note"].startswith("2 deals fit equally")
 
 
 def test_no_fields_gives_the_latest_deals():
     world()
-    out = tools.crm(None, "")
+    out = tools.crm(DESK, "")
     assert out["total_matches"] == 64 and len(out["matches"]) == 10
 
 

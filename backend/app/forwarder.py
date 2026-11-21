@@ -107,6 +107,8 @@ class Forwarder:
         if self.deal_for_bid(m):
             return "bid"
         if kit.world().carrier_by_email(sender):
+            if booking_for(f"{subject}\n{m['body']}"):  # news about one of our bookings: delay, change, cancellation
+                return "booking"
             if m.get("attachments") or re.search(r"tariff|rate sheet|rates", subject, re.I):
                 return "tariff"
             return "other"
@@ -276,14 +278,14 @@ class Forwarder:
                     req: dict) -> int:
         # labelled lines: the carriers' desks read "Total weight: N kg" (live: "320 kg chargeable" was not read)
         body = (f"Hello {c.name} team,\n\nplease quote air freight for this shipment:\n"
-                f"Route: {o} to {d}\nTotal weight: {billed:.0f} kg\n"
+                f"Route: {o} to {d}\nTotal weight: {kg_text(billed)} kg\n"
                 + (f"Volume: {cbm:.2f} cbm\n" if cbm else "")
                 + f"Pieces: {req.get('pieces') or 1}\nCargo: general cargo\n"
                 f"Ready: {req.get('ready_date') or 'now'}\n\n"
                 "Please send your all-in total, currency, transit time, rate reference and validity.\n\n"
                 f"Thanks,\n{settings.persona}, {settings.company}")
-        mid = self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {billed:.0f} kg", body)
-        store.kv_set(f"bidweight:{mid}", str(billed.quantize(Decimal("1"))))
+        mid = self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {kg_text(billed)} kg", body)
+        store.kv_set(f"bidweight:{mid}", kg_text(billed))
         return mid
 
     def ask_trucker(self, deal_id: str, c: kit.Carrier, req: dict) -> int:
@@ -291,7 +293,7 @@ class Forwarder:
         postcode = req.get("pickup_postcode") or kit.ZONE_POSTCODE.get(req["pickup_zone"], "")  # a town: its postcode
         body = (f"Hello {c.name} team,\n\nplease quote a pickup from {postcode} "
                 f"{z.get('area', '')} (zone {req['pickup_zone']}) to {z.get('airport', req['origin'])} airport.\n"
-                f"Total weight: {Decimal(req['weight_kg']):.0f} kg\n"
+                f"Total weight: {kg_text(Decimal(req['weight_kg']))} kg\n"
                 + (f"Volume: {Decimal(req['volume_cbm']):.2f} cbm\n" if req.get("volume_cbm") else "")
                 + f"Pieces: {req.get('pieces') or 1}\nPickup: {req.get('ready_date') or 'as soon as possible'}\n\n"
                 f"Please send your total, currency, pickup time and offer reference.\n\nThanks,\n"
@@ -364,7 +366,7 @@ class Forwarder:
         elif air.get("email") or kit.world().carrier_by_name(air["carrier"]):  # by mail with the airline
             air = {**air, "email": air.get("email") or kit.world().carrier_by_name(air["carrier"]).email}
             text = (f"Hello,\n\nwe would like to book your offer {air.get('rate_id') or ''} ({booking['route']}, "
-                    f"{Decimal(air.get('billed_kg') or req['weight_kg']):.0f} kg). Our reference: {ref}.\n\n"
+                    f"{kg_text(Decimal(air.get('billed_kg') or req['weight_kg']))} kg). Our reference: {ref}.\n\n"
                     f"Thanks,\n{settings.persona}, {settings.company}")
             self.mail_carrier(deal_id, air["email"], f"Booking {air.get('rate_id') or ref}", text,
                               in_reply_to=air.get("reply_mail"))
@@ -391,7 +393,7 @@ class Forwarder:
         if deal_id is None:
             return
         rec = store.get(deal_id)
-        if rec and rec["data"].get("booking") and re.search(r"\bconfirm|\bbooked\b", m["body"], re.I):
+        if rec and rec["data"].get("booking") and is_confirmation(m):  # a confirmation sent in a bid thread
             self.on_booking_mail(m)
         carrier = kit.world().carrier_by_email(m["sender"])
         told = re.search(r"\bwe fly\b([^\n]*)", m["body"], re.I)  # "We fly CGN-DEL, FRA-JFK, ..." in a decline
@@ -480,28 +482,37 @@ class Forwarder:
                     "offers": r["data"].get("offers", []) + [o.as_dict() for o in offers]}))
 
     def on_booking_mail(self, m: dict) -> None:
+        """An airline writes about one of our bookings: its confirmation, or news after it (a delay, a change, a
+        cancellation). Its word goes on the booking, where crm and tracking read it; the deal's session hears it,
+        unless it only confirms exactly what we booked."""
         text = f"{m['subject']}\n{m['body']}"
-        for rec in store.records("booking"):
-            b = rec["data"]
-            if any(x and x in text for x in (b.get("rate_id"), b.get("team_reference"), b.get("booking_reference"))):
-                ref = re.search(r"Booking\s+(\S+)\s+confirmed", m["subject"] or "", re.I)
-                found = re.search(r"\b(?:booking reference|reference)\s*:?\s*([A-Z0-9][A-Z0-9-]{3,})", m["body"], re.I)
-                b = {**b, "status": "confirmed", "confirmation_mail": m["id"], "confirmation_text": m["body"][:800],
-                     "booking_reference": b.get("booking_reference") or (ref.group(1) if ref else None)
-                     or (found.group(1) if found else None)}
-                store.put(rec["id"], "booking", "confirmed", b)
-                store.update(b["deal"], lambda r: (r["status"], {**r["data"], "booking": b}))
-                store.log("booking", "info", f"confirmed {b.get('booking_reference')}", run_id=b["deal"])
-                if confirmation_matches(b, text):  # same reference, same price: nothing new for the deal
-                    store.log("booking", "info", f"{b.get('booking_reference')}: the airline's confirmation matches "
-                              "the booking, the session is not woken", run_id=b["deal"])
-                    return
-                # news from the world for this deal: its session hears it (and decides whether the customer should)
-                agent.notify(f"session-{store.get(b['deal'])['data']['root']}",
-                             f"The airline confirmed the booking (their mail {m['id']}): booking reference "
-                             f"{b.get('booking_reference')}. Mail:\n{m['body'][:1500]}")
-                return
-        store.log("booking", "info", f"confirmation not matched: {m['subject']}")
+        rec = booking_for(text)
+        if rec is None:
+            store.log("booking", "info", f"airline mail not matched to a booking: {m['subject']}")
+            return
+        b = rec["data"]
+        confirmation = is_confirmation(m)
+        ref = re.search(r"Booking\s+(\S+)\s+confirmed", m["subject"] or "", re.I)
+        found = re.search(r"\b(?:booking reference|reference)\s*:?\s*([A-Z0-9][A-Z0-9-]{3,})", m["body"], re.I)
+        b = {**b, "booking_reference": b.get("booking_reference") or (ref.group(1) if ref else None)
+             or (found.group(1) if found else None)}
+        if confirmation:
+            b = {**b, "status": "confirmed", "confirmation_mail": m["id"], "confirmation_text": m["body"][:800]}
+        else:  # the airline's latest word on this shipment: tracking answers start from it
+            b = {**b, "carrier_status": {"text": m["body"][:1500], "at": m.get("received_at"), "mail": m["id"]}}
+        store.put(rec["id"], "booking", b.get("status", rec["status"]), b)
+        store.update(b["deal"], lambda r: (r["status"], {**r["data"], "booking": b}))
+        store.log("booking", "info", (f"confirmed {b.get('booking_reference')}" if confirmation else
+                                      f"airline news on {b.get('booking_reference')}: {m['subject']}"), run_id=b["deal"])
+        if confirmation and confirmation_matches(b, text):  # same reference, same price: nothing new for the deal
+            store.log("booking", "info", f"{b.get('booking_reference')}: the airline's confirmation matches "
+                      "the booking, the session is not woken", run_id=b["deal"])
+            return
+        # news from the world for this deal: its session hears it (and decides whether the customer should)
+        what = "confirmed the booking" if confirmation else "wrote about the booking"
+        agent.notify(f"session-{store.get(b['deal'])['data']['root']}",
+                     f"The airline {what} (their mail {m['id']}): booking reference {b.get('booking_reference')}. "
+                     f"Mail:\n{m['body'][:1500]}")
 
     def eur(self, amount: Decimal, currency: str, fx: Any) -> Decimal | None:
         total = pricing.to_eur(amount, currency, fx, self.fx)
@@ -660,6 +671,31 @@ def _day(text: Any) -> str | None:
         return datetime.fromisoformat(t[:10]).date().isoformat()
     except ValueError:
         return None
+
+
+def kg_text(kg: Decimal) -> str:
+    """A weight as carriers should read it: exact, no rounding (round 28: 116.9 kg sent as 117 cost 0.33 EUR and
+    0.38 points; a probe at 18:5x showed the airlines price 116.9 kg exactly)."""
+    t = f"{Decimal(kg).quantize(Decimal('0.01')):f}".rstrip("0").rstrip(".")
+    return t or "0"
+
+
+def is_confirmation(m: dict) -> bool:
+    """An airline confirming a booking ('Booking BK-... confirmed', '... is confirmed'), not news after it."""
+    return bool(re.match(r"^(?:re:\s*)?booking\s+\S+\s+confirmed", m.get("subject") or "", re.I)
+                and not re.search(r"to quote we need", m.get("body") or "", re.I)) or \
+        bool(re.search(r"\b(?:booking|reservation)\b[^.\n]*\b(?:is\s+)?confirmed\b", m.get("body") or "", re.I)
+             and not re.search(r"to quote we need|delay|cancel", m.get("body") or "", re.I))
+
+
+def booking_for(text: str) -> dict | None:
+    """The booking a mail is about: one of our references (the airline's booking reference, our SM- reference,
+    the rate id we booked with) appears in it."""
+    for rec in store.records("booking"):
+        b = rec["data"]
+        if any(x and x in text for x in (b.get("rate_id"), b.get("team_reference"), b.get("booking_reference"))):
+            return rec
+    return None
 
 
 def confirmation_matches(b: dict, text: str) -> bool:
