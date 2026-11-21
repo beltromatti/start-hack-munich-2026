@@ -16,11 +16,20 @@ curl localhost:8000/api/health  # {"ok": true, "worker": true, ...}
 
 UI: `http://<server>:8000`. Behind a firewall: `ssh -L 8000:localhost:8000 <server>` and open `localhost:8000`.
 
-## Moving production from the Mac to the server (keeps every deal and session)
+## Moving production between the Mac and a server over SSH (keeps every deal and session)
 
-1. On the Mac: stop `make live` (Ctrl+C in its terminal, or `pkill -f backend/live.sh; pkill -f "uvicorn app.main:app --port 8000"`).
-2. Copy the register: `scp backend/data/forwarder.db* <server>:start-hack-munich-2026/backend/data/`
-3. On the server: `docker compose up -d --build`. It continues from the same `since_id`: nothing answered twice.
+`deploy/push.sh` does it, from the repo root on the Mac (key `~/.ssh/amd_forwarder`):
+
+```sh
+deploy/push.sh user@host 22            # copy code, UI, .env; not live yet: a preview on a snapshot, NO forwarder
+SWITCH=1 deploy/push.sh user@host 22   # stop the Mac, move the register, start the forwarder on the server
+deploy/push.sh user@host 22            # after the switch: reload the new code on the server
+BACK=1 deploy/push.sh user@host 22     # the reverse: stop the server, bring the register home, start the Mac
+```
+
+Switch right after a round's quote and booking (rounds come every 6 minutes). The server continues from the same
+`since_id`: nothing is answered twice, and a mail that was mid-work is picked up again. With `UI_PASSWORD` in
+`.env` the UI and API ask for the team password (any user name); `/api/health` stays open.
 
 ## Update to the latest main
 
