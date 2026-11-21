@@ -43,8 +43,9 @@ def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> 
     sid, deal_id = f"session-{root}", f"deal-{root}"
     s = store.get(sid)
     if s is None:
+        earlier = _earlier(root, mail)  # a thread that started before this session (a restart, a migration)
         messages = [{"role": "system", "content": _system()},
-                    {"role": "user", "content": f"{llm.prompt('tasks/' + task)}\n\n{_context()}\n\n{event}"}]
+                    {"role": "user", "content": f"{llm.prompt('tasks/' + task)}\n\n{_context()}\n\n{earlier}{event}"}]
         s = {"root": root, "task": task, "messages": messages, "seen": [], "executions": 0}
     else:
         s = s["data"]
@@ -146,6 +147,15 @@ def _mail_event(fw: Any, m: dict) -> str:
         except Exception as e:
             text += f"\n\n[attachment {a.get('filename')}: could not be read: {e!r}]"
     return text
+
+
+def _earlier(root: int, mail: dict | None) -> str:
+    prior = [x for x in store.thread(root) if not mail or x["id"] != mail["id"]]
+    if not prior:
+        return ""
+    lines = [f"--- mail {x['id']} {'from us' if x['direction'] == 'out' else 'from ' + x['sender']} at "
+             f"{x['received_at']}\nSubject: {x['subject']}\n\n{x['body']}" for x in prior]
+    return "Earlier in this thread:\n\n" + "\n\n".join(lines) + "\n\n"
 
 
 def _close_dangling(messages: list[dict]) -> None:
