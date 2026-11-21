@@ -4,6 +4,7 @@ strict JSON schema output, tokens and USD cost logged per call.
 The model reads and writes language. It never decides a number that reaches a customer (see pricing.py).
 """
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -25,6 +26,7 @@ PRICES = {
 EFFORT = {"gpt-6": "none", "gpt-5.6": "none", "gpt-5": "minimal"}
 
 _client: OpenAI | None = None
+_direct: OpenAI | None = None
 _fake: Callable[..., dict] | None = None
 
 
@@ -34,6 +36,16 @@ def client() -> OpenAI:
         _client = OpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key or "missing", timeout=40,
                          max_retries=2)
     return _client
+
+
+def direct() -> OpenAI | None:
+    """OpenAI without the gateway: only a last resort when the gateway is down (that quote loses its cost points,
+    but keeps accuracy and time, which beats losing the request)."""
+    global _direct
+    key = os.getenv("OPENAI_API_KEY")
+    if _direct is None and key and settings.llm_base_url:
+        _direct = OpenAI(api_key=key, timeout=40, max_retries=1)
+    return _direct
 
 
 def use_fake(fn: Callable[..., dict] | None) -> None:
@@ -72,17 +84,20 @@ def structured(name: str, system: str, user: str, schema: dict, *, model: str, r
         args["reasoning_effort"] = effort
     t = time.time()
     last: Exception | None = None
-    for attempt in range(2):
+    for attempt, c in enumerate([client(), client(), direct()]):
+        if c is None:
+            continue
         try:
-            res = client().chat.completions.create(**args)
+            res = c.chat.completions.create(**args)
             msg = res.choices[0].message
             out = json.loads(msg.content or "")
             u = res.usage
-            store.log(agent, "llm", f"{model} [{name}] {time.time() - t:.1f}s", {"out": out}, run_id=run_id,
+            via = " DIRECT (gateway down)" if attempt == 2 else ""
+            store.log(agent, "llm", f"{model} [{name}] {time.time() - t:.1f}s{via}", {"out": out}, run_id=run_id,
                       tokens_in=getattr(u, "prompt_tokens", 0) or 0, tokens_out=getattr(u, "completion_tokens", 0) or 0,
                       cost_usd=cost(model, u))
             return out
-        except Exception as e:  # network, refusal, bad JSON: one retry, then the caller decides
+        except Exception as e:  # network, refusal, bad JSON: retry, then the direct fallback, then the caller decides
             last = e
             store.log(agent, "error", f"{model} [{name}] failed: {e!r}"[:400], run_id=run_id)
     raise RuntimeError(f"model call {name} failed: {last!r}")
