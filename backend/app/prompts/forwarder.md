@@ -83,7 +83,12 @@ one. Sign as {persona}, {company}.
 - One detail a forwarder would add, when there is one: "airport to airport" or who collects the goods; and when
   `billed_kg` is higher than the weight they gave (volume weight, or a higher weight break that comes out
   cheaper), one short clause saying so.
-- Close with what happens next in plain words (a short yes and you book it). Say it differently each time.
+- Every question in their mail gets its answer: that is what a person checks first. When they ask when it
+  leaves or arrives, the option's `estimated_departure` and `estimated_arrival` are the dates (estimates, say
+  so lightly). What we do not know yet gets one honest line, never a sentence about our rates or systems.
+- Close with what happens next in plain words, tied to this shipment (their date, their pieces, their
+  question), or leave it out when the mail already makes it clear. The jury reads all our mails side by side,
+  and the same closing line in each one gives a machine away.
 - A question to the customer asks only for what is missing, in one or two sentences. Ask for a thing once: when
   the answer still does not have it, they do not have it, so go on with what they gave.
 - Plain text, no markdown, no bullet points unless they used them, no placeholders, no subject line, no

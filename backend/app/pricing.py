@@ -43,6 +43,28 @@ def to_eur(amount: Any, currency: str | None, fx: Any, rates: dict[str, Decimal]
     return money(Decimal(str(amount)) * rate) if rate else None
 
 
+def schedule(ready: Any, pickup_hours: Any, transit_days: Any, not_before: Any = None) -> dict | None:
+    """The one way a date reaches a customer: the goods leave when they are ready (09:00 UTC that day, or
+    `not_before` if later, e.g. the booking time) plus the trucker's pickup time, and arrive transit days later.
+    Estimates. None when the ready date or the transit time is unknown (never guessed)."""
+    from datetime import datetime, timedelta, timezone
+    try:
+        start = datetime.fromisoformat(str(ready)[:10]).replace(hour=9, tzinfo=timezone.utc)
+        transit = float(transit_days)
+    except (TypeError, ValueError):
+        if not isinstance(not_before, datetime):
+            return None
+        start, transit = not_before, float(transit_days)
+    if isinstance(not_before, datetime):
+        start = max(start, not_before)
+    departure = start + timedelta(hours=float(pickup_hours or 0))
+    arrival = departure + timedelta(days=transit)
+    f = "%a %d %b %Y"
+    return {"ready": start, "departure": departure, "arrival": arrival,
+            "ready_date": start.strftime(f), "estimated_departure": departure.strftime(f),
+            "estimated_arrival": arrival.strftime(f)}
+
+
 def chargeable(weight_kg: Decimal, volume_cbm: Decimal | None) -> Decimal:
     vol = (volume_cbm or Decimal(0)) * KG_PER_CBM
     return max(Decimal(weight_kg), vol)

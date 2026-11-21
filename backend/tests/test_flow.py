@@ -336,3 +336,24 @@ def test_a_misread_bid_amount_is_read_again(monkeypatch):
     run(f)
     offers = store.get("deal-1")["data"]["offers"]
     assert [o["total"] for o in offers] == ["94.08"]
+
+
+def test_each_option_carries_its_dates_computed_in_code():
+    """9 of 25 live customers asked when the goods arrive. Rounds 3, 7 and 25 got no date ('arrival is estimated
+    3 days after departure'), rounds 2, 5, 21, 22 and 24 got one the model worked out itself. The dates come from
+    code: ready date (09:00 UTC) + pickup hours + transit days."""
+    from decimal import Decimal as D
+    from app.pricing import Offer
+    f = Sync(FakeFiveU())
+    req = {"origin": "STR", "destination": "EZE", "weight_kg": "544", "volume_cbm": "1.86", "chargeable_kg": "544",
+           "pieces": 11, "pickup_zone": "70", "pickup_postcode": "70498", "ready_date": "2026-11-28"}
+    offers = [Offer("air", "Fjordline Air Cargo", D("2300.00"), D(4), "portal"),
+              Offer("pickup", "Spessart Spedition", D("242.48"), D("0.5"), "mail")]
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req, "offers": [o.as_dict() for o in offers],
+                                             "asked": {}, "replied": []})
+    row = f.options("deal-1", "fastest")["options"][0]
+    assert row["estimated_departure"] == "Sat 28 Nov 2026" and row["estimated_arrival"] == "Wed 02 Dec 2026"
+    req.pop("ready_date")
+    store.put("deal-2", "deal", "pricing", {"root": 2, "request": req, "offers": [o.as_dict() for o in offers],
+                                             "asked": {}, "replied": []})
+    assert f.options("deal-2", "fastest")["options"][0]["estimated_arrival"] is None  # never guessed

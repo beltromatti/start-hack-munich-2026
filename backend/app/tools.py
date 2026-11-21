@@ -345,27 +345,22 @@ def timeline(booking: dict) -> dict:
     """Where a booked shipment should be now, from our dates: it leaves when the goods are ready (not when we
     booked), arrives transit days later. Estimates, and the agent says so. The airline's word, when it gives one,
     wins (carrier_status)."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
     try:
         booked = datetime.fromtimestamp(booking["booked_at"], timezone.utc)
-        ready = booked
-        try:
-            ready = max(booked, datetime.fromisoformat(str(booking.get("ready_date"))[:10]).replace(
-                hour=9, tzinfo=timezone.utc))
-        except ValueError:
-            pass
         pickup_h = float((booking.get("pickup") or {}).get("days") or 0) * 24
-        departure = ready + timedelta(hours=pickup_h)
-        arrival = departure + timedelta(days=float(booking["transit_days"]))
+        s = pricing.schedule(booking.get("ready_date"), pickup_h, booking["transit_days"], not_before=booked)
     except (KeyError, TypeError, ValueError):
         return {}
+    if not s:
+        return {}
+    ready, departure, arrival = s["ready"], s["departure"], s["arrival"]
     now = datetime.now(timezone.utc)
     stage = ("booked, waiting for the goods to be ready" + (" and collected" if pickup_h else "")
              if now < ready else "collected, on its way to the airport" if now < departure
              else "in transit" if now < arrival else "arrived")
-    fmt = "%a %d %b %Y"
-    return {"ready_date": ready.strftime(fmt), "estimated_departure": departure.strftime(fmt),
-            "estimated_arrival": arrival.strftime(fmt), "expected_stage_now": stage}
+    return {"ready_date": s["ready_date"], "estimated_departure": s["estimated_departure"],
+            "estimated_arrival": s["estimated_arrival"], "expected_stage_now": stage}
 
 
 def eta(booking: dict) -> str | None:
