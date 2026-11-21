@@ -1,57 +1,59 @@
 import { useEffect, useState } from "react";
+import { useBoard } from "./sim/board";
 import { fmtTime } from "./sim/sim";
 import { useWorld } from "./sim/useWorld";
+import Exceptions from "./views/Exceptions";
 import Inbox from "./views/Inbox";
+import LiveRound from "./views/LiveRound";
 import MissionControl from "./views/MissionControl";
 import Pipeline from "./views/Pipeline";
+import Score from "./views/Score";
 import Standings from "./views/Standings";
 
-const VIEWS = [
-  { id: "a", label: "Sessions", hint: "technical: every request step by step, cost, health" },
-  { id: "b", label: "Inbox", hint: "mail-first: thread + case facts" },
-  { id: "c", label: "Pipeline", hint: "CRM: grouped by stage, won and lost" },
-  { id: "d", label: "Standings", hint: "us against the other teams, live from the 5U board" },
+const MAIN = [
+  { id: "1", label: "1 · Score", hint: "the score equation: total, three levers, biggest leak, round by round" },
+  { id: "2", label: "2 · Live round", hint: "the request running now: clock, pipeline, points still on the table" },
+  { id: "3", label: "3 · Exceptions", hint: "disruptions first: green runs alone, what broke and whether it repeats" },
 ] as const;
-const THEMES = [
-  { id: "ink", label: "Ink", hint: "Sam's brand: ink, one indigo accent, Helvetica, light numerals" },
-  { id: "sempli", label: "Sempli", hint: "app look: system grey, white cards, sage, rounded numbers" },
-  { id: "board", label: "Departures", hint: "airport board: black, amber, mono, all caps" },
+const DETAIL = [
+  { id: "a", label: "Sessions" }, { id: "b", label: "Inbox" }, { id: "c", label: "Pipeline" }, { id: "d", label: "Standings" },
 ] as const;
-type V = (typeof VIEWS)[number]["id"];
-type T = (typeof THEMES)[number]["id"];
+type V = (typeof MAIN)[number]["id"] | (typeof DETAIL)[number]["id"];
 
 export default function App() {
   const { w, paused, toggle } = useWorld();
-  const q = new URLSearchParams(location.search);
-  const [view, setView] = useState<V>((q.get("v") as V) || "a");
-  const [theme, setTheme] = useState<T>((q.get("t") as T) || "ink");
+  const b = useBoard();
+  const [view, setView] = useState<V>((new URLSearchParams(location.search).get("v") as V) || "1");
   useEffect(() => {
-    history.replaceState(null, "", `?v=${view}&t=${theme}`);
-    document.documentElement.dataset.theme = theme;
-  }, [view, theme]);
+    history.replaceState(null, "", `?v=${view}`);
+    document.documentElement.dataset.theme = "night";
+  }, [view]);
 
   return (
     <div className="page">
       <header className="top">
         <div className="brand">
           <span className="kicker">START Milan · 5U AI</span>
-          <h1>Forwarder Console</h1>
+          <h1>Forwarder</h1>
         </div>
-        <nav className="seg" aria-label="View">
-          {VIEWS.map((o) => (
+        <nav className="seg" aria-label="Structure">
+          {MAIN.map((o) => (
             <button key={o.id} title={o.hint} className={view === o.id ? "active" : ""} onClick={() => setView(o.id)}>{o.label}</button>
           ))}
         </nav>
         <div className="clock">
-          <nav className="seg small" aria-label="Design direction">
-            {THEMES.map((o) => (
-              <button key={o.id} title={o.hint} className={theme === o.id ? "active" : ""} onClick={() => setTheme(o.id)}>{o.label}</button>
-            ))}
-          </nav>
-          {view !== "d" && <><span className="badge">Synthetic</span><span className="mono">{fmtTime(w.now)}</span>
-            <button className="ghost" onClick={toggle}>{paused ? "Play" : "Pause"}</button></>}
+          <select className="details" value={DETAIL.some((d) => d.id === view) ? view : ""} onChange={(e) => e.target.value && setView(e.target.value as V)} aria-label="Detail views">
+            <option value="">Details…</option>
+            {DETAIL.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+          </select>
+          <span className="badge">Synthetic</span>
+          <span className="mono">{fmtTime(w.now)}</span>
+          <button className="ghost" onClick={toggle}>{paused ? "Play" : "Pause"}</button>
         </div>
       </header>
+      {view === "1" && <Score w={w} b={b} />}
+      {view === "2" && <LiveRound w={w} b={b} />}
+      {view === "3" && <Exceptions w={w} b={b} />}
       {view === "a" && <MissionControl w={w} />}
       {view === "b" && <Inbox w={w} />}
       {view === "c" && <Pipeline w={w} />}
