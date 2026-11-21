@@ -43,8 +43,8 @@ SHIPMENT = obj({
 
 
 def fn(name: str, desc: str, props: dict) -> dict:
-    return {"type": "function", "function": {"name": name, "description": desc, "strict": True,
-                                             "parameters": obj(props)}}
+    """A tool in the Responses API shape, strict: the model's arguments always match the schema."""
+    return {"type": "function", "name": name, "description": desc, "strict": True, "parameters": obj(props)}
 
 
 TOOLS = [
@@ -166,7 +166,7 @@ def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dic
     took = time.time() - _ts(d.get("received_at"))
     q = {"option": option_id, "amount": opt["total_text"], "total": opt["total"], "air": opt["air"],
          "pickup": opt["pickup"], "mail": sent["id"], "at": time.time(), "response_seconds": round(took, 1)}
-    store.update(ctx.deal_id, lambda r: ("quoted" if r["status"] in ("new", "pricing") else r["status"], {
+    store.update(ctx.deal_id, lambda r: ("quoted" if r["status"] in ("new", "pricing", "waiting_customer") else r["status"], {
         **r["data"], "quote": r["data"].get("quote") or q, "quotes": r["data"].get("quotes", []) + [q]}))
     store.log("forwarder", "decision", f"quoted {opt['total_text']} ({opt['air']['carrier']}) in {took:.0f}s",
               q, run_id=ctx.deal_id)

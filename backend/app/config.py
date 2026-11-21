@@ -26,7 +26,7 @@ class Settings:
     llm_api_key: str = _target()[1]
     # The forwarder agent, and the small model that reads carrier replies and tariffs for the tools.
     model_agent: str = os.getenv("LLM_MODEL_AGENT", "gpt-6-luna")
-    effort_agent: str = os.getenv("LLM_EFFORT_AGENT", "none")
+    effort_agent: str = os.getenv("LLM_EFFORT_AGENT", "low")
     model_bid: str = os.getenv("LLM_MODEL_BID", "gpt-5-nano")
     model_tariff: str = os.getenv("LLM_MODEL_TARIFF", "gpt-6-luna")
     db_path: str = os.getenv("DB_PATH", str(ROOT / "backend" / "data" / "forwarder.db"))
