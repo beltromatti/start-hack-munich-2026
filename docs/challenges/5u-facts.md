@@ -216,3 +216,8 @@ picture, the total written once as in the mail.
 1560.5148 kg); we sent the portal 9.344 and booked a rate billing 1560.448 kg. 5U: accepted, accuracy 44.97,
 `booked: false`, tracking 0. Every other booking of the night billed the chargeable weight or a higher break, and
 all are `booked: true`. Since 23:57 the volume is kept exact and weights to carriers are rounded up, never down.
+
+**A new scoring rule appears (Sun 00:23:30):** the board's `rules` gained `few_winners: null` and every round in
+`rounds` a `factor: null`, both at the same snapshot, neither described in the live openapi. Most likely a
+multiplier for rounds few teams get right (round 76: 2 of 13 accepted). Nothing to change: a hard round answered
+right is worth more, which is what we already aim for. Watch for the first non-null factor.
