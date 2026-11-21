@@ -665,3 +665,31 @@ def test_a_ready_date_said_relative_to_today_is_the_next_such_day():
     assert _day("Monday") == monday.isoformat() and _day("next Monday") == monday.isoformat()
     assert _day("tomorrow") == (today + timedelta(days=1)).isoformat()
     assert _day("2026-11-24") == "2026-11-24" and _day("whenever") is None
+
+
+def test_a_change_in_how_5u_scores_is_logged_once():
+    """The board's `rules` (18 minute cost window since Sat 21:00) changed once without a word, and 5U announced a
+    new scoring algorithm (Sun 00:04): the watcher says so in the journal the moment the board shows it."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rules = {"accuracy_points": 45, "time_points": 15, "cost_points": 40, "cost_window_minutes": 18}
+    r40 = {"round_no": 40, "sent_at": "2026-11-21T18:57:47.787398+00:00", "answered_at": "2026-11-21T18:58:27.538195+00:00",
+           "verdict": "accepted", "reason": None, "points": {"time": 15.0, "accuracy": 45.0}}
+    said = lambda: [e["summary"] for e in store.events(limit=500) if e["agent"] == "watcher" and e["kind"] == "error"]
+    f.watch_scoring({"requests": [r40]}, {"rules": rules, "frozen_at": None})   # the first look is the baseline
+    f.watch_scoring({"requests": [r40]}, {"rules": rules, "frozen_at": None})
+    assert said() == []
+    r41 = {"round_no": 41, "sent_at": "2026-11-21T19:03:52+00:00", "answered_at": "2026-11-21T19:04:36+00:00",
+           "verdict": "rejected", "reason": "declined_out_of_scope", "points": {"time": 9.5, "accuracy": 45.0, "followup": 5.0}}
+    r40b = {**r40, "points": {"time": 15.0, "accuracy": 40.5, "cost": 39.1}}   # cost arrives late, accuracy moved
+    new = {"requests": [r41, r40b]}, {"rules": {**rules, "time_points": 25}, "frozen_at": "2026-11-22T09:00:00+00:00"}
+    f.watch_scoring(*new)
+    f.watch_scoring(*new)   # the same board again says nothing new
+    out = said()
+    assert len(out) == 6 and len(set(out)) == 6
+    assert any("changed the board rules" in s and "'time_points': 25" in s for s in out)
+    assert any("frozen" in s for s in out) and any("followup" in s for s in out)
+    assert any("declined_out_of_scope" in s for s in out)
+    assert any("points of 1 earlier results moved: round 40 accuracy 45.0 -> 40.5" in s for s in out)
+    assert any("round 41 answered in 44 s took 9.5 of 25" in s and "round 40" not in s for s in out)

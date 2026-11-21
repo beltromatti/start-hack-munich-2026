@@ -611,9 +611,62 @@ class Forwarder:
                 seen.add(key)
                 store.log("watcher", "info", f"round {rnd}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
+        self.watch_scoring(me, public)
+
+    def watch_scoring(self, me: dict, public: dict) -> None:
+        """How 5U scores changes without a word (Sat 18:36 quote points at the round's end, 21:00 the cost window 18
+        minutes instead of the hour), and on Sun 00:04 5U announced new cases and a new scoring algorithm. What shows
+        it first: the board's `rules`, a kind of points or a reason code we have not seen, a frozen board, points of
+        an earlier round that moved, a quote answered inside two minutes that does not take the full time points.
+        Each is logged once, as an error so that it stands out in the journal. `prompts/forwarder.md` ("how our
+        work is judged") tells the agent the scoring: when this fires, that paragraph is the place to follow."""
+        reqs = me.get("requests") or []
+        before = json.loads(store.kv_get("board_scoring") or "null")
+        old = (before or {}).get("points", {})
+        points = {**old, **{str(r.get("round_no")): r.get("points") or {} for r in reqs}}
+        now = {"rules": public.get("rules"), "frozen_at": public.get("frozen_at") or me.get("frozen_at"),
+               "points": points, "kinds": sorted({k for p in points.values() for k in p}),
+               "reasons": sorted({str(r["reason"]) for r in reqs if r.get("reason")}
+                                 | set((before or {}).get("reasons", [])))}
+        store.kv_set("board_scoring", json.dumps(now))
+        if before is None:  # the first look after this code starts is the baseline: nothing changed yet
+            return
+        said = []
+        if now["rules"] != before["rules"]:
+            said.append(f"5U changed the board rules: {before['rules']} -> {now['rules']}")
+        if now["frozen_at"] and not before["frozen_at"]:
+            said.append(f"the board is frozen since {now['frozen_at']}")
+        if set(now["kinds"]) - set(before["kinds"]):
+            said.append(f"new kind of points on the board: {', '.join(sorted(set(now['kinds']) - set(before['kinds'])))}")
+        if set(now["reasons"]) - set(before["reasons"]):
+            said.append(f"new reason code on the board: {', '.join(sorted(set(now['reasons']) - set(before['reasons'])))}")
+        moved = [f"round {n} {k} {old[n][k]} -> {v}" for n, p in points.items() for k, v in p.items()
+                 if k in old.get(n, {}) and old[n][k] != v]
+        if moved:  # a kind that arrives later (cost, tracking) is not a move; a value that was there and changed is
+            said.append(f"points of {len(moved)} earlier results moved: {'; '.join(moved[:8])}")
+        full = (now["rules"] or {}).get("time_points")
+        slow = []
+        for r in reqs:  # the brief: full time points inside 2 minutes. Less than full there is another time scale
+            n, t = str(r.get("round_no")), (r.get("points") or {}).get("time")
+            took = _seconds(r.get("sent_at"), r.get("answered_at"))
+            if full and t is not None and took is not None and took <= 120 and t < full and old.get(n, {}).get("time") != t:
+                slow.append(f"round {n} answered in {took:.0f} s took {t} of {full}")
+        if slow:
+            said.append(f"time points below full inside 2 minutes: {'; '.join(slow[:8])}")
+        for line in said:
+            store.log("watcher", "error", f"scoring: {line}"[:900])
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
+
+def _seconds(sent: Any, answered: Any) -> float | None:
+    """Seconds between two of the board's ISO times; None when one is missing or unreadable."""
+    from datetime import datetime
+    try:
+        return (datetime.fromisoformat(answered) - datetime.fromisoformat(sent)).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
 
 def waiting_for(d: dict) -> list[str]:
     """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""
