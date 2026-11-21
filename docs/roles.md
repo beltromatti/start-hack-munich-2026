@@ -4,6 +4,10 @@ Draft from Sam's vision session, Sat 21 Nov. Compare with Jan's and Mattia's not
 
 ## Vision so far (Sam)
 
+**Our question:** "How does an autonomous forwarder stay right at 2 a.m. when the world changes without warning?"
+Lead on pricing, accuracy and speed; the competitive advantage is **Jan's prediction engine**, which ties the
+whole system together.
+
 - **AI reads, code prices.** The funnel (routing, reading RFQs, bids, tariff sheets) is AI-led.
   The price itself comes from our own pricing engine, in code, no LLM.
 - **Different, not just better:** everyone does prices. We focus on **supply-chain disruptions and outliers**
