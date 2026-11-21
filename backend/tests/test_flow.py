@@ -308,6 +308,18 @@ def test_market_is_empty_on_a_quiet_market_and_carries_what_other_deals_saw():
     # a carrier this deal does not use is not its news
     assert "live_vs_sheet" not in forwarder.market("deal-new", req, [Offer("air", "Fjordline", D(1), D(1), "sheet")])
 
+    # the echo (Sam's sim, Sat 21 Nov): a second deal writes the same news again, it stays one report
+    store.put("deal-echo", "deal", "quoted", {"root": 10, "request": req})
+    tools.note(tools.Ctx(None, "session-10", "deal-echo", 10, "customer", None),
+               "Customer says the MXP handlers strike from Monday", "market")
+    assert len(forwarder.market("deal-new", req, air)["notes_from_other_deals"]) == 1
+    # old news in a deal that just got a new mail does not come back
+    import time
+    for rid in ("deal-old", "deal-echo"):
+        store.update(rid, lambda r: (r["status"], {**r["data"], "notes": [
+            {**n, "at": time.time() - 4 * 3600} for n in r["data"]["notes"]]}))
+    assert "notes_from_other_deals" not in forwarder.market("deal-new", req, air)
+
 
 def test_the_server_asks_for_the_team_password(monkeypatch):
     import base64
@@ -319,3 +331,21 @@ def test_the_server_asks_for_the_team_password(monkeypatch):
     assert c.get("/api/deals").status_code == 401
     ok = {"Authorization": "Basic " + base64.b64encode(b"team:s3cret").decode()}
     assert c.get("/api/deals", headers=ok).status_code == 200
+
+
+def test_no_options_says_why_with_what_the_carriers_wrote():
+    """Live round 15: the truckers asked for the postcode, the bid reader called it a no, and get_offers returned an
+    empty list with nothing else; the agent told the customer no airline flew the route. Empty now says why."""
+    from decimal import Decimal as D
+    from app.pricing import Offer
+    f = Sync(FakeFiveU())
+    req = {"origin": "MUC", "destination": "SGN", "weight_kg": "572", "volume_cbm": "2.290", "chargeable_kg": "572",
+           "pieces": 11, "pickup_zone": "93", "pickup_postcode": None}
+    asks = "Hello,\n\nthank you for your request. To quote we need:\n- the pickup postcode\n"
+    store.put("deal-1", "deal", "pricing", {
+        "root": 1, "request": req, "offers": [Offer("air", "Helix Air Freight", D("2316.60"), D(5), "email").as_dict()],
+        "carrier_messages": [{"from": "isarwelle-spedition@hackloop.mail", "mail": 3793, "text": asks,
+                              "declined": True, "had_sheet_price": False}]})
+    out = f.options("deal-1", "cheapest")
+    assert out["options"] == [] and out["no_options_because"] == "no trucker has priced the pickup"
+    assert "pickup postcode" in out["carriers_without_price"][0]["says"]

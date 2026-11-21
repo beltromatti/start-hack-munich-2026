@@ -235,7 +235,7 @@ class Forwarder:
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "options": table}))
         waiting = waiting_for(d)
         pref_key = preference if preference in ("cheapest", "fastest") else settings.unspecified_rule
-        return {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
+        result = {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
                                                  "pieces", "pickup_zone", "pickup_postcode")},
                 "options": rows, "recommended": rec.get(pref_key), "recommended_for": pref_key,
                 "recommended_by_preference": rec,
@@ -245,9 +245,16 @@ class Forwarder:
                 # answers that change the picture: a carrier we had a price for says no, or a carrier asks back
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
-                                           if c.get("had_sheet_price") or c.get("declined") is False][-5:],
-                # what the last deals saw that this thread cannot (empty on a quiet market, so it costs nothing)
-                **({"market": m} if (m := market(deal_id, req, air)) else {})}
+                                           if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
+        # what the last deals saw that this thread cannot (empty on a quiet market, so it costs nothing)
+        if m := market(deal_id, req, air):
+            result["market"] = m
+        if not rows:  # nothing to quote: say why, with everything the carriers wrote (round 15 showed neither)
+            result["no_options_because"] = ("no trucker has priced the pickup" if needs_pickup and air
+                                            else "no airline has priced this route")
+            result["carriers_without_price"] = [{"from": c["from"], "mail": c["mail"], "says": c["text"][:300]}
+                                                for c in d.get("carrier_messages", [])][-12:]
+        return result
 
     def ask_airline(self, deal_id: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
                     req: dict) -> int:
@@ -534,9 +541,14 @@ def market(deal_id: str, req: dict, air: list[Offer]) -> dict:
     declined: set[str] = set()
     notes = []
     for r in store.records("deal", limit=200):
-        if r["id"] == deal_id or r["updated_at"] < since:
+        if r["id"] == deal_id:
             continue
         d, rq = r["data"], r["data"].get("request") or {}
+        # a note counts from when it was written: a new mail in an old deal does not bring old news back
+        notes += [{"at": n["at"], "route": f"{rq.get('origin')}-{rq.get('destination')}", "text": n["text"]}
+                  for n in d.get("notes", []) if n.get("flag") == "market" and n.get("at", 0) >= since]
+        if r["updated_at"] < since:
+            continue
         offers = [Offer.of(x) for x in d.get("offers", [])]
         sheet = {o.carrier: o.total for o in offers if o.leg == "air" and o.source == "sheet" and o.total}
         for o in offers:
@@ -544,8 +556,6 @@ def market(deal_id: str, req: dict, air: list[Offer]) -> dict:
                 drift.setdefault(o.carrier, []).append(o.total / sheet[o.carrier])
         if rq.get("destination") and rq.get("destination") == req.get("destination"):
             declined |= set(d.get("declined", []))
-        notes += [{"at": n["at"], "route": f"{rq.get('origin')}-{rq.get('destination')}", "text": n["text"]}
-                  for n in d.get("notes", []) if n.get("flag") == "market"]
     out: dict[str, Any] = {}
     moved = []
     for c, xs in sorted(drift.items()):
@@ -556,9 +566,11 @@ def market(deal_id: str, req: dict, air: list[Offer]) -> dict:
         out["live_vs_sheet"] = moved
     if declined:
         out["declined_this_destination"] = sorted(declined)
-    if notes:
-        out["notes_from_other_deals"] = [{k: n[k] for k in ("route", "text")}
-                                         for n in sorted(notes, key=lambda n: n["at"])[-5:]]
+    first: dict[str, dict] = {}  # the same words twice are one report, dated by its first telling
+    for n in sorted(notes, key=lambda n: n["at"]):
+        first.setdefault(" ".join(n["text"].lower().split()), n)
+    if first:
+        out["notes_from_other_deals"] = [{k: n[k] for k in ("route", "text")} for n in list(first.values())[-5:]]
     me = json.loads(store.kv_get("board_me") or "null") or {}
     after = datetime.fromtimestamp(since, timezone.utc).isoformat()
     lost = [{"round": r.get("round_no"), "verdict": r.get("verdict"), "reason": r.get("reason")}
@@ -606,11 +618,14 @@ def normalise(s: dict, w: kit.World) -> dict:
         origin = w.zones[zone]["airport"]  # the truck goes to its zone's airport
     dest = kit.destination_code(s.get("destination_airport"))  # a city name is its airport in our network
     missing = []
-    if not origin or origin not in w.origins():
+    if pickup and (postcode or pickup.get("city")) and not zone:
+        missing.append(f"a pickup postcode inside our pickup zones (they start with {', '.join(sorted(w.zones))})")
+    elif pickup and len(postcode) < 5:  # truckers price a collection by postcode (live rounds 15-18)
+        missing.append("the pickup postcode: truckers price the collection by postcode, and a town alone (or the one "
+                       "in a signature) is not enough")
+    if (not origin or origin not in w.origins()) and not missing:
         missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
                        f"pickup postcodes start with {', '.join(sorted(w.zones))})")
-    if pickup and (pickup.get("postcode") or pickup.get("city")) and not zone:
-        missing.append("a pickup postcode inside our pickup zones")
     if not dest:
         missing.append("destination airport (we fly to: " + ", ".join(
             f"{c} {n.split(' / ')[0]}" for c, n in kit.DESTINATIONS.items()) + ")")

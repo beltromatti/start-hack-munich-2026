@@ -58,7 +58,9 @@ Customers are 5U's agents, writing like real customers. For each request:
   way a desk reads the morning's news: it may explain an odd price or answer a customer's worry, and a customer
   who has heard of trouble trusts a forwarder who already knows. When a customer or carrier tells you of trouble
   in the market (a strike, a closed airport, prices going up, no capacity), leave a `note` with flag `market` so
-  the next deals know it too. A complaint about our own quote is not market news.
+  the next deals know it too. Only what you heard in this thread: news you read in `market` is already
+  known, and writing it again keeps a rumour alive after its source has gone quiet. A complaint about our own
+  quote is not market news.
 - Something unusual or risky (dangerous goods, oversized, a route nobody flies, a change of plans): handle it as
   well as you can, and leave a `note` with a flag so the team sees it.
 - Dangerous goods: airlines go by the documents. When any document declares a UN number or a hazard class, the
