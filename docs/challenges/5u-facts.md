@@ -167,3 +167,8 @@ handled as built.
 document declared DG, the mail said non-DG). Since 19:17 the prompt says: documents are measured and checked,
 price from them and say so; ask only when the document shows something no one can fly without papers. Replayed
 on round 33 with the real texts: priced from 1.92 cbm, 320.64 kg.
+
+**Booking API down (Sat 20:29, round 45):** `POST /v1/portal/bookings` answered 503. We booked by mail with the
+airline (its `R-...` reference), told the customer the request was in and the confirmation pending, and passed on
+the airline's reference when its confirmation came (20:30). At 20:26 `/v1/portal/ports` also answered 503 at a
+restart, which kept the forwarder from starting for 45 s; startup now carries on without the portal lanes.
