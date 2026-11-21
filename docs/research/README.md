@@ -1,8 +1,10 @@
 # Branch `research/pricing`: what it did and what to take
 
 For Mattia and his assistant. Sam's research chat works here, never on main.
-**Main's forwarder agent (`010166b`) is merged in (`e9053f8`), so the branch merges into main without conflicts.**
-See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 25 passed.
+**Main up to `dea5acc` (agent on the Responses API, Jan's synthetic mails) is merged in (`155f295`), so the
+branch merges into main without conflicts.**
+See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 31 passed.
+Sam approved the tone of the three example mails in `prompts/forwarder.md` (Sat 15:50).
 
 ## What changes in the agent's engine
 
@@ -14,6 +16,7 @@ See everything at once: `git diff origin/main...origin/research/pricing`. `make 
 | `forwarder.waiting_for()` | `get_offers` waits per request mail, not per sender (a carrier asked at two weights answers twice) | same result when every carrier is asked once |
 | `forwarder.eur()` -> `pricing.to_eur()` | Exchange rate per currency; a rate stated in a bid mail is read (`fx_eur_per_unit` in the bid form and `prompts/bid.md`) | EUR prices unchanged |
 | `pricing.balanced()`, `pricing.quote(..., pickup_rule, balance, unspecified)` | The rules as pure functions, with tests on the live zone-60 trucker bids | unchanged |
+| `prompts/forwarder.md` "How you write", `options()` rows carry `billed_kg` | Writing criteria from the humanizer checklist and three example mails: answer first, no thanks-for-your-request opener (27 of 35 carrier mails have one), one forwarder detail, a close that changes | prompt text only |
 
 Why: `docs/research/pricing.md` (evidence and numbers). The one open rule is which trucker 5U puts into the
 best price: the candidates differ by 88.80 EUR in zone 60, 9 % on a 1000 EUR shipment. Until the board shows
