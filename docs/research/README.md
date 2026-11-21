@@ -3,7 +3,7 @@
 For Mattia and his assistant. Sam's research chat works here, never on main.
 **Main up to `dea5acc` (agent on the Responses API, Jan's synthetic mails) is merged in (`155f295`), so the
 branch merges into main without conflicts.**
-See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 31 passed.
+See everything at once: `git diff origin/main...origin/research/pricing`. `make test`: 34 passed.
 Sam approved the tone of the three example mails in `prompts/forwarder.md` (Sat 15:50).
 
 ## What changes in the agent's engine
@@ -22,6 +22,14 @@ Why: `docs/research/pricing.md` (evidence and numbers). **Round 1 (Sat 16:00, `d
 settled half of the open rule: a "fastest" request is scored with the fastest trucker (or the 50/50 pick), not
 the cheapest. Leave `PICKUP_RULE` at its default `asked`.** Before the round I estimated `cheapest`; that was
 wrong and would have cost accuracy points.
+
+## Stress test with the real model (`docs/research/stress.md`, commits `c57080b`, `82bfa62`)
+
+44 cases on Sam's own OpenAI key against a local 5U: a quote costs 0.00066 USD (39.7 of 40 cost points), a whole
+deal with booking and tracking about 0.0017 USD. Six failures found and fixed: a city instead of an IATA code got
+a question instead of a quote; an address in the signature became a pickup; the fast trucker was taken for a
+"cheapest" request; two totals in one quote; an airline that said "suspended" was still quoted from its sheet;
+a USD wish got a question. Each fix was re-run with the real model.
 
 ## Rules the engine keeps (all in `forwarder.py`, under `get_offers`)
 
