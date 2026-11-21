@@ -217,8 +217,8 @@ class Forwarder:
         for a in w.portal.get((o, d), []):
             weights = [kg]
             nb = pricing.next_break(w.brackets.get(a["code"], []), cw)
-            if nb is not None:
-                weights.append(nb)  # billing at the next break is often cheaper
+            if nb is not None and nb / cw < Decimal("1.5"):
+                weights.append(nb)  # billing at the next break is often cheaper (rates fall < 1.5x per break)
             for wt in weights:
                 r = self.api.rate(o, d, a["code"], wt, cbm)
                 if r.get("error"):
@@ -513,6 +513,10 @@ def normalise(p: dict, w: kit.World) -> dict:
     postcode = re.sub(r"\D", "", p.get("pickup_postcode") or "")
     if p.get("pickup_needed") and len(postcode) >= 2:
         zone = postcode[:2] if postcode[:2] in w.zones else None
+    if p.get("pickup_needed") and not zone and p.get("pickup_city"):  # "pickup in Darmstadt": the zone's area
+        city = p["pickup_city"].strip().lower()
+        zone = next((z for z, v in w.zones.items() if v["area"].lower() == city), None) or \
+            next((z for z, v in w.zones.items() if city in v["area"].lower() or v["area"].lower() in city), None)
     origin = (p.get("origin_airport") or "").upper() or None
     if zone and not origin:
         origin = w.zones[zone]["airport"]

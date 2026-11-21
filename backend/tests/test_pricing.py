@@ -57,3 +57,12 @@ def test_units():
     assert language.weight_kg({"value": 50, "unit": "kg", "per_piece": True}, 4) == 200
     dims = [{"count": 2, "length": 120, "width": 80, "height": 100, "unit": "cm"}]
     assert language.volume_cbm({"value": None, "unit": None, "per_piece": False}, dims, 2) == D("1.92")
+
+
+def test_pickup_city_maps_to_zone():
+    from app.forwarder import normalise
+    p = {"pieces": 1, "weight": {"value": 100, "unit": "kg", "per_piece": False}, "volume": {}, "dimensions": [],
+         "pickup_needed": True, "pickup_postcode": None, "pickup_city": "Darmstadt", "origin_airport": None,
+         "destination_airport": "JFK", "preference": "cheapest"}
+    r = normalise(p, kit.world())
+    assert r["pickup_zone"] == "64" and r["origin"] == "FRA" and not r["missing"]
