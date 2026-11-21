@@ -25,6 +25,8 @@ The team key never goes into the repo. It lives only in each person's `.env`.
 - New inputs (mailbox API, portal, supplier mail) are adapters in `app/channels/` behind a small interface,
   with a fake for local testing.
 - `frontend/` Vite + React + TypeScript. Plain CSS in `src/styles.css`, light and dark.
+- How Mattia builds agent systems (state-driven work, the register as truth, tools enforce rules):
+  `reference/siever-mail/README.md`. `personal/` is gitignored, for each person's private notes.
 
 ## Rules
 
