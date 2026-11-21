@@ -1,0 +1,84 @@
+{
+  "_about": "If-then pre-sort for incoming mails (Jan's idea). Plain code matches these before any LLM call: cheap, fast, deterministic. Hits become hints for the parser and fill fields the cheap model might miss. Compiled from general air-freight practice, not from 5U; extend it with what real 5U mails use.",
+
+  "intent": {
+    "cheapest": ["cheapest", "lowest price", "best price", "best rate", "budget", "economy", "economic", "not urgent", "no rush", "deferred",
+      "günstigste", "billigste", "preiswerteste", "günstig", "kein eilauftrag",
+      "le moins cher", "meilleur prix", "économique",
+      "más barato", "más económico", "mejor precio",
+      "più economico", "miglior prezzo",
+      "najtańsza", "najtańszy", "najlepsza cena",
+      "en ucuz", "en uygun",
+      "最便宜", "最低价",
+      "가장 저렴한", "최저가"],
+    "fastest": ["fastest", "quickest", "urgent", "asap", "a.s.a.p", "express", "priority", "rush", "time critical", "time-critical", "aog", "next flight", "first flight",
+      "schnellste", "schnellstmöglich", "dringend", "eilig", "eilt", "sofort",
+      "le plus rapide", "urgent", "au plus vite",
+      "más rápido", "urgente", "lo antes posible",
+      "più veloce", "urgente", "il prima possibile",
+      "najszybsza", "najszybszy", "pilne", "jak najszybciej",
+      "en hızlı", "acil",
+      "最快", "加急", "紧急",
+      "가장 빠른", "긴급"]
+  },
+
+  "abbreviations": {
+    "RFQ": "request for quotation",
+    "AWB": "air waybill", "MAWB": "master air waybill (airline)", "HAWB": "house air waybill (forwarder)",
+    "GW": "gross weight", "G.W.": "gross weight", "CW": "chargeable weight", "VW": "volumetric weight", "N.W.": "net weight",
+    "KGS": "kilograms", "KG": "kilograms", "LBS": "pounds", "CBM": "cubic metres", "M3": "cubic metres",
+    "PCS": "pieces", "PKGS": "packages", "CTNS": "cartons", "PLT": "pallet", "PLTS": "pallets", "EUR-PAL": "euro pallet 120x80 cm",
+    "DIMS": "dimensions L x W x H", "L/W/H": "length/width/height",
+    "ETD": "estimated time of departure", "ETA": "estimated time of arrival", "ATD": "actual time of departure", "ATA": "actual time of arrival",
+    "TT": "transit time", "T/T": "transit time",
+    "D2A": "door to airport", "D2D": "door to door", "A2A": "airport to airport", "A2D": "airport to door",
+    "EXW": "Incoterm ex works (buyer arranges pickup)", "FCA": "Incoterm free carrier", "CPT": "Incoterm carriage paid to", "CIP": "Incoterm carriage and insurance paid to",
+    "DAP": "Incoterm delivered at place", "DDP": "Incoterm delivered duty paid",
+    "FSC": "fuel surcharge", "SSC": "security surcharge", "MYC": "fuel surcharge (carrier code)", "XRAY": "security screening",
+    "DG": "dangerous goods", "DGR": "dangerous goods regulations", "UN": "UN number of dangerous goods", "MSDS": "material safety data sheet", "SDS": "safety data sheet",
+    "PER": "perishable", "AVI": "live animals", "HEA": "heavy piece", "VAL": "valuable cargo", "PIL": "pharmaceuticals",
+    "CAO": "cargo aircraft only", "PAX": "passenger aircraft", "SPX": "secured for passenger aircraft",
+    "ULD": "unit load device", "PMC": "pallet ULD", "AKE": "container ULD (LD3)", "BUP": "bulk unitisation programme",
+    "NS": "non-stackable", "NON-STACK": "non-stackable",
+    "KC": "known consignor", "RA": "regulated agent",
+    "POA": "price on application", "ASAP": "as soon as possible", "AOG": "aircraft on ground (most urgent)",
+    "PU": "pickup", "P/U": "pickup", "DEL": "delivery", "CRD": "cargo ready date"
+  },
+
+  "fields": {
+    "gross_weight": ["gross weight", "weight", "gw", "g.w.", "kg", "kgs", "bruttogewicht", "gewicht", "poids brut", "peso bruto", "peso lordo", "waga brutto", "brüt ağırlık", "毛重", "总重", "총중량", "중량"],
+    "volume": ["volume", "cbm", "m3", "m³", "volumen", "volume", "volumen", "volume", "objętość", "hacim", "体积", "부피"],
+    "pieces": ["pieces", "pcs", "packages", "pkgs", "cartons", "pallets", "plts", "colli", "kolli", "packstücke", "paletten", "colis", "bultos", "paletas", "colli", "sztuki", "palety", "koli", "adet", "件数", "托盘", "수량", "팔레트"],
+    "dimensions": ["dims", "dimensions", "size", "l x w x h", "maße", "abmessungen", "dimensions", "medidas", "dimensioni", "wymiary", "ölçüler", "尺寸", "치수"],
+    "pickup": ["pickup", "pick up", "pick-up", "collection", "door", "abholung", "abholadresse", "enlèvement", "recogida", "ritiro", "odbiór", "teslim alma", "提货", "取货", "픽업"],
+    "ready_date": ["ready", "cargo ready", "crd", "ready date", "available from", "versandbereit", "bereit ab", "prête", "lista", "pronta", "gotowe", "hazır", "货好时间", "준비"],
+    "commodity": ["commodity", "goods", "cargo", "contents", "ware", "warenbeschreibung", "marchandise", "mercancía", "merce", "towar", "emtia", "货物", "품목"],
+    "quote_request": ["quote", "quotation", "offer", "rate", "price", "anfrage", "angebot", "preis", "devis", "cotation", "cotización", "presupuesto", "preventivo", "quotazione", "wycena", "oferta", "fiyat teklifi", "报价", "询价", "견적"]
+  },
+
+  "units": {
+    "lbs_to_kg": 0.45359237,
+    "in_to_cm": 2.54,
+    "volume_kg_per_cbm": 167,
+    "chargeable_weight": "max(gross kg, cbm * 167); cbm from dims = L*W*H (cm) / 1,000,000 * pieces",
+    "number_formats": "Accept 1.234,56 (DE/IT/ES) and 1,234.56 (EN). A single separator followed by exactly 3 digits is a thousands separator only if the value would otherwise be implausible for the field."
+  },
+
+  "flags": {
+    "dangerous_goods": ["dg", "dgr", "dangerous", "hazardous", "hazmat", "un 1", "un 2", "un 3", "lithium", "class 9", "gefahrgut", "matières dangereuses", "mercancía peligrosa", "merce pericolosa", "towary niebezpieczne", "tehlikeli madde", "危险品", "위험물"],
+    "perishable": ["per", "perishable", "temperature controlled", "cool chain", "2-8", "+2/+8", "kühl", "frisch", "périssable", "perecedero", "deperibile"],
+    "oversized": ["oversized", "out of gauge", "oog", "heavy piece", "hea", "non-stackable", "non stack", "ns", "überlänge", "übergröße", "nicht stapelbar"],
+    "live_animals": ["avi", "live animal", "lebende tiere"]
+  },
+
+  "languages": {
+    "de": ["hallo", "guten tag", "sehr geehrte", "vielen dank", "grüße", "anfrage", "bitte"],
+    "fr": ["bonjour", "merci", "cordialement", "demande", "devis"],
+    "es": ["hola", "buenos días", "gracias", "saludos", "cotización"],
+    "it": ["ciao", "buongiorno", "grazie", "saluti", "preventivo"],
+    "pl": ["dzień dobry", "dziękuję", "pozdrawiam", "wycena"],
+    "tr": ["merhaba", "teşekkürler", "saygılarımla", "teklif"],
+    "zh": ["您好", "谢谢", "报价"],
+    "ko": ["안녕하세요", "감사합니다", "견적"]
+  }
+}
