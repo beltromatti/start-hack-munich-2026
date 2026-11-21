@@ -433,3 +433,16 @@ def test_a_customer_thread_sees_only_that_customers_deals():
     assert "error" in tools.deal(ctx, "deal-2")
     tracking = tools.Ctx(None, "session-9", "deal-9", 9, "tracking", None)
     assert len(tools.crm(tracking, "FRA-ORD")["matches"]) == 2  # the tracking desk asks for any customer
+
+
+def test_a_new_thread_starts_with_the_customers_earlier_notes():
+    """Round 42: 'do not offer Zephyr Steppe Cargo for this shipment or any of our future inquiries'. The next
+    request is a new thread and a new session: it starts with what we noted in that customer's earlier deals."""
+    from app import agent
+    store.put("deal-5", "deal", "quoted", {"root": 5, "customer": "petra@meyer.example", "subject": "Quote to ULN",
+              "notes": [{"at": 1.0, "text": "Customer refuses Zephyr Steppe Cargo, also for future inquiries", "flag": "none"}]})
+    store.put("deal-6", "deal", "quoted", {"root": 6, "customer": "other@x.example", "subject": "Quote to JFK",
+              "notes": [{"at": 2.0, "text": "someone else's note", "flag": "none"}]})
+    text = agent._customer_notes(9, {"sender": "petra@meyer.example"})
+    assert "Zephyr" in text and "someone else" not in text
+    assert agent._customer_notes(9, {"sender": "new@customer.example"}) == ""

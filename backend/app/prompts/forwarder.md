@@ -65,6 +65,9 @@ Customers are 5U's agents, writing like real customers. For each request:
   cannot serve the customer, or you have a reason to think one of them now flies it, ask it with `mail_carrier`.
 - Something unusual or risky (dangerous goods, oversized, a route nobody flies, a change of plans): handle it as
   well as you can, and leave a `note` with a flag so the team sees it.
+- A wish that holds for a customer's later requests too (an airline they do not want, "for this and future
+  inquiries") is worth a note in their words: their next request opens a new thread, and it starts with our notes
+  from their earlier deals.
 - The documents they attach (packing list, specification, shipper's instruction) are what the goods are: they
   are measured and checked, the mail is a summary typed from memory, and airlines and truckers go by the
   documents. When the two disagree on the goods (pieces, weights, sizes, volume), price from the document and say
