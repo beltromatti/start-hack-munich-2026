@@ -1,0 +1,45 @@
+:root {
+  --bg: #0d0d0e; --card: #141415; --line: #1f1f20; --row: #19191a; --ink: #ededed; --muted: #8c8c8c; --soft: #a9a9a9;
+  --green: #43c27a; --green-bg: #13261b; --yellow: #e8b44c; --yellow-bg: #2a2210; --red: #f26d6d; --red-bg: #2c1414;
+  --grey-bg: #222223;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 "Schibsted Grotesk", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; }
+.page { max-width: 1180px; margin: 0 auto; padding: 28px 24px 110px; display: flex; flex-direction: column; gap: 22px; }
+.muted { color: var(--muted); } .small { font-size: 12px; } .red { color: var(--red); }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 28px; font-weight: 700; } .head p { margin: 4px 0 0; }
+.headnums { display: flex; gap: 22px; } .headnums div { display: flex; flex-direction: column; align-items: flex-end; } .headnums b { font-size: 30px; }
+.tabs { display: flex; gap: 26px; border-bottom: 1px solid #222; overflow-x: auto; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 0 0 10px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button.active { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; min-width: 0; }
+.cardhead { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+.attn { display: grid; grid-template-columns: 100px 1fr auto; gap: 12px; padding: 9px 0; border-top: 1px solid var(--row); align-items: center; }
+.attn .why { color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { color: var(--muted); padding: 10px 0; }
+h2.section { margin: 0; font-size: 14px; color: #bdbdbd; font-weight: 600; }
+.table { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+.tr { display: grid; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--row); align-items: center; min-width: 900px; }
+.tr.th { color: var(--muted); font-size: 12px; border-color: var(--line); }
+.tr:last-child { border-bottom: 0; }
+.req { grid-template-columns: 70px minmax(140px, 1fr) 120px 80px 70px 110px 1.2fr 54px; }
+.mail { grid-template-columns: 70px 90px minmax(160px, 0.8fr) 1.6fr; }
+.mail .subj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--soft); }
+.std { grid-template-columns: 40px 1fr 90px 100px 80px 70px 70px; }
+.std.us { background: #1a1a1b; font-weight: 600; }
+.num { text-align: right; }
+.tag { border-radius: 5px; padding: 2px 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.t-green { background: var(--green-bg); color: var(--green); } .t-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.t-red { background: var(--red-bg); color: var(--red); } .t-grey { background: var(--grey-bg); color: var(--soft); }
+.dock { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b1b1c; border: 1px solid #2a2a2b; border-radius: 99px; padding: 6px 8px 6px 16px; display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 32px); }
+.search { display: flex; align-items: center; gap: 8px; background: #262627; border-radius: 99px; padding: 6px 12px; color: var(--muted); }
+.search input { background: none; border: 0; outline: none; width: 170px; color: var(--ink); }
+svg.chart { width: 100%; height: 150px; display: block; }
+@media (max-width: 640px) { .page { padding: 20px 16px 120px; } .headnums b { font-size: 24px; } .dock > span:first-child { display: none; } .search input { width: 110px; } }
+
+.dock a { text-decoration: none; } .dock a:hover { color: var(--ink); }

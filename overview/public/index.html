@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forwarder Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="page">
+  <header class="head">
+    <div>
+      <h1>Requests</h1>
+      <p class="muted" id="sub">Saturday, 21 November · loading…</p>
+    </div>
+    <div class="headnums">
+      <div><span class="muted small">Points</span><b id="points">—</b></div>
+      <div><span class="muted small">Rank</span><b id="rank">—</b></div>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Sections">
+    <button data-tab="requests" class="active">Requests</button>
+    <button data-tab="inbox">Inbox <span id="inboxCount" class="muted"></span></button>
+    <button data-tab="standings">Standings</button>
+  </nav>
+
+  <section id="tab-requests">
+    <div class="cards">
+      <section class="card" aria-label="Needs attention">
+        <div class="cardhead"><b>Needs attention</b><span class="muted" id="attnSummary"></span></div>
+        <div id="attention"></div>
+      </section>
+      <section class="card" aria-label="Points per request">
+        <div class="cardhead"><b>Points per request</b><span class="legend"><span>● accepted</span><span class="red">● rejected</span></span></div>
+        <div id="chart"></div>
+      </section>
+    </div>
+    <h2 class="section">Latest requests</h2>
+    <div class="table" id="requests"></div>
+  </section>
+
+  <section id="tab-inbox" hidden>
+    <div class="table" id="inbox"></div>
+  </section>
+
+  <section id="tab-standings" hidden>
+    <div class="table" id="standings"></div>
+  </section>
+</div>
+
+<nav class="dock" aria-label="Status">
+  <span class="muted" id="who">Read-only</span>
+  <a class="muted" href="/logout">Log out</a>
+  <span id="updated" class="muted"></span>
+  <label class="search">Search<input id="q" placeholder="Lane, customer, ID" autocomplete="off"></label>
+</nav>
+<script type="module" src="app.js"></script>
+</body>
+</html>

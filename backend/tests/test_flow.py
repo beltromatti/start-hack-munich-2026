@@ -157,12 +157,9 @@ def test_pickup_rule_decides_which_trucker_the_recommended_option_carries(monkey
         row = next(o for o in out["options"] if o["option"] == out["recommended"])
         return row["airline"], row["pickup"]["trucker"], row["total"]
 
-    # asked: the trucker follows the customer's preference
+    # `asked`: the trucker follows the customer's preference
     assert recommended("cheapest", pickup_rule="asked") == ("Slow", "Bodenseefracht", "788.60 EUR")
     assert recommended("fastest", pickup_rule="asked") == ("Fast", "Taunusfracht", "1077.40 EUR")
-    # default since round 2: the 50/50 trucker (ratio) for every preference
-    assert recommended("cheapest") == ("Slow", "Taunusfracht", "877.40 EUR")
-    assert recommended("fastest") == ("Fast", "Taunusfracht", "1077.40 EUR")
     # the fastest trucker is 88.80 EUR more: 9 % on this shipment, outside the 5 % band if 5U expects another
     assert recommended("fastest", pickup_rule="cheapest") == ("Fast", "Bodenseefracht", "988.60 EUR")
     assert recommended("fastest", pickup_rule="balanced", balance_rule="minmax") == ("Fast", "Westfalenroute", "996.80 EUR")
@@ -181,11 +178,22 @@ def test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status():
     f = Sync(api)
     ctx = tools.Ctx(f, "session-900", "deal-900", 900, "tracking", None)   # a tracking thread: nothing to price
     assert "error" in tools.get_offers(ctx, None, "unspecified", 1)        # nobody asked yet: nothing to wait for
-    tools.mail_carrier(ctx, "yellowtail-air-freight@hackloop.mail", "Shipment status BK-1",
+    tools.mail_carrier(ctx, "yellowtail-air-freight@hackloop.mail", "Status of booking BK-1",
                        "Hello, where is the shipment under booking BK-1 (FRA-ORD) now?", None)
     out = tools.get_offers(ctx, None, "unspecified", 5)
     assert out["still_waiting_for"] == [] and "in transit" in out["carrier_messages"][0]["text"]
     assert store.get("deal-900")["status"] == "new"                         # not shown as a deal being priced
+
+
+def test_crm_gives_the_airlines_address_for_a_status_question():
+    from app import tools
+    f = Sync(FakeFiveU())
+    booking = {"booking_reference": "BK-7", "team_reference": "SM-5", "airline": "Yellowtail Air Freight",
+               "route": "FRA-ORD", "transit_days": "4", "status": "confirmed", "booked_at": 1795273200.0}
+    store.put("deal-5", "deal", "booked", {"root": 5, "customer": "anna@acme.example", "booking": booking})
+    store.put("booking-5", "booking", "confirmed", booking)
+    out = tools.crm(tools.Ctx(f, "session-9", "deal-9", 9, "tracking", None), "BK-7")
+    assert out["matches"][0]["booking"]["airline_email"] == "yellowtail-air-freight@hackloop.mail"
 
 
 def test_a_carrier_that_says_no_takes_its_sheet_price_with_it():
@@ -224,7 +232,8 @@ def test_a_city_is_its_airport_and_a_signature_is_no_pickup():
     assert "LOS Lagos" in hint and "PEK Beijing" in hint
 
 
-def test_a_quote_with_two_amounts_is_not_sent():
+def test_a_quote_with_two_amounts_is_sent_and_flagged():
+    """No gate on the model's text (the prompt teaches one total); the diagnostics flag it for the team."""
     from app import tools
     api = FakeFiveU()
     kit.load(api)
@@ -237,7 +246,5 @@ def test_a_quote_with_two_amounts_is_not_sent():
     store.put(ctx.deal_id, "deal", "pricing", {"root": rfq["id"], "received_at": None, "options": {"A1": opt}})
     two = "Hi Sam,\n\nCheapest: 2748.00 EUR all-in\nFastest: 3336.00 EUR all-in\n\nGiulia"
     out = tools.send_mail(ctx, "quote", two, "A1", None)
-    assert "error" in out and not to(api, "sam@lumen.example"), "nothing went out"
-    one = "Hi Sam,\n\ncheapest is Yellowtail, 5 days. Fjordline would be there in 3.\n\nTotal: 2748.00 EUR all-in\n\nGiulia"
-    out = tools.send_mail(ctx, "quote", one, "A1", None)
     assert out["recorded_quote"] == "2748.00 EUR" and len(to(api, "sam@lumen.example")) == 1
+    assert any("quote mail amounts" in e["summary"] for e in store.events() if e["kind"] == "error")

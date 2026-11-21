@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Any, Callable
 
-from . import agent, docs, kit, language, pricing, store
+from . import agent, anomaly, docs, kit, language, pricing, store
 from .config import settings
 from .pricing import Offer
 
@@ -139,8 +139,6 @@ class Forwarder:
             req = normalise(shipment, w)
             if req["missing"]:
                 return {"missing": req["missing"], "understood": req,
-                        "destinations_we_fly_to": sorted({d for c in w.carriers if c.kind == "airline"
-                                                          for d in c.serves} | {d for _, d in w.portal}),
                         "hint": "if the customer's words already say it (a city is its airport), call again with it; "
                                 "otherwise ask the customer for exactly this"}
             same = deal and deal["data"].get("request") and all(
@@ -493,6 +491,7 @@ class Forwarder:
                 seen.add(key)
                 store.log("watcher", "info", f"round {rnd}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
+        anomaly.check()  # a market change, seen before failed quotes pile up (app/anomaly.py)
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------

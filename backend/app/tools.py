@@ -153,10 +153,6 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
                   m)
     subject = parent["subject"] or "Your shipment"
     subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
-    if kind == "quote":  # the one thing 5U reads in a quote: one all-in total. Guaranteed here, before it is sent
-        wrong = _quote_amounts(ctx, option_id, body)
-        if wrong:
-            return {"error": wrong}
     sent = ctx.fw.api.send(to, subject, body, in_reply_to=parent["id"])
     store.save_mail(sent, "out", kind, handled=True)
     ctx.outcome.append(kind)
@@ -195,8 +191,9 @@ def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dic
     if not opt:
         store.log("forwarder", "info", f"quote sent without a known option ({option_id})", run_id=ctx.deal_id)
         return {"note": "no option recorded with this quote (option_id unknown): the CRM has no price for it"}
-    if opt["total_text"] not in body:  # diagnostics, not a rule: we measure, the prompt teaches
-        store.log("forwarder", "info", f"quote text does not contain {opt['total_text']}", run_id=ctx.deal_id)
+    wrong = _quote_amounts(ctx, option_id, body)  # diagnostics, not a gate: we measure, the prompt teaches
+    if wrong:
+        store.log("forwarder", "error", f"quote mail amounts: {wrong}"[:400], run_id=ctx.deal_id)
     first = not d.get("quote")
     took = time.time() - _ts(d.get("received_at"))
     q = {"option": option_id, "amount": opt["total_text"], "total": opt["total"], "air": opt["air"],
@@ -324,6 +321,7 @@ def _summary(rec: dict, b: dict | None) -> dict:
             "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",
                                                    "transit_days", "status", "via", "pickup", "amount",
                                                    "carrier_status")},
+                         "airline_email": getattr(kit.world().carrier_by_name(bd.get("airline") or ""), "email", None),
                          "booked_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(bd["booked_at"])),
                          "estimated_arrival": eta(bd)} if bd else None)}
 
