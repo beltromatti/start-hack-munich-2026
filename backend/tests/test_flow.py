@@ -167,3 +167,30 @@ def test_pickup_rule_decides_which_trucker_the_recommended_option_carries(monkey
     # a request without a stated preference
     assert recommended("unspecified", pickup_rule="cheapest", unspecified_rule="cheapest")[0] == "Slow"
     assert recommended("unspecified", pickup_rule="cheapest")[0] == "Fast"  # default: ratio balance, speed dominates
+
+
+# ---- research: tracking needs the airline's word (5U at the booth, docs/research/README.md) ------------------
+
+def test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status():
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    ctx = tools.Ctx(f, "session-900", "deal-900", 900, "tracking", None)   # a tracking thread: nothing to price
+    assert "error" in tools.get_offers(ctx, None, "unspecified", 1)        # nobody asked yet: nothing to wait for
+    tools.mail_carrier(ctx, "yellowtail-air-freight@hackloop.mail", "Status of booking BK-1",
+                       "Hello, where is the shipment under booking BK-1 (FRA-ORD) now?", None)
+    out = tools.get_offers(ctx, None, "unspecified", 5)
+    assert out["still_waiting_for"] == [] and "in transit" in out["carrier_messages"][0]["text"]
+    assert store.get("deal-900")["status"] == "new"                         # not shown as a deal being priced
+
+
+def test_crm_gives_the_airlines_address_for_a_status_question():
+    from app import tools
+    f = Sync(FakeFiveU())
+    booking = {"booking_reference": "BK-7", "team_reference": "SM-5", "airline": "Yellowtail Air Freight",
+               "route": "FRA-ORD", "transit_days": "4", "status": "confirmed", "booked_at": 1795273200.0}
+    store.put("deal-5", "deal", "booked", {"root": 5, "customer": "anna@acme.example", "booking": booking})
+    store.put("booking-5", "booking", "confirmed", booking)
+    out = tools.crm(tools.Ctx(f, "session-9", "deal-9", 9, "tracking", None), "BK-7")
+    assert out["matches"][0]["booking"]["airline_email"] == "yellowtail-air-freight@hackloop.mail"

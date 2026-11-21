@@ -147,13 +147,18 @@ class Forwarder:
                 self._ask_everyone(deal_id, req)
         deal = store.get(deal_id)
         if not deal or not deal["data"].get("request"):
+            if deal and deal["data"].get("asked"):  # nothing to price (a tracking thread): wait for the answers
+                self._wait(deal_id, wait)
+                d = store.get(deal_id)["data"]
+                return {"carrier_messages": d.get("carrier_messages", []), "still_waiting_for": waiting_for(d)}
             return {"error": "no shipment yet: call get_offers with the shipment"}
-        end = time.time() + max(0.0, float(wait))
-        while time.time() < end:
-            if not waiting_for(store.get(deal_id)["data"]):
-                break
-            self.wait_step()
+        self._wait(deal_id, wait)
         return self.options(deal_id, preference)
+
+    def _wait(self, deal_id: str, wait: float) -> None:
+        end = time.time() + max(0.0, float(wait))
+        while time.time() < end and waiting_for(store.get(deal_id)["data"]):
+            self.wait_step()
 
     def wait_step(self) -> None:
         """While a tool waits for carriers, the loop's other threads read their replies."""
