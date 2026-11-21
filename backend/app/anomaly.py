@@ -130,6 +130,10 @@ def signals(mails: list[dict], events: list[dict], board: dict | None, deals: li
         hit(f"price:{s['carrier']}", "1", f"{s['carrier']} live price at {s['ratio']}x its sheet "
             f"(usual {s['base_ratio']}x)", s)
     for r in (board or {}).get("requests", []):
+        sent, answered = _ts(r.get("sent_at")), _ts(r.get("answered_at"))
+        if sent and answered and answered - sent > 120:
+            hit("late-answer", "8", "rounds answered after 2 minutes (time points lost)",
+                {"round": r.get("round_no", r.get("round")), "seconds": round(answered - sent)})
         verdict = str(r.get("verdict") or "").lower()
         if verdict and verdict not in GOOD:
             reason = re.sub(r"\W+", "-", str(r.get("reason") or r.get("reason_code") or verdict).lower())[:40]

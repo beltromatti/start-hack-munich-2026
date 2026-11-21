@@ -29,10 +29,12 @@ def test_each_change_raises_its_signal():
                  files=[{"filename": "dec.xlsx"}], subject="Tariff December")
     events = [{"id": 9, "kind": "error", "agent": "bids", "summary": "portal FRA-ORD: 503 use the rate desk"},
               {"id": 10, "kind": "llm", "agent": "forwarder", "summary": "gpt-6-luna [turn] 3.1s DIRECT (gateway down)"}]
-    board = {"requests": [{"round": 7, "verdict": "rejected", "reason": "price above market"}]}
+    board = {"requests": [{"round_no": 7, "verdict": "rejected", "reason": "price above market"},
+                          {"round_no": 8, "verdict": "accepted", "sent_at": "2026-11-21T16:00:00+00:00",
+                           "answered_at": "2026-11-21T16:02:30+00:00"}]}
     got = keys([ASK, slow, usd, ask, sheet], events, board)
     assert got == {f"slow:{AIR}", "currency:USD", f"askback:{AIR}", f"tariff:{AIR}", f"validity:{AIR}",
-                   "http:503:bids", "gateway-down", "board:price-above-market"}
+                   "http:503:bids", "gateway-down", "board:price-above-market", "late-answer"}
 
 
 def test_customer_reply_naming_a_problem_is_a_signal():
