@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import kit, pricing, store
+from . import lookup, kit, pricing, store
 from .config import settings
 from .kit import RATEDESK, TRACKING
 
@@ -87,10 +87,17 @@ TOOLS = [
        "expired), otherwise by mail to the airline. Returns the booking with its reference and status.",
        {"option_id": {"type": "string"}}),
     fn("crm",
-       "Search our CRM: deals and bookings by booking or rate reference, our reference (SM-...), customer name or "
-       "address, company, route, airline, anything. Returns the matching deals with their shipment, quote, booking, "
-       "status and dates (estimated arrival computed). Empty query: the latest deals.",
-       {"query": {"type": "string"}}),
+       "Search our CRM for a deal or booking. Customers rarely give a reference: put what they wrote into the fields "
+       "in our form (airport codes for cities, kg for tonnes or pounds, YYYY-MM-DD for any date), null for what they "
+       "did not say, and the rest of their words in query. Each match says which fields fit and which differ, so two "
+       "shipments of one customer can be told apart. All null and empty query: the latest deals.",
+       {"query": {**S, "description": "any other words: company, goods, airline, a phrase from their mail"},
+        "reference": {"type": ["string", "null"], "description": "BK-..., SM-..., R-..., deal-... if they gave one"},
+        "customer": {"type": ["string", "null"], "description": "company or sender address"},
+        "origin": {"type": ["string", "null"], "description": "IATA of the German airport, or the pickup postcode"},
+        "destination": {"type": ["string", "null"], "description": "IATA of the destination airport"},
+        "weight_kg": {"type": ["number", "null"], "description": "actual weight in kg"},
+        "ready_date": {"type": ["string", "null"], "description": "YYYY-MM-DD"}}),
     fn("deal",
        "The whole record of a deal: the thread, the shipment, every offer and carrier message, the options, the "
        "quote, the booking, notes. No id: the deal of this thread.",
@@ -221,17 +228,17 @@ def book(ctx: Ctx, option_id: str) -> dict:
     return ctx.fw.book_option(ctx.deal_id, option_id)
 
 
-def crm(ctx: Ctx, query: str) -> dict:
-    words = re.findall(r"[a-z0-9][a-z0-9_\-]*[a-z0-9]", query.lower())
-    out = []
-    for rec in store.records("deal"):
-        b = store.get(f"booking-{rec['data'].get('root')}")
-        hay = json.dumps({"deal": rec, "booking": b}, default=str).lower()
-        score = sum(1 for w in words if w in hay) if words else 1
-        if score:
-            out.append((score, rec["updated_at"], _summary(rec, b)))
-    out.sort(key=lambda x: (-x[0], -x[1]))
-    return {"matches": [x[2] for x in out[:10]], "total_matches": len(out)}
+def crm(ctx: Ctx, query: str = "", reference: str | None = None, customer: str | None = None,
+        origin: str | None = None, destination: str | None = None, weight_kg: float | None = None,
+        ready_date: str | None = None) -> dict:
+    found = lookup.find(reference=reference, customer=customer, origin=origin, destination=destination,
+                        weight_kg=weight_kg, ready_date=ready_date, text=query)
+    out = {"matches": [{**_summary(x["rec"], x["booking"]), "matched": x["matched"], "differs": x["differs"]}
+                       for x in found[:10]], "total_matches": len(found)}
+    tied = [x for x in found if x["score"] == found[0]["score"]] if found and found[0]["score"] else []
+    if len(tied) > 1:
+        out["note"] = f"{len(tied)} deals fit equally well: compare them, or ask the customer for what tells them apart"
+    return out
 
 
 def deal(ctx: Ctx, deal_id: str | None) -> dict:
