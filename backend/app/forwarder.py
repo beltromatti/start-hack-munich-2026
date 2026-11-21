@@ -15,7 +15,7 @@ import time
 import traceback
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from typing import Any, Callable
 
 from . import agent, docs, kit, language, pricing, store
@@ -673,7 +673,10 @@ def normalise(s: dict, w: kit.World) -> dict:
         missing.append("total weight")
     cw = pricing.chargeable(kg, cbm) if kg else None
     return {"origin": origin, "destination": dest, "weight_kg": str(kg) if kg else None,
-            "volume_cbm": str(cbm.quantize(Decimal("0.001"))) if cbm else None,
+            # never rounded down: a rate for less volume bills less than the shipment weighs, and 5U does not count
+            # that booking (round 62: lots summed to 9.3444 cbm, the portal got 9.344 and priced 1560.448 kg of
+            # 1560.5148; accuracy 44.97, booked False, tracking 0)
+            "volume_cbm": f"{cbm.quantize(Decimal('0.000001'), rounding=ROUND_CEILING).normalize():f}" if cbm else None,
             "chargeable_kg": str(cw) if cw else None, "pieces": pieces, "pickup_zone": zone,
             # the ready date as a date, however the customer wrote it (round 65: "24 November 2026" reached the
             # schedule as text, the dates fell back to today, and the agent told the customer to check the timing)
@@ -738,9 +741,10 @@ def _day(text: Any) -> str | None:
 
 
 def kg_text(kg: Decimal) -> str:
-    """A weight as carriers should read it: exact, no rounding (round 28: 116.9 kg sent as 117 cost 0.33 EUR and
-    0.38 points; a probe at 18:5x showed the airlines price 116.9 kg exactly)."""
-    t = f"{Decimal(kg).quantize(Decimal('0.01')):f}".rstrip("0").rstrip(".")
+    """A weight as carriers should read it: exact to the hundredth, and never below the real weight (round 28: 116.9
+    kg sent as 117 cost 0.33 EUR and 0.38 points; round 62: a rate for less than the shipment weighs is not a
+    booking of it)."""
+    t = f"{Decimal(kg).quantize(Decimal('0.01'), rounding=ROUND_CEILING):f}".rstrip("0").rstrip(".")
     return t or "0"
 
 

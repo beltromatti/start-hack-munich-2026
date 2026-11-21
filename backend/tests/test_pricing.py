@@ -173,8 +173,20 @@ def test_a_consignment_of_lots_is_added_up_in_code():
                   {"pieces": 5, "weight": q(206, "kg", True), "volume": none,
                    "dimensions": {"length": 120, "width": 100, "height": 8, "unit": "cm"}}]}
     r = normalise(s, kit.world())
-    assert r["pieces"] == 13 and D(r["weight_kg"]) == 1952 and r["volume_cbm"] == "4.677"
+    assert r["pieces"] == 13 and D(r["weight_kg"]) == 1952 and r["volume_cbm"] == "4.6768"
     assert r["origin"] == "FRA" and r["pickup_zone"] == "36" and not r["missing"]
+    # round 62: the lots sum to 9.3444 cbm; sent as 9.344 the portal priced 1560.448 kg of 1560.5148, and 5U did not
+    # count that booking. The volume the portal and the sheets see is the one the chargeable weight comes from.
+    s["lots"] = [{"pieces": 1, "weight": q(465, "kg", False), "volume": q(3.87, "cbm", False), "dimensions": None},
+                 {"pieces": 3, "weight": q(160, "kg", True), "volume": none,
+                  "dimensions": {"length": 100, "width": 60, "height": 46, "unit": "cm"}},
+                 {"pieces": 3, "weight": q(59, "kg", True), "volume": none,
+                  "dimensions": {"length": 110, "width": 110, "height": 128, "unit": "cm"}}]
+    r = normalise(s, kit.world())
+    assert r["volume_cbm"] == "9.3444" and D(r["chargeable_kg"]) == D("1560.5148")
+    assert D(r["volume_cbm"]) * pricing.KG_PER_CBM == D(r["chargeable_kg"])
+    from app.forwarder import kg_text
+    assert kg_text(D("1560.5148")) == "1560.52" and kg_text(D("116.9")) == "116.9"  # never below the real weight
 
 
 def test_durations_are_converted_by_code():
