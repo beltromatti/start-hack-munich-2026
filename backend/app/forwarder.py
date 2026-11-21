@@ -363,6 +363,16 @@ class Forwarder:
         if status in (200, 201):
             booking.update(booking_reference=body.get("booking_reference"), status="booked", via="portal",
                            price=body.get("price"), currency=body.get("currency"), note=body.get("note"))
+            # the airline's booking price is what it charges, also when it is not the rate we quoted (round 48:
+            # quoted 5655.55, booked at 6221.11): the all-in total follows it, and the change is stated plainly
+            try:
+                booked_air = self.eur(Decimal(str(body["price"])), body.get("currency") or "EUR", None)
+            except Exception:
+                booked_air = None
+            if booked_air is not None and pricing.money(booked_air) != pricing.money(Decimal(str(air["total"]))):
+                now = booked_air + Decimal(str((opt.get("pickup") or {}).get("total") or 0))
+                booking.update(amount=pricing.fmt(now), quoted_amount=opt["total_text"],
+                               price_changed={"quoted": opt["total_text"], "booked": pricing.fmt(now)})
         elif air.get("email") or kit.world().carrier_by_name(air["carrier"]):  # by mail with the airline
             air = {**air, "email": air.get("email") or kit.world().carrier_by_name(air["carrier"]).email}
             text = (f"Hello,\n\nwe would like to book your offer {air.get('rate_id') or ''} ({booking['route']}, "

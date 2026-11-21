@@ -446,3 +446,29 @@ def test_a_new_thread_starts_with_the_customers_earlier_notes():
     text = agent._customer_notes(9, {"sender": "petra@meyer.example"})
     assert "Zephyr" in text and "someone else" not in text
     assert agent._customer_notes(9, {"sender": "new@customer.example"}) == ""
+
+
+def test_a_booking_at_another_price_says_so_and_its_confirmation_stays_quiet():
+    """Round 48: quoted 5655.55, the portal booked the same rate at 6221.11. `book` returned both numbers without
+    saying they differ, so the agent confirmed without the price and corrected itself after the airline's mail."""
+    from app.forwarder import confirmation_matches
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    deal_id = f"deal-{rfq['id']}"
+    opts = store.get(deal_id)["data"]["options"]
+    oid, opt = next((k, o) for k, o in opts.items() if o["air"]["source"] == "portal")
+    rate = api.rates[opt["air"]["rate_id"]]
+    rate["total"] = f"{float(rate['total']) * 1.1:.2f}"  # the airline books at 10 % more than it quoted
+    b = f.book_option(deal_id, oid)
+    assert b["price_changed"] == {"quoted": opt["total_text"], "booked": f"{rate['total']} EUR"}
+    assert b["amount"] == f"{rate['total']} EUR" and b["quoted_amount"] == opt["total_text"]
+    mail = f"Booking {b['booking_reference']} confirmed\nBooking reference: {b['booking_reference']}\n" \
+           f"Price: {rate['total']} EUR\nStatus: booked"
+    assert confirmation_matches(b, mail)  # it confirms what the booking already told the agent: not news
+
+    rate["total"] = opt["air"]["total"]
+    same = f.book_option(deal_id, oid)
+    assert "price_changed" not in same and same["amount"] == opt["total_text"]
