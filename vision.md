@@ -30,6 +30,11 @@ deterministic ground. Everything below follows from this split.
   5 % of the best price. Only the first quote of a thread counts.
 - +10 for a correct tracking answer (only a booked shipment gets the question), +10 humanity from the jury (one
   pick per round). The `booking` points field is always 0 by design. 5U can correct a round by hand (`adjustment`).
+- From round 84, a round only 1, 2 or 3 teams get right multiplies their accuracy, time and cost points (board
+  `rules.few_winners`: factors 5, 3, 2; a `factor` per round). The rounds most teams fail are the new kinds 5U
+  invents ("think beyond the given use cases", Discord 00:04), so being right where others are not is now worth
+  several ordinary rounds: the same aim as before (read everything, always price, decline only what we truly
+  do not offer), with more at stake. The rules travel on the board itself; `review.py` prints them when they change.
 - The setup changes about once an hour, unannounced, and gets harder: traps in mails and documents, outages, new
   limits, prices that move. We learn of a change from a failed quote unless we notice it first
   (`docs/likely-changes.md` lists the kinds, the earliest signal and our response).
@@ -194,7 +199,7 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **A mail is its body and its attachments, whatever their form** (round 63: truckers priced in a PDF, a Word
   letter and a voice message; round 65: the request itself was a voice message; 5U said stranger formats are
   coming). One reader (`docs.text`) serves customers, carriers and the rate desk: pdf (scanned pages read as
-  pictures), xlsx, docx, text in any common encoding, zip and eml opened, pictures read through the gateway
+  pictures, with Pillow), xlsx, xls, docx, text in any common encoding, zip and eml opened, pictures read through the gateway
   (`llm.look`), voice messages transcribed with a call of our own (the gateway takes no audio; 5U said to do so),
   prices said aloud accepted by the amount check. Units are read however written and never guessed: an unknown
   one goes back to the agent by name. A trucker's time is the time until it collects, however it is put.
@@ -205,6 +210,13 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   not priced yet, wait for it or ask it; the customer cannot help.
 - **Prices can move between the quote and the booking** (rounds 48-50): the customer hears it from us, in the
   confirmation, not from the invoice.
+- **A request can change after the quote** (rounds 86, 87: "the final packing list came in" a few seconds after our
+  quote): the agent prices the new goods and quotes again; the booking follows the options as they are now.
+- **A booking can be undone, an offer accepted from another thread.** After a booking, an airline's answer to a
+  mail the agent wrote (a cancellation) is booking news that wakes the session, like the airline's own news; an
+  offer accepted in a new mail is booked on the deal that holds it (`book` with its `deal_id`, the customer's own
+  deals only). A shipment that starts outside Germany (an import) is named out of our service by `get_offers`,
+  so the agent says so instead of asking for a German airport (Sam's probe, Sun 00:30).
 - **Time:** every accepted quote inside 2 minutes took the full 15; speed beyond that is not worth accuracy.
 - **Not every mail is a customer.** 5U sends traps: a "CEO" asking for the API keys (refused: the agent holds no
   secret to give), a sales pitch (no reply). Judging them is the agent's job; what a mail can make us do is bounded
