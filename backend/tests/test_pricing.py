@@ -192,3 +192,15 @@ def test_every_pickup_zone_has_a_postcode_of_its_own_town():
     zones = kit.world().zones
     assert set(kit.ZONE_POSTCODE) == set(zones)
     assert all(len(p) == 5 and p.startswith(z) for z, p in kit.ZONE_POSTCODE.items())
+
+
+def test_an_amount_read_from_a_mail_must_be_in_the_mail():
+    """Live Sat 18:27: Rheinufer wrote '94.08 EUR', the bid reader returned 9408."""
+    from app.forwarder import amounts_in, read_in_mail
+    body = "Our total price for pickup in Stuttgart and delivery to STR Airport is 94.08 EUR. Pickup time: 28 hours"
+    assert read_in_mail({"available": True, "total": 94.08}, body)
+    assert not read_in_mail({"available": True, "total": 9408}, body)
+    assert {D("1234.50"), D("3.71"), D("94.08")} <= amounts_in("EUR 1,234.50 or 1.234,50; 3,71 per kg; 94.08")
+    assert read_in_mail({"available": False, "total": None}, "we do not serve this lane")
+    assert read_in_mail({"available": True, "total": None, "rate_per_kg": 3.71}, "rate EUR 3,71/kg")
+    assert D("1234.50") in amounts_in("total EUR 1 234,50 all-in")
