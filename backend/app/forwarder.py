@@ -143,7 +143,8 @@ class Forwarder:
             if req["missing"]:
                 return {"missing": req["missing"], "understood": req,
                         "hint": "if the customer's words already say it (a city is its airport), call again with it; "
-                                "otherwise ask the customer for exactly this"}
+                                "otherwise ask the customer for exactly this (what is out of our service is no "
+                                "question: tell them so)"}
             same = deal and deal["data"].get("request") and all(
                 deal["data"]["request"].get(k) == req.get(k)
                 for k in ("origin", "destination", "chargeable_kg", "pickup_zone", "volume_cbm"))
@@ -430,9 +431,12 @@ class Forwarder:
         m = self.with_attachments(m)
         rec = store.get(deal_id)
         booked = (rec or {}).get("data", {}).get("booking") or {}
-        if booked and (is_confirmation(m) or (m.get("in_reply_to") and m["in_reply_to"] == booked.get("request_mail"))):
-            # the airline answering our booking (its confirmation, or its reply to our booking mail) is booking news,
-            # not an offer: round 51's "thank you for your booking ... Price: 4466.52" became a 0-day option
+        answers_us = m.get("in_reply_to") and (m["in_reply_to"] == booked.get("request_mail")
+                                               or store.kv_get(f"agentmail:{m['in_reply_to']}"))
+        if booked and (is_confirmation(m) or answers_us):
+            # the airline answering our booking (its confirmation, its reply to our booking mail, or to a mail the
+            # agent wrote after it, such as a cancellation) is booking news, not an offer: round 51's "thank you for
+            # your booking ... Price: 4466.52" became a 0-day option; Sam's probe (Sun 00:30) lost a cancellation
             self.on_booking_mail(m, store.get(f"booking-{rec['data']['root']}"))
             return
         carrier = kit.world().carrier_by_email(m["sender"])
@@ -668,8 +672,19 @@ def normalise(s: dict, w: kit.World) -> dict:
     elif pickup and not zone:  # a pickup asked for, no place given at all (rounds 15-18)
         missing.append("where to collect: the pickup postcode, or at least the town")
     # A town is enough: it is its zone, and the zone prices the truck (round 20: "All I have is Augsburg").
-    if (not origin or origin not in w.origins()) and not missing:
-        missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
+    ours = ', '.join(sorted(w.origins()))
+    if origin and origin not in w.origins() and not zone and not missing and dest in w.origins():
+        # an import (Sam's probe, Sun 00:30: ORD to FRA was answered "which German departure airport?")
+        missing.append(f"out of our service: {origin} to {dest} flies into Germany, and we are an export desk "
+                       f"(air freight out of Germany, from {ours}). Not a question for the customer: tell them "
+                       f"plainly that we do not offer it")
+    elif origin and origin not in w.origins() and not zone and not missing:
+        missing.append(f"{origin} is not one of our departure airports: we fly out of Germany only, from {ours}, "
+                       f"or collect in our pickup zones (postcodes start with {', '.join(sorted(w.zones))}). A "
+                       f"shipment that starts abroad is a service we do not offer: say so; ask only if they may have "
+                       f"meant a German airport or a pickup in Germany")
+    elif (not origin or origin not in w.origins()) and not missing:
+        missing.append(f"departure airport or pickup place in Germany (we fly from {ours}; "
                        f"pickup postcodes start with {', '.join(sorted(w.zones))})")
     if not dest:
         missing.append("destination airport (we fly to: " + ", ".join(

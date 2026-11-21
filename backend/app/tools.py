@@ -336,9 +336,12 @@ def mail_carrier(ctx: Ctx, to: str, subject: str, body: str, in_reply_to: int | 
         return {"error": f"{to} is not on our carrier list"}
     _ensure_deal(ctx)
     mid = ctx.fw.mail_carrier(ctx.deal_id, to, subject, body, in_reply_to=in_reply_to)
+    store.kv_set(f"agentmail:{mid}", ctx.deal_id)  # the agent's own question: after a booking its answer is news
     store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"].get("asked", {}),
                                                                               str(mid): to}}))
-    return {"sent": mid, "note": "their answer comes back into this deal"}
+    booked = bool((store.get(ctx.deal_id) or {}).get("data", {}).get("booking"))
+    return {"sent": mid, "note": "the deal is booked: their answer goes on the booking and comes back to you here"
+            if booked else "their answer comes back into this deal"}
 
 
 def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: float) -> dict:

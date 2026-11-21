@@ -776,3 +776,43 @@ def test_an_xls_is_read_like_an_xlsx():
     from app import docs
     xls = docs.text("Packing-List.XLS", (Path(__file__).parent / "data" / "packing-list.xls").read_bytes())
     assert "# sheet Packing list" in xls and "2\t120\t80\t95\t160.5" in xls and "Total gross weight kg\t356" in xls
+
+
+def test_an_airlines_answer_to_our_own_mail_after_the_booking_is_news():
+    """Sam's probe, Sun 00:30: the agent asked the airline to cancel a booking; the airline's "booking cancelled" was
+    read as a bid, woke nobody, and tracking later said the shipment should be in transit."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    b = {"team_reference": "SM-78", "deal": "deal-78", "customer": "anna@acme.example", "airline": "Meridian Freightways",
+         "route": "STR-MNL", "transit_days": "3", "booking_reference": "BK-ZB4HK7UX", "via": "portal",
+         "amount": "1594.80 EUR", "status": "confirmed"}
+    store.put("booking-78", "booking", "confirmed", b)
+    store.put("deal-78", "deal", "booked", {"root": 78, "booking": b, "asked": {}})
+    store.put("session-78", "session", "idle", {"root": 78, "task": "customer", "seen": [], "executions": 1, "items": []})
+    ctx = tools.Ctx(f, "session-78", "deal-78", 78, "customer", None)
+    out = tools.mail_carrier(ctx, "meridian-freightways@hackloop.mail", "Cancel BK-ZB4HK7UX",
+                             "Please cancel booking BK-ZB4HK7UX.", None)
+    assert "booked" in out["note"]
+    api._deliver("meridian-freightways@hackloop.mail", api.mailbox, "Re: Cancel BK-ZB4HK7UX",
+                 "Hello,\n\nbooking BK-ZB4HK7UX has been cancelled.\n\nMeridian", out["sent"])
+    run(f)
+    assert "has been cancelled" in store.get("booking-78")["data"]["carrier_status"]["text"]
+    assert "has been cancelled" in json.dumps(store.get("session-78")["data"]["items"])  # the session heard it
+
+
+def test_an_import_is_named_out_of_our_service_not_asked_back():
+    """Sam's probe, Sun 00:30: ORD to FRA was answered "which German departure airport?". We export from Germany: the
+    tool says so, and that it is no question for the customer."""
+    from app.forwarder import normalise
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    s = {"origin_airport": "ORD", "pickup": None, "destination_airport": "FRA",
+         "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+         "lots": [{"pieces": 2, "weight": q(300, "kg"), "volume": q(1.2, "cbm"), "dimensions": None}]}
+    r = normalise(s, kit.world())
+    assert any("out of our service" in x and "into Germany" in x for x in r["missing"])
+    r = normalise({**s, "destination_airport": "LOS"}, kit.world())
+    assert any("not one of our departure airports" in x for x in r["missing"])
+    r = normalise({**s, "origin_airport": "FRA", "destination_airport": "LOS"}, kit.world())
+    assert not r["missing"]
