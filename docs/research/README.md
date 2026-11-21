@@ -18,9 +18,10 @@ Sam approved the tone of the three example mails in `prompts/forwarder.md` (Sat 
 | `pricing.balanced()`, `pricing.quote(..., pickup_rule, balance, unspecified)` | The rules as pure functions, with tests on the live zone-60 trucker bids | unchanged |
 | `prompts/forwarder.md` "How you write", `options()` rows carry `billed_kg` | Writing criteria from the humanizer checklist and three example mails: answer first, no thanks-for-your-request opener (27 of 35 carrier mails have one), one forwarder detail, a close that changes | prompt text only |
 
-Why: `docs/research/pricing.md` (evidence and numbers). The one open rule is which trucker 5U puts into the
-best price: the candidates differ by 88.80 EUR in zone 60, 9 % on a 1000 EUR shipment. Until the board shows
-it, my estimate is `PICKUP_RULE=cheapest` in `.env` (one line, restart).
+Why: `docs/research/pricing.md` (evidence and numbers). **Round 1 (Sat 16:00, `docs/research/round-log.md`)
+settled half of the open rule: a "fastest" request is scored with the fastest trucker (or the 50/50 pick), not
+the cheapest. Leave `PICKUP_RULE` at its default `asked`.** Before the round I estimated `cheapest`; that was
+wrong and would have cost accuracy points.
 
 ## Rules the engine keeps (all in `forwarder.py`, under `get_offers`)
 
@@ -80,8 +81,8 @@ Tests: `test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status`,
 
 ## Open: decided by the first scored rounds, not by us
 
-- Trucker rule (cheapest, 50/50 or the fastest when asked) and the 50/50 formula. My estimate until then:
-  `PICKUP_RULE=cheapest`.
+- "Cheapest" with pickup: cheapest trucker or the 50/50 pick. And the 50/50 formula. Round 1 only showed that
+  "fastest" does not take the cheapest trucker.
 - Whether a quote below the best price is accepted.
 
 `backend/research/rounds.py` (read-only: GET on board and mailbox, no mail, no portal, no gateway) lists per
