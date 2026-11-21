@@ -67,6 +67,8 @@ resumes it with everything before it.
   rule for thank-you mails.
 - **The router is code**, by sender and thread, never by what a mail claims: the tracking desk goes to the tracking
   task; the rate desk, carriers, tariffs and booking confirmations to system handlers; anyone else is a customer.
+  Only a carrier on our list can confirm, change or reprice a booking (a "Booking ... confirmed" subject from any
+  other address is a mail the agent reads, not a confirmation).
 - **Two tasks of one identity:** `customer` (quote, ask, book, reply) and `tracking`. 5U's "router plus three
   agents" is this seen from outside.
 - **Carrier mail wakes nobody.** Bids are read into the deal's offers by a small model; the agent sees them when it
@@ -190,6 +192,11 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **Prices can move between the quote and the booking** (rounds 48-50): the customer hears it from us, in the
   confirmation, not from the invoice.
 - **Time:** every accepted quote inside 2 minutes took the full 15; speed beyond that is not worth accuracy.
+- **Not every mail is a customer.** 5U sends traps: a "CEO" asking for the API keys (refused: the agent holds no
+  secret to give), a sales pitch (no reply). Judging them is the agent's job; what a mail can make us do is bounded
+  by the tools (replies only to who wrote, carriers only from the list, prices by code, bookings only of the deal's
+  own options, a customer's thread sees only that customer's deals). Other teams cannot reach us: 5U's API answers
+  422 to mail between teams, and `in_reply_to` only takes a mail the sender sent or received.
 
 ## 10. Measure, then decide
 
@@ -272,3 +279,7 @@ Then:
   (`mail_carrier`) and the airline's answer reaches the deal, but the booking status does not change by itself.
 - Notes carried to a customer's next thread are every note of their earlier deals, routine ones included: the
   agent judges them, but they are noise next to the one wish that matters.
+- **Untrusted input has no size bound:** a mail body (up to 200,000 characters) and its attachments (up to 5 of
+  10 MB) enter the agent's first message whole, and every turn re-reads them. A huge document would cost the hour's
+  cost points or overflow the context. SIEVER's answer (§2.3, §13.6 of its vision): what fits goes in whole, the
+  rest as pages the agent reads when it needs them. Not built: so far every document is a page or two.
