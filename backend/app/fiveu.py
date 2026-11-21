@@ -45,7 +45,8 @@ class FiveU:
 
     # ---- mailbox -------------------------------------------------------------------------------------------
 
-    poll_gap = 5.0      # seconds between mailbox polls: 5U's limit ("one poll per 5 seconds", Sat 20:30), raised by a 429
+    poll_gap = 5.5      # seconds between mailbox polls: 5U's limit ("one poll per 5 seconds", Sat 20:30) plus 10 % for
+    #                     network jitter (a 5.0 s gap still drew a 429 at 20:40), raised by a 429
     _last_poll = 0.0
 
     def poll(self, since_id: int) -> tuple[list[dict], int]:
@@ -61,7 +62,7 @@ class FiveU:
             except Exception:
                 d = {}
             m = re.search(r"per\s+(\d+(?:\.\d+)?)\s*second", str(d.get("detail", "")))
-            self.poll_gap = max(self.poll_gap, float(m.group(1)) if m else 5.0)
+            self.poll_gap = max(self.poll_gap, (float(m.group(1)) if m else 5.0) * 1.1)
             self._last_poll = time.time()  # the next poll waits a full gap from now
             # we keep to the limit, so a 429 means someone else polls with our team key, or 5U tightened it:
             # an error, so the team hears of it (it costs us time on every reply)
