@@ -36,7 +36,7 @@ easy for 5U to score. Jury criterion 4 ("how human the emails read") and +10 for
 The live version of these rules is the "How you write" part of `backend/app/prompts/forwarder.md`.
 
 - Answer first. Airline and transit time in the first sentence, then the total. No "Thank you for your inquiry":
-  every 5U carrier mail opens like that (35 of 35 in our mailbox are in that register), so it marks a bot.
+  27 of the 35 carrier mails in our mailbox thank us in their first lines, so it marks a bot.
 - Every sentence tells the reader something new. Nothing repeated from their mail.
 - One specific detail a forwarder would add: "airport to airport", who collects the goods, or that the shipment
   is billed at a higher weight (volume weight, or the cheaper next break).
