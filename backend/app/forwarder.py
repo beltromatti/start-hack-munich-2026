@@ -159,6 +159,20 @@ class Forwarder:
         self._wait(deal_id, wait)
         return self.options(deal_id, preference)
 
+    def _ask(self, deal_id: str, c: kit.Carrier, ask: Callable[[], int], asked: dict, not_asked: list) -> None:
+        """One request that cannot be sent (5U's send limit, "limits may be tuned"; a 5xx; our own cap per
+        recipient) used to end the whole collection: the carriers already mailed were not recorded as asked, the
+        truckers and the portal were never asked, and get_offers answered the agent with an error. Each request
+        stands alone: a failed one is logged and named to the agent (`not_asked`, with why), who can still mail
+        that carrier, and everyone else is asked."""
+        try:
+            asked[str(ask())] = c.email
+        except Exception as e:
+            store.log("bids", "error", f"could not ask {c.name}: {e}"[:300], run_id=deal_id)
+            if not any(x["email"] == c.email for x in not_asked):
+                not_asked.append({"carrier": c.name, "email": c.email,
+                                  "why": f"our request to it could not be sent ({str(e)[:140]})"})
+
     def _wait(self, deal_id: str, wait: float) -> None:
         end = time.time() + max(0.0, float(wait))
         while time.time() < end and waiting_for(store.get(deal_id)["data"]):
@@ -192,10 +206,10 @@ class Forwarder:
             if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
                 weights += pricing.breaks_to_try(cw)
             for wt in weights:
-                asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
+                self._ask(deal_id, c, lambda: self.ask_airline(deal_id, c, o, d, wt, cbm, req), asked, not_asked)
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
-                asked[str(self.ask_trucker(deal_id, c, req))] = c.email
+                self._ask(deal_id, c, lambda: self.ask_trucker(deal_id, c, req), asked, not_asked)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "not_asked": not_asked}))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
@@ -208,8 +222,9 @@ class Forwarder:
                 above = ([nb] if nb is not None and nb / cw < Decimal("1.5") else []) if breaks \
                     else pricing.breaks_to_try(cw)
                 for wt in [cw] + above:
-                    asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
+                    self._ask(deal_id, c, lambda: self.ask_airline(deal_id, c, o, d, wt, cbm, req), asked, not_asked)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
+                                                       "not_asked": not_asked,
                                                        "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
         store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",
                   run_id=deal_id)

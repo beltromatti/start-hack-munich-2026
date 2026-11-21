@@ -783,3 +783,27 @@ def test_a_bid_without_a_readable_time_is_marked_and_cannot_be_the_fast_one():
     unread = f.offer(read, {"id": 5, "sender": trucker.email, "body": "Our total is 176.71 EUR, we collect once the driver is back."}, trucker)
     stated = f.offer(read, {"id": 6, "sender": trucker.email, "body": "Our total is 176.71 EUR. Pickup time: 3 hours."}, trucker)
     assert unread.extra.get("time_unknown") is True and "time_unknown" not in stated.extra and stated.days > 0
+
+
+def test_a_request_that_cannot_be_sent_does_not_end_the_price_collection():
+    """5U's send limit is 60 mails a minute and "may be tuned". One refused mail raised out of the collection:
+    the mails already sent were not recorded, the portal was never read, get_offers answered with an error."""
+    class Limited(FakeFiveU):
+        refused = None
+
+        def send(self, to, subject, body, in_reply_to=None):
+            if to == self.refused:
+                raise RuntimeError(f"send to {to} failed: 429 rate limit exceeded")
+            return super().send(to, subject, body, in_reply_to)
+
+    api = Limited()
+    kit.load(api)
+    api.refused = kit.world().email_airlines("FRA", "ORD")[0].email
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    d = store.get(f"deal-{rfq['id']}")["data"]
+    assert len(to(api, "anna@acme.example")) == 1 and d["quote"]                      # the quote still goes out
+    assert [x["email"] for x in d["not_asked"]] == [api.refused] and "could not be sent" in d["not_asked"][0]["why"]
+    assert d["asked"] and api.refused not in d["asked"].values()                      # the others were asked and recorded
+    assert any(o["source"] == "portal" for o in d["offers"])                           # and the portal was read
