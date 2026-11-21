@@ -3,10 +3,13 @@
 Run: uv run uvicorn app.main:app --port 8000   (make api / make live)
 """
 import json
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import agent, store
 from .config import settings
@@ -144,3 +147,9 @@ def board() -> dict:
 @app.get("/api/board/history")
 def board_history(limit: int = 200) -> list[dict]:
     return [r["data"] for r in store.records("board", limit=limit)]
+
+
+# The sessions UI, built (frontend/dist): served by the same process on a server (Docker), so one port is enough.
+_dist = Path(os.getenv("FRONTEND_DIST", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
+if _dist.is_dir():
+    app.mount("/", StaticFiles(directory=_dist, html=True), name="ui")
