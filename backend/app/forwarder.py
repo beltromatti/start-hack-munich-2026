@@ -218,6 +218,7 @@ class Forwarder:
                 rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
                              "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
                              "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
+                             "billed_kg": float(a.billed_kg) if a.billed_kg is not None else None,
                              "carrier_note": (a.extra or {}).get("note")})
         rec = {}
         for pref in ("cheapest", "fastest", "balanced"):
