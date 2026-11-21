@@ -160,3 +160,10 @@ Rates are still published on the portal page.` (that page is behind a bot challe
 airlines asked by mail answered in 30 s with prices and `R-...` references, the quote went out in 42 s, and
 `POST /v1/portal/bookings` with the mail's reference still booked (201). Change #3 of `docs/likely-changes.md`,
 handled as built.
+
+**The attached document wins over the mail (round 33, rejected too_high):** the mail said 5 pieces of
+120x40x116 cm, 2.78 cbm; the attached packing specification said 80 cm high, 1.92 cbm. 5U priced the document
+(about 321 kg chargeable); we priced the mail (billed 500 kg) and were rejected. Same kind as rounds 10-11 (the
+document declared DG, the mail said non-DG). Since 19:17 the prompt says: documents are measured and checked,
+price from them and say so; ask only when the document shows something no one can fly without papers. Replayed
+on round 33 with the real texts: priced from 1.92 cbm, 320.64 kg.
