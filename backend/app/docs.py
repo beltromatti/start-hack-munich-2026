@@ -9,6 +9,8 @@ import io
 AUDIO = (".mp3", ".wav", ".m4a", ".ogg", ".oga", ".aac", ".flac", ".webm", ".mp4", ".mpga", ".mpeg")
 PICTURE = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
 CONVERTED = (".tif", ".tiff", ".bmp", ".heic", ".heif")  # pictures the model does not take as they are: made png first
+MATERIAL = 20_000   # bytes: a picture inside a document from this size on is content (a scan, a photo), below a logo
+MOST = 12           # pictures read per file: each is a model call of a few seconds, and a quote has two minutes
 
 
 def kind(filename: str, raw: bytes) -> str:
@@ -69,7 +71,7 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
                 for r in ws.iter_rows(values_only=True):
                     if any(c is not None for c in r):
                         rows.append("\t".join("" if c is None else str(c) for c in r))
-            return "\n".join(rows)
+            return "\n".join(rows + _inside(raw, "xl/media/", run_id))
         if name.endswith(".xls"):  # the old Excel format, on 5U's list of attachment types (Sam, Sun 00:33)
             import xlrd
             wb = xlrd.open_workbook(file_contents=raw)
@@ -89,7 +91,7 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
             for t in d.tables:
                 for row in t.rows:
                     parts.append("\t".join(c.text for c in row.cells))
-            return "\n".join(parts)
+            return "\n".join(parts + _inside(raw, "word/media/", run_id))
         ext = name
         if ext in PICTURE:
             from . import llm
@@ -105,7 +107,7 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
         if name.endswith(".eml") and depth < 2:
             return _eml(raw, run_id, depth)
         if ext in (".pptx", ".odf", ".odt", ".ods", ".odp"):
-            return _office_xml(raw)
+            return "\n".join([_office_xml(raw)] + _inside(raw, "ppt/media/" if ext == ".pptx" else "Pictures/", run_id))
         if ext == ".rtf":
             return _rtf(raw)
         if ext in (".ole", ".doc", ".msg", ".ppt"):
@@ -146,19 +148,48 @@ def pdf(title: str, lines: list[str]) -> bytes:
 def _pdf(filename: str, raw: bytes, run_id: str | None) -> str:
     """A pdf's text; a page without text (a scan) is read from its pictures, like a photo."""
     from pypdf import PdfReader
-    out = []
+    out, read, skipped = [], 0, 0
     for i, page in enumerate(PdfReader(io.BytesIO(raw)).pages, 1):
-        t = (page.extract_text() or "").strip()
-        if len(t) < 200:  # a scan: its text is in its pictures, also under a letterhead (pypdf needs Pillow for them)
-            from . import llm
-            try:
-                for img in page.images:
-                    mime = "image/png" if img.name.lower().endswith(".png") else "image/jpeg"
-                    t += f"\n[page {i}, scanned, as read]\n" + llm.look(mime, img.data, run_id=run_id)
-            except Exception as e:  # one page we cannot see does not cost the pages we can
-                t += f"\n[page {i}: could not read its pictures: {e!r}]"
+        try:
+            t = (page.extract_text() or "").strip()
+        except Exception as e:  # one page that cannot be read costs that page, not the ones before it
+            out.append(f"[page {i} could not be read: {e!r}]")
+            continue
+        scan = len(t) < 200  # a scan: its text is in its pictures, also under a letterhead (pypdf needs Pillow)
+        from . import llm
+        try:  # on a page with text of its own, only a picture big enough to be content (a pasted scan), not a logo
+            for img in getattr(page, "images", []) or []:
+                if not scan and len(img.data) < MATERIAL:
+                    continue
+                if read >= MOST:
+                    skipped += 1
+                    continue
+                read += 1
+                mime = "image/png" if img.name.lower().endswith(".png") else "image/jpeg"
+                t += f"\n[page {i}, {'scanned' if scan else 'picture'}, as read]\n" + llm.look(mime, img.data, run_id=run_id)
+        except Exception as e:  # one page's picture must not cost the text of the others
+            t += f"\n[page {i}: its picture could not be read: {e!r}]"
         out.append(t)
+    if skipped:
+        out.append(f"[{skipped} more pictures in {filename} were not read: only the first {MOST} are]")
     return "\n".join(out)
+
+
+def _inside(raw: bytes, folder: str, run_id: str | None) -> list[str]:
+    """The pictures inside an office file (a scan or a photo pasted into a Word letter or a workbook): the text of
+    the file says "see below", the numbers are in the picture. Logos are left out by size."""
+    import zipfile
+    out = []
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            big = [n for n in z.namelist() if n.startswith(folder) and z.getinfo(n).file_size >= MATERIAL]
+            for n in big[:MOST]:
+                out.append(text(n.rsplit("/", 1)[-1], z.read(n), run_id, depth=2).replace("[picture ", "[picture inside the file: ", 1))
+            if len(big) > MOST:
+                out.append(f"[{len(big) - MOST} more pictures inside the file were not read: only the first {MOST} are]")
+    except Exception as e:
+        out.append(f"[the pictures inside the file could not be read: {e!r}]")
+    return out
 
 
 def _png(raw: bytes, ext: str) -> bytes:

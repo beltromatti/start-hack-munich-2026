@@ -1255,3 +1255,33 @@ def test_dates_units_and_text_files_as_people_write_them():
     wide = "Gross weight kg;320\nVolume cbm;1,5\nDestination;São Paulo".encode("utf-16-le")
     assert docs.text("details.csv", wide) == "Gross weight kg;320\nVolume cbm;1,5\nDestination;São Paulo"
     assert docs.text("details.csv", b"Gross weight kg;320\nVolume cbm;1,5") == "Gross weight kg;320\nVolume cbm;1,5"
+
+
+def test_a_picture_inside_a_document_is_read_when_it_is_content():
+    """A Word letter that says "see the shipping particulars below" with a scan pasted in, a pdf page with a paragraph
+    above a pasted scan: the reader passed the words on and left the picture, where the weight or the price was
+    (ergebnis_8_kanten.md, cases 1 and 7). A logo is still not read: every picture read is a model call."""
+    import io
+    import os
+    import zlib
+    from docx import Document
+    from PIL import Image
+    from app import docs, llm
+    scan, logo = io.BytesIO(), io.BytesIO()
+    Image.frombytes("RGB", (200, 200), os.urandom(200 * 200 * 3)).save(scan, "PNG")      # noise: a big file, like a scan
+    Image.new("RGB", (40, 20), (200, 30, 30)).save(logo, "PNG")
+    assert len(scan.getvalue()) >= docs.MATERIAL > len(logo.getvalue())
+    letter = Document()
+    letter.add_paragraph("See the attached shipping particulars.")
+    letter.add_picture(io.BytesIO(logo.getvalue()))
+    letter.add_picture(io.BytesIO(scan.getvalue()))
+    word = io.BytesIO()
+    letter.save(word)
+    seen, real = [], llm.look
+    llm.look = lambda mime, raw, run_id=None: seen.append(len(raw)) or "FRA-ASU, 100 kg, 0.1 cbm"
+    try:
+        out = docs.text("request.docx", word.getvalue())
+        assert out.startswith("See the attached shipping particulars.") and "FRA-ASU, 100 kg, 0.1 cbm" in out
+        assert len(seen) == 1 and seen[0] >= docs.MATERIAL                                  # the scan, not the logo
+    finally:
+        llm.look = real
