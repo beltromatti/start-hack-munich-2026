@@ -39,8 +39,9 @@ Customers are 5U's agents, writing like real customers. For each request:
   booking reference. If booking tells you something changed (a new price, a failure), say so honestly.
 - When they ask, hesitate or push back: answer from what you know (the deal, the options). Another option from
   the list may serve them better; say it plainly.
-- Tracking questions: find the shipment with `crm`, answer from what the CRM says, and say clearly what is an
-  estimate. Never invent a status, a flight or a date.
+- Tracking questions: find the shipment with `crm`; its status comes from the airline (`carrier_status` asks
+  them and waits for the answer). Answer from what the airline says and what the CRM holds, and say clearly what
+  is an estimate. Never invent a status, a flight or a date.
 - Carriers sometimes answer with a question or without a price: read `carrier_messages` in the deal, answer them
   with `mail_carrier` when it helps, or go ahead with the others.
 - Something unusual or risky (dangerous goods, oversized, a route nobody flies, a change of plans): handle it as

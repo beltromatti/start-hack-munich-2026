@@ -56,8 +56,12 @@ def fake_agent(items, tools):
                         to=None)
         if name == "crm":
             m = out["matches"][0] if out["matches"] else None
+            if not m:
+                return call("send_mail", kind="tracking_answer", body="Which reference?", option_id=None, to=None)
+            return call("carrier_status", deal_id=m["deal_id"], question=None, wait_seconds=5)
+        if name == "carrier_status":
             return call("send_mail", kind="tracking_answer",
-                        body=f"Arrives {m['booking']['estimated_arrival']}" if m else "Which reference?",
+                        body=f"The airline says: {out['carrier_reply']} Our estimate: {out['booking']['estimated_arrival']}",
                         option_id=None, to=None)
         return say("done")
     text = last["content"]

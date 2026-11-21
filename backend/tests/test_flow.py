@@ -59,7 +59,8 @@ def test_deal_quote_book_track():
     api.customer("tracking@hackloop.mail", f"Where is {ref}?", f"Hello, where is shipment {ref}?")
     run(f)
     answers = to(api, "tracking@hackloop.mail")
-    assert len(answers) == 1 and "Arrives" in answers[0]["body"]
+    assert len(answers) == 1 and "in transit over the Atlantic" in answers[0]["body"]
+    assert "Atlantic" in store.get(f"booking-{rfq['id']}")["data"]["carrier_status"]["text"]
 
 
 def test_door_to_port_waits_for_truckers():
