@@ -5,7 +5,8 @@ install:
 api:           # API only, no forwarder loop (safe on any laptop)
 	cd backend && uv run uvicorn app.main:app --reload --port 8000
 live:          # THE production forwarder: polls the real mailbox and replies. Run on ONE machine only.
-	cd backend && WORKER=1 uv run uvicorn app.main:app --port 8000
+	# restarts by itself: a crash, or `pkill -f "uvicorn app.main"` to deploy new code, brings it back in 2 s
+	cd backend && while true; do WORKER=1 uv run uvicorn app.main:app --port 8000; echo "restarting"; sleep 2; done
 web:
 	cd frontend && npm run dev
 test:
