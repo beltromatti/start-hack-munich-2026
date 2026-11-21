@@ -914,7 +914,7 @@ def test_places_are_understood_as_their_people_write_them():
     # only the first digits of a postcode: the truckers still get five (they answer nothing else)
     sent = []
     f = Sync(api)
-    f.mail_carrier = lambda deal_id, to, subject, body, in_reply_to=None: sent.append(body) or 1
+    f.mail_carrier = lambda deal_id, to, subject, body, in_reply_to=None, **kw: sent.append(body) or 1
     trucker = next(c for c in w.carriers if c.kind == "trucker")
     f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
     f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80469", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
@@ -1001,3 +1001,45 @@ def test_a_picture_inside_a_document_is_read_when_it_is_content():
         assert len(seen) == 1 and seen[0] >= docs.MATERIAL                                  # the scan, not the logo
     finally:
         llm.look = real
+
+
+def test_what_the_booked_airline_answers_in_the_deals_threads_is_news_about_the_booking():
+    """Probe, Sun 00:30 (real model, fake 5U): the customer cancelled a booked shipment and the agent asked the
+    airline with mail_carrier. Its "booking BK-MAIL-25 is cancelled as requested" came back as a bid, was read as
+    "no price" and woke nobody: the customer never heard, and tracking answered "should now be in transit"."""
+    from decimal import Decimal
+    from app import tools
+    from app.forwarder import is_confirmation, waiting_for
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    api.customer("anna@acme.example", "Re: Quote FRA to ORD", "Great, go ahead and book it.",
+                 in_reply_to=to(api, "anna@acme.example")[0]["id"])
+    run(f, 6)
+    deal_id, booking_id, session_id = f"deal-{rfq['id']}", f"booking-{rfq['id']}", f"session-{rfq['id']}"
+    b = store.get(booking_id)["data"]
+    airline = kit.world().carrier_by_name(b["airline"])
+    assert b["status"] == "confirmed" and "airline has written" not in tools.timeline(b)["expected_stage_now"]
+    ctx = tools.Ctx(f, session_id, deal_id, rfq["id"], "customer", None)
+    ask = tools.mail_carrier(ctx, airline.email, f"Cancellation request {b['booking_reference']}", "Please cancel.", None)
+    offers = store.get(deal_id)["data"]["offers"]
+    api._deliver(airline.email, api.mailbox, "Re: Cancellation request", f"Hello,\n\nbooking {b['booking_reference']} "
+                 "is cancelled as requested. A cancellation fee of 150.00 EUR applies.\n", ask["sent"])
+    run(f)
+    after = store.get(booking_id)["data"]
+    assert "cancelled as requested" in after["carrier_status"]["text"]          # on the booking, for crm and tracking
+    assert after["amount"] == b["amount"] and "price_changed" not in after     # a fee is not the flight's price
+    assert "cancelled as requested" in json.dumps(store.get(session_id)["data"]["items"])  # the session heard it
+    d = store.get(deal_id)["data"]
+    assert d["offers"] == offers and waiting_for(d) == []                       # not an offer; nobody waits for it
+    assert "the airline has written since" in tools.timeline(after)["expected_stage_now"]
+    # the deal is priced again after a change: the same airline's answer to a price request is still an offer
+    f.ask_airline(deal_id, airline, "FRA", "ORD", Decimal(410), None, d["request"])
+    run(f)
+    assert len(store.get(deal_id)["data"]["offers"]) == len(offers) + 1
+    assert store.get(booking_id)["data"]["carrier_status"] == after["carrier_status"]
+    # news written into the confirmation's thread carries its subject and confirms nothing
+    assert not is_confirmation({"subject": "Re: Booking BK-1 confirmed", "body": "Your booking BK-1 is cancelled."})
+    assert is_confirmation({"subject": "Booking BK-1 confirmed", "body": "Your booking BK-1 is confirmed."})

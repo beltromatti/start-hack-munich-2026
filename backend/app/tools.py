@@ -319,7 +319,7 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
     # in the airline's own booking thread when it confirmed by mail (its desk knows the booking there)
     thread = b.get("confirmation_mail") or air.get("reply_mail")
     subject = f"Re: Booking {ref} confirmed" if b.get("confirmation_mail") else f"Shipment status {ref}"
-    mid = ctx.fw.mail_carrier(deal_id, to, subject, body, in_reply_to=thread)
+    mid = ctx.fw.mail_carrier(deal_id, to, subject, body, in_reply_to=thread, kind="status_request")
     end = time.time() + max(0.0, float(wait_seconds))
     reply = None
     while time.time() < end:
@@ -391,7 +391,9 @@ def _summary(rec: dict, b: dict | None) -> dict:
 
 def timeline(booking: dict) -> dict:
     """Where a booked shipment should be now, from our dates (pricing.schedule, the same the quote used). Estimates,
-    and the agent says so. The airline's word, when it gives one, wins (carrier_status)."""
+    and the agent says so. The airline's word, when it gives one, wins (carrier_status): our dates are from the
+    booking, so what the airline wrote after confirming it (a delay, a change, a cancellation) is not in them, and
+    the stage says so instead of standing next to that news as if nothing had happened."""
     from datetime import datetime, timezone
     try:
         booked = datetime.fromtimestamp(booking["booked_at"], timezone.utc)
@@ -404,6 +406,8 @@ def timeline(booking: dict) -> dict:
     stage = ("booked, waiting for the goods to be ready" + (" and collected" if pickup_h else "")
              if now < ready else "collected, on its way to the airport" if now < departure
              else "in transit" if now < arrival else "arrived")
+    if ((booking.get("carrier_status") or {}).get("mail") or 0) > (booking.get("confirmation_mail") or 0):
+        stage += " by our dates at booking; the airline has written since (carrier_status)"
     return {"ready_date": ready.strftime(pricing.DATE), "estimated_departure": departure.strftime(pricing.DATE),
             "estimated_arrival": arrival.strftime(pricing.DATE), "expected_stage_now": stage}
 

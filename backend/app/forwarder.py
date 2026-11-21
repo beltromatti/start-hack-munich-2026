@@ -303,7 +303,8 @@ class Forwarder:
                 f"Ready: {req.get('ready_date') or 'now'}\n\n"
                 "Please send your all-in total, currency, transit time, rate reference and validity.\n\n"
                 f"Thanks,\n{settings.persona}, {settings.company}")
-        mid = self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {kg_text(billed)} kg", body)
+        mid = self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {kg_text(billed)} kg", body,
+                                kind="rate_request")
         store.kv_set(f"bidweight:{mid}", kg_text(billed))
         return mid
 
@@ -321,13 +322,15 @@ class Forwarder:
                 f"Please send your total, currency, pickup time and offer reference.\n\nThanks,\n"
                 f"{settings.persona}, {settings.company}")
         return self.mail_carrier(deal_id, c.email, f"Pickup quote zone {req['pickup_zone']} to {z.get('airport', '')}",
-                                 body)
+                                 body, kind="rate_request")
 
-    def mail_carrier(self, deal_id: str, to: str, subject: str, body: str, in_reply_to: int | None = None) -> int:
-        """Every mail to a carrier belongs to a deal: its answer comes back to that deal's offers."""
+    def mail_carrier(self, deal_id: str, to: str, subject: str, body: str, in_reply_to: int | None = None,
+                     kind: str = "to_carrier") -> int:
+        """Every mail to a carrier belongs to a deal: its answer comes back to that deal. kind is what we asked
+        (rate_request, status_request, anything else): the answer is routed by it, not by its own words."""
         sent = self.api.send(to, subject, body, in_reply_to=in_reply_to)
         store.kv_set(f"bidreq:{sent['id']}", deal_id)
-        store.save_mail(sent, "out", "to_carrier", handled=True)
+        store.save_mail(sent, "out", kind, handled=True)
         store.log("bids", "mail_out", f"to {to}: {subject}", {"mail": sent["id"], "body": body}, run_id=deal_id)
         return sent["id"]
 
@@ -442,9 +445,13 @@ class Forwarder:
         m = self.with_attachments(m)
         rec = store.get(deal_id)
         booked = (rec or {}).get("data", {}).get("booking") or {}
-        if booked and (is_confirmation(m) or (m.get("in_reply_to") and m["in_reply_to"] == booked.get("request_mail"))):
+        if booked and (is_confirmation(m) or (m.get("in_reply_to") and m["in_reply_to"] == booked.get("request_mail"))
+                       or about_booking(m, booked)):
             # the airline answering our booking (its confirmation, or its reply to our booking mail) is booking news,
             # not an offer: round 51's "thank you for your booking ... Price: 4466.52" became a 0-day option
+            if str(m.get("in_reply_to")) in rec["data"].get("asked", {}):  # the answer get_offers may be waiting for
+                store.update(deal_id, lambda r: (r["status"], {**r["data"],
+                                                               "replied": r["data"].get("replied", []) + [m["sender"]]}))
             self.on_booking_mail(m, store.get(f"booking-{rec['data']['root']}"))
             return
         carrier = kit.world().carrier_by_email(m["sender"])
@@ -892,11 +899,28 @@ def kg_text(kg: Decimal) -> str:
 
 
 def is_confirmation(m: dict) -> bool:
-    """An airline confirming a booking ('Booking BK-... confirmed', '... is confirmed'), not news after it."""
-    return bool(re.match(r"^(?:re:\s*)?booking\s+\S+\s+confirmed", m.get("subject") or "", re.I)
-                and not re.search(r"to quote we need", m.get("body") or "", re.I)) or \
-        bool(re.search(r"\b(?:booking|reservation)\b[^.\n]*\b(?:is\s+)?confirmed\b", m.get("body") or "", re.I)
-             and not re.search(r"to quote we need|delay|cancel", m.get("body") or "", re.I))
+    """An airline confirming a booking ('Booking BK-... confirmed', '... is confirmed'), not news after it: a delay
+    or a cancellation written into the confirmation's thread carries its subject and confirms nothing."""
+    subject, body = m.get("subject") or "", m.get("body") or ""
+    return not re.search(r"to quote we need|delay|cancel", body, re.I) and bool(
+        re.match(r"^(?:re:\s*)?booking\s+\S+\s+confirmed", subject, re.I)
+        or re.search(r"\b(?:booking|reservation)\b[^.\n]*\b(?:is\s+)?confirmed\b", body, re.I))
+
+
+def about_booking(m: dict, booked: dict) -> bool:
+    """Once a deal is booked, what the airline of that booking writes in the deal's threads is news about the
+    booking (its answer to a cancellation, a change, a request for documents), not an offer. Two answers keep their
+    own readers, told apart by what our mail asked, not by their words: a price we asked for is an offer (a deal is
+    priced again after a change), and carrier_status waits for the answer to its status question itself. The desks'
+    quote form, their answer to whatever they do not handle, is news of nothing."""
+    airline = kit.world().carrier_by_name(booked.get("airline") or "")
+    ours = (store.mail(m["in_reply_to"]) if m.get("in_reply_to") else None) or {}
+    # what we asked: the kind our mail was stored with, or, for a mail sent before kinds were stored (a deploy with
+    # deals in flight), the subject we gave it ourselves
+    asked = ours.get("kind") in ("rate_request", "status_request") or bool(re.match(
+        r"(?:re:\s*)*(?:rate request|pickup quote|shipment status)\b", ours.get("subject") or "", re.I))
+    return bool(airline and airline.email.lower() == m["sender"].lower() and not asked
+                and not re.search(r"to quote we need", m.get("body") or "", re.I))
 
 
 def booking_for(text: str) -> dict | None:
