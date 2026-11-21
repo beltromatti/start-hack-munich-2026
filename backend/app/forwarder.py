@@ -71,7 +71,7 @@ class Forwarder:
         if now - self._last_portal > 900:
             self._last_portal = now
             self.submit("portal", kit.refresh_portal, self.api)
-        if now - self._last_board > 60:
+        if now - self._last_board > 30:
             self._last_board = now
             self.submit("board", self.watch_board)
 
@@ -457,14 +457,22 @@ class Forwarder:
     # ---- watcher: how the field judges us ------------------------------------------------------------------
 
     def watch_board(self) -> None:
-        board = self.api.board_me()
-        store.kv_set("board_me", json.dumps(board))
+        """How the field judges us, every 30 s: our verdict per request, every team's standing, the last rounds.
+        Every change is kept, so we can learn from it (and the UI shows it)."""
+        me, public = self.api.board_me(), self.api.board()
+        store.kv_set("board_me", json.dumps(me))
+        store.kv_set("board", json.dumps(public))
+        snap = json.dumps({"me": me, "public": public}, sort_keys=True)
+        if snap != store.kv_get("board_last"):
+            store.kv_set("board_last", snap)
+            store.put(f"board-{int(time.time())}", "board", "snapshot", {"me": me, "public": public, "at": time.time()})
         seen = set((store.kv_get("board_seen") or "").split(","))
-        for r in board.get("requests", []):
+        for r in me.get("requests", []):
             key = f"{r.get('round')}:{r.get('verdict')}"
             if key not in seen and r.get("verdict") not in ("open", "pending"):
                 seen.add(key)
-                store.log("watcher", "info", f"round {r.get('round')}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
+                store.log("watcher", "info", f"round {r.get('round')}: {r.get('verdict')} {r.get('reason') or ''}"[:300],
+                          r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
         anomaly.check()  # a market change, seen before failed quotes pile up (app/anomaly.py)
 

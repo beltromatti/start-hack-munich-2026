@@ -105,6 +105,10 @@ class FakeFiveU:
         self.bookings[rate_id] = b
         return 201, b
 
+    def board(self) -> dict:
+        return {"frozen_at": None, "overview": {"rounds_sent": 0, "teams": 1, "accepted": 0, "bookings": 0},
+                "ranking": [], "bookings": [], "rounds": []}
+
     def board_me(self) -> dict:
         return {"team": "start-milan", "requests": [], "bookings": list(self.bookings.values())}
 
