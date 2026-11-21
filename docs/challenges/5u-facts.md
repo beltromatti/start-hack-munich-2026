@@ -233,3 +233,15 @@ cheapest trucker, and all three got accuracy 45. 5U's best price uses the same t
 trucker collects in 31 h, Lumen flies 3 days: our schedule (09:00 on the ready date + pickup hours + transit days)
 puts it on 1 Dec 16:00, on the deadline. Quoted as meeting it, accepted (10 of 13). A pickup is not rounded up
 to whole days by 5U.
+
+**New kinds, Sun 23:38-00:00 (rounds 86-89):**
+- The goods change seconds after our quote ("the final packing list came in", rounds 86, 87): re-priced and
+  re-quoted, booked at the new price, both accepted.
+- A cancellation after the booking (round 88, "our buyer has withdrawn the order"): the portal has no cancel, and the
+  airline's desk answered the cancel mails with its quote form twice, then, after the agent insisted that it is a
+  booked shipment, "We acknowledge your request to cancel ... our bookings team must review it". The airlines are
+  agents too: a clear, insisting mail gets through. The agent kept the customer informed at each step.
+- Two shipments in one mail, "a separate all-in price for each ... in the same reply" (round 89, GRU and TLV):
+  quoted with one total line per shipment; "book the first one now, the second later". The booking record took
+  the route and weight of the last pricing (fixed by hand; since 23:58 each option carries its own shipment and
+  each booking its own reference, SM-<root>-2 for the next).
