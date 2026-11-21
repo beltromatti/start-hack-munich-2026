@@ -551,3 +551,11 @@ def test_only_a_carrier_on_our_list_can_confirm_or_reprice_a_booking():
     assert f.classify(fake) == "customer"
     real = {**fake, "sender": "nova-atlas-cargo@hackloop.mail"}
     assert kit.world().carrier_by_email(real["sender"]) and f.classify(real) == "booking"
+
+
+def test_a_reference_read_with_words_around_it_is_kept_as_its_id():
+    from app.forwarder import clean_reference
+    assert clean_reference("R-IR61CclGsFVVd1un when booking.") == "R-IR61CclGsFVVd1un"
+    assert clean_reference("R--Bhl2SbrPA2LipP9") == "R--Bhl2SbrPA2LipP9"  # a valid id is kept as written
+    assert clean_reference("TRK-5150") == "TRK-5150" and clean_reference("Q-2026/11/0034") == "Q-2026/11/0034"
+    assert clean_reference(None) is None

@@ -463,7 +463,7 @@ class Forwarder:
         # a carrier answering for itself is named as in the carrier list (its mail bid and its sheet are one
         # carrier); the rate desk names the airlines it lists
         name = carrier.name if carrier else (o.get("carrier") or m["sender"])
-        return Offer("pickup" if trucker else "air", name, total, days, "email", o.get("reference"),
+        return Offer("pickup" if trucker else "air", name, total, days, "email", clean_reference(o.get("reference")),
                      reply_mail=m["id"], email=m["sender"] if carrier else None,
                      extra={"valid_until": o.get("valid_until"), "note": o.get("note")})
 
@@ -716,6 +716,16 @@ def booking_for(text: str) -> dict | None:
         if any(x and x in text for x in (b.get("rate_id"), b.get("team_reference"), b.get("booking_reference"))):
             return rec
     return None
+
+
+def clean_reference(ref: str | None) -> str | None:
+    """The carrier's reference as the id it is: "Please quote R-IR61CclGsFVVd1un when booking." came back from the
+    reader as "R-IR61CclGsFVVd1un when booking.", which the portal would refuse as a rate id. Only a reference with
+    words around it is cut to its id; one without spaces is kept as written, whatever its format."""
+    if not ref or " " not in ref.strip():
+        return ref.strip() if ref else ref
+    m = re.search(r"\b[A-Za-z]{1,5}-[A-Za-z0-9_-]{3,}", ref)
+    return m.group(0) if m else ref.strip()
 
 
 def booked_air(b: dict) -> tuple[Decimal, Decimal] | None:
