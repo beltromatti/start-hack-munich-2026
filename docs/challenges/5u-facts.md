@@ -137,7 +137,10 @@ Regression test: `tests/test_pricing.py::test_balanced_ratio_trucker_matches_the
   `40 x (1 - spend / 0.10 USD)`, spend = all gateway spend of the hour / accepted quotes of the hour. Our own
   register gives the same number (16-17 UTC: 0.0293 USD / 8 accepted = 0.0037 USD). A lost round still spends and
   divides by fewer quotes, so it lowers everyone's cost points that hour.
-- **tracking**: 10 per booked shipment asked about (once 5, round 7).
+- **tracking**: 10 per booked shipment asked about; 5 on rounds 7, 32 and 59. Checked at 22:10 against all 49
+  tracked rounds: not the language (German answers got 10 in rounds 2 and 27), not the register ("Hello Anna"
+  got 10 in 29 and 38), not the weekday, the dates, the pickup or 5U's booking status (all `confirmed`). What
+  5U's check missed is not visible from our side.
 - **humanity**: 10 on rounds 1, 4, 5, 8 (the jury's pick, per round).
 - **booking**: always 0.0, by design (5U, asked by Jan at 18:40): booking earns no points itself, but only a booked
   shipment gets the tracking question (+10). Round 10 was accepted and never booked (the DG papers never came), so
