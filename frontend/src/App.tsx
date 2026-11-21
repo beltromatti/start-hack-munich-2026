@@ -1,86 +1,78 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Board, Deal, DealRow, Health, Usage, get } from "./api";
+import { DealView } from "./DealView";
+import { BoardPane, DealList } from "./Side";
+import { usd } from "./format";
 
-type Event = {
-  id: number; ts: number; run_id: string | null; agent: string; kind: string;
-  summary: string; data: unknown; tokens_in: number; tokens_out: number;
-};
-type Usage = { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };
-type Health = { ok: boolean; worker: boolean; llm: string; models: { parse: string; bid: string; write: string } };
+const TEAM = "start-milan";
 
-const get = <T,>(path: string): Promise<T> => fetch(path).then((r) => r.json());
-const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+function usePoll<T>(path: string | null, ms: number): [T | null, boolean, () => void] {
+  const [data, setData] = useState<T | null>(null);
+  const [ok, setOk] = useState(true);
+  const load = useCallback(() => {
+    if (!path) return;
+    get<T>(path).then((d) => { setData(d); setOk(true); }).catch(() => setOk(false));
+  }, [path]);
+  useEffect(() => {
+    setData(null);
+    load();
+    const t = setInterval(load, ms);
+    return () => clearInterval(t);
+  }, [load, ms]);
+  return [data, ok, load];
+}
 
 export default function App() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [usage, setUsage] = useState<Usage | null>(null);
-  const [health, setHealth] = useState<Health | null>(null);
-  const [run, setRun] = useState<string | null>(null);
-  const [offline, setOffline] = useState(false);
+  const [deals, online] = usePoll<DealRow[]>("/api/deals", 2000);
+  const [health] = usePoll<Health>("/api/health", 10000);
+  const [usage] = usePoll<Usage>("/api/usage", 5000);
+  const [board] = usePoll<Board>("/api/board", 10000);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [deal, , reload] = usePoll<Deal>(selected ? `/api/deals/${selected}` : null, 1500);
 
   useEffect(() => {
-    let last = 0;
-    const poll = async () => {
-      try {
-        const fresh = await get<Event[]>(`/api/events?since=${last}`);
-        if (fresh.length) {
-          last = fresh[fresh.length - 1].id;
-          setEvents((old) => [...old, ...fresh].slice(-1000));
-        }
-        setUsage(await get<Usage>("/api/usage"));
-        setOffline(false);
-      } catch {
-        setOffline(true);
-      }
-    };
-    get<Health>("/api/health").then(setHealth).catch(() => setOffline(true));
-    poll();
-    const t = setInterval(poll, 2000);
-    return () => clearInterval(t);
-  }, []);
+    if (!selected && deals?.length) setSelected(deals[0].id);
+  }, [deals, selected]);
 
-  const runs = useMemo(() => {
-    const m = new Map<string, Event[]>();
-    for (const e of events) if (e.run_id) m.set(e.run_id, [...(m.get(e.run_id) ?? []), e]);
-    return [...m.entries()].reverse();
-  }, [events]);
-  const shown = run ? events.filter((e) => e.run_id === run) : events;
+  const quoted = deals?.filter((d) => d.quote).length ?? 0;
+  const times = (deals ?? []).map((d) => d.response_seconds).filter((x): x is number => x != null);
+  const avg = times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+  const me = board?.me;
+  const accepted = board?.public.ranking?.find((r) => r.name === TEAM);
 
   return (
-    <div className="page">
-      <header>
-        <h1>Agent Console</h1>
-        <div className="meta">
-          {offline ? <span className="bad">API offline</span> : health && <span>{health.models.parse} · forwarder {health.worker ? "live" : "off"}</span>}
-          {usage && <span>{usage.llm_calls} calls · {usage.tokens_in + usage.tokens_out} tokens · ${usage.cost_usd.toFixed(4)}</span>}
+    <div className="app">
+      <header className="top">
+        <div className="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 18.5 29 7l-7.5 19-5-7.2L9 23l1.4-6.9z" /></svg>
+          <div>
+            <h1>START Milan Forwarding</h1>
+            <p>Autonomous air export desk · one agent per deal</p>
+          </div>
+        </div>
+        <dl className="kpis">
+          <div><dt>Requests</dt><dd>{deals?.length ?? "–"}</dd></div>
+          <div><dt>Quoted</dt><dd>{quoted}</dd></div>
+          <div><dt>Accepted</dt><dd>{accepted ? `${accepted.accepted}/${accepted.answered}` : "–"}</dd></div>
+          <div><dt>Booked</dt><dd>{deals?.filter((d) => d.booking).length ?? "–"}</dd></div>
+          <div><dt>Avg reply</dt><dd>{avg != null ? `${avg} s` : "–"}</dd></div>
+          <div><dt>Cost / quote</dt><dd>{usage && quoted ? usd(usage.cost_usd / quoted) : "–"}</dd></div>
+          <div><dt>Points</dt><dd>{me?.total != null ? me.total.toFixed(1) : "–"}{me?.rank ? <small> · #{me.rank}</small> : null}</dd></div>
+        </dl>
+        <div className={`live ${online && health?.worker ? "on" : "off"}`}>
+          <span className="pulse" />
+          {online ? (health?.worker ? "Live" : "API only") : "Offline"}
+          <small>{health ? `${health.models.agent} · ${health.models.effort}` : ""}</small>
         </div>
       </header>
-      <main>
-        <aside>
-          <h2>Runs</h2>
-          <button className={run === null ? "active" : ""} onClick={() => setRun(null)}>All activity</button>
-          {runs.map(([id, ev]) => (
-            <button key={id} className={run === id ? "active" : ""} onClick={() => setRun(id)}>
-              <strong>{ev[0].agent}</strong>
-              <span>{ev[0].summary}</span>
-              <small>{time(ev[0].ts)} · {ev[ev.length - 1].kind}</small>
-            </button>
-          ))}
-        </aside>
-        <section>
-          <h2>{run ? "Run timeline" : "Live timeline"}</h2>
-          {shown.length === 0 && <p className="empty">No activity yet. Start the backend and drop a mail into backend/data/inbox.</p>}
-          <ol>
-            {[...shown].reverse().map((e) => (
-              <li key={e.id} className={`k-${e.kind}`}>
-                <time>{time(e.ts)}</time>
-                <span className="agent">{e.agent}</span>
-                <span className="kind">{e.kind}</span>
-                <span className="text">{e.summary}</span>
-                {e.tokens_in + e.tokens_out > 0 && <span className="tok">{e.tokens_in + e.tokens_out} tok</span>}
-              </li>
-            ))}
-          </ol>
-        </section>
+      <main className="grid">
+        <DealList deals={deals ?? []} selected={selected} onSelect={setSelected} />
+        {deal ? <DealView deal={deal} onSent={reload} /> : (
+          <section className="deal placeholder">
+            <p>Every request becomes a deal with its own agent session: the mails, what the agent did and why, the priced options, the booking. Select one on the left.</p>
+          </section>
+        )}
+        <BoardPane board={board} team={TEAM} />
       </main>
     </div>
   );

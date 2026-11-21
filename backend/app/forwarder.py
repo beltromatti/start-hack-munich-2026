@@ -138,7 +138,10 @@ class Forwarder:
             req = normalise(shipment, w)
             if req["missing"]:
                 return {"missing": req["missing"], "understood": req,
-                        "hint": "ask the customer for these, or call again with them"}
+                        "destinations_we_fly_to": sorted({d for c in w.carriers if c.kind == "airline"
+                                                          for d in c.serves} | {d for _, d in w.portal}),
+                        "hint": "if the customer's words already say it (a city is its airport), call again with it; "
+                                "otherwise ask the customer for exactly this"}
             same = deal and deal["data"].get("request") and all(
                 deal["data"]["request"].get(k) == req.get(k)
                 for k in ("origin", "destination", "chargeable_kg", "pickup_zone", "volume_cbm"))

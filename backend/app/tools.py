@@ -32,7 +32,8 @@ QUANTITY = obj({"value": N, "unit": S, "per_piece": {"type": "boolean"}})
 SHIPMENT = obj({
     "origin_airport": {**S, "description": "IATA code of the German departure airport, if the customer names one"},
     "pickup": nullable(obj({"postcode": S, "city": S}, "door-to-port: where the truck collects the goods")),
-    "destination_airport": {**S, "description": "IATA code of the destination airport"},
+    "destination_airport": {**S, "description": "IATA code of the destination airport. A city means its cargo "
+                                                "airport (New Delhi -> DEL, Chicago -> ORD, Tokyo -> NRT, Sao Paulo -> GRU)"},
     "pieces": I,
     "weight": {**QUANTITY, "description": "as written: value, unit (kg, lb, t), per piece or total"},
     "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or total; null values if unknown"},
