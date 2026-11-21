@@ -90,3 +90,20 @@ in the zone file.
   time 15, plus humanity 10 and tracking 10.
 - `/v1/board/me`: start-milan, total 0, no requests yet.
 - Mailbox empty. Gateway: `"set": false`, so no model call works until our OpenAI key is posted.
+
+## Live mail formats (probed Sat 14:50–15:10 by Mattia's Claude, real 5U carriers)
+
+- **Carriers answer bid requests by mail in 15–35 s**, the rate desk in ~47 s, all in prose (an LLM parses them).
+- **Write the weight as `Total weight: 320 kg`.** "320 kg chargeable" got "To quote we need: the total weight in kg"
+  from every airline. Labelled lines work: `Route: FRA to ORD` / `Total weight:` / `Volume:` / `Pieces:`.
+- **Sheet airlines quote by mail exactly their sheet price** (Yellowtail FRA-ORD 320 kg 1.5 cbm: 828.80 EUR = sheet),
+  with a portal-style `R-...` reference "to quote when booking", valid 15 min.
+- **Email-only airlines** (Zephyr etc.) answer the same way. **Portal airlines** asked by mail say which lanes they fly.
+- **Truckers**: "Our total for the pickup ... is 177.40 EUR. Pickup time: 3 hours. ... offer reference TRK-49. No
+  booking is required." Zone 60 (Frankfurt): 5 truckers, 88.60 EUR / 26 h up to 177.40 EUR / 3 h.
+- **Rate desk** (`ratedesk@`): answers in a new thread (`in_reply_to` null), subject `Portal rates FRA-ORD 320.0 kg`,
+  one line per airline on the lane with total, transit, rate_id; non-portal airlines listed as "email ...".
+- **Gateway**: `gpt-6-luna` (reasoning `none`) ~1.5–2.5 s per call, `gpt-5-nano` (`minimal`) ~0.8 s. A whole RFQ
+  (read, ~6 bid parses, write) costs about **$0.0008**, i.e. ~39.7 of 40 cost points.
+- **Production runs on Mattia's Mac (`make live`) from Sat 15:10.** Nobody else runs `make live`: two pollers on
+  one mailbox would answer twice.
