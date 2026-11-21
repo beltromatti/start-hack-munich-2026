@@ -211,3 +211,8 @@ ahead with it." 5U's send API takes attachments (at most 5, 10 MB each; pdf, xls
 The verdict: `rejected no_pdf_offer` (2 of 13 teams accepted), on the first quote, so a PDF sent later would not
 count. Since 23:42 `send_mail` attaches our offer as a PDF made by code from the option (`offer_pdf`), text not a
 picture, the total written once as in the mail.
+
+**A booking must cover the whole shipment (found Sat 23:55, round 62):** lots summed to 9.3444 cbm (chargeable
+1560.5148 kg); we sent the portal 9.344 and booked a rate billing 1560.448 kg. 5U: accepted, accuracy 44.97,
+`booked: false`, tracking 0. Every other booking of the night billed the chargeable weight or a higher break, and
+all are `booked: true`. Since 23:57 the volume is kept exact and weights to carriers are rounded up, never down.
