@@ -9,6 +9,8 @@ Lead on pricing, accuracy and speed; the competitive advantage is **Jan's predic
 whole system together.
 **Where the engine sits: as the watcher** (is this an outlier or a disruption?). Real data will be thin, so we
 **simulate** more data as we go and learn from our own mistakes.
+Simulation data: the 10 rate sheets (and variants of them) **and** the leaderboard (per mail: every team's
+score and who booked what).
 
 - **AI reads, code prices.** The funnel (routing, reading RFQs, bids, tariff sheets) is AI-led.
   The price itself comes from our own pricing engine, in code, no LLM.
