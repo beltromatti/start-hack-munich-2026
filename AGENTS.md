@@ -3,9 +3,9 @@
 We are three people at a 24-hour hackathon (START Hack Munich, 21–22 Nov 2026). Hard deadline Sunday 12:45.
 Ship a working, demoable agent system. Speed and a clean demo beat completeness.
 
-**Read `docs/how-we-build.md` first:** how we think about this system (the model decides, the system guarantees;
-one agent per deal; intelligence in the agent, guarantees in tools), with Saturday's real examples of what
-worked and what we removed. It explains the reasons behind everything below.
+**Read `vision.md` first:** how we think about this system and why (the model decides, the system guarantees;
+one agent per deal; intelligence in the agent, guarantees in tools), the decisions we took with the rounds
+that taught them, and what is still open. Keep it true: a decision that changes is changed there.
 
 ## The challenge
 
@@ -72,7 +72,7 @@ mail in -> register (SQLite) -> router (code, by sender/thread)
 
 ## Before you change anything
 
-The reasoning is in `docs/how-we-build.md`. In short: a new capability is a tool or a field a tool returns, not a
+The reasoning is in `vision.md`. In short: a new capability is a tool or a field a tool returns, not a
 step in front of the agent; no hard checks on what the model writes (teach with the prompt, measure with
 diagnostics); one implementation per thing; fix the kind of change, not the one mail; prompts give goals and
 reasons. Work on a short branch from `main`, `make test` and `make sim`, let Mattia merge, never `make live`.
