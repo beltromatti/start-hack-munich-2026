@@ -3,15 +3,16 @@
 Team: Sam Sonntag, Jan Köberle, Mattia Beltrami. 21–22 Nov 2026, TUM Audimax.
 
 **Our challenge: 5U AI, "Build the Forwarder"** (allocated Sat 21 Nov; we ranked Lio, 5U AI, revel8).
-See `docs/challenges/5u.md`. This repo is the shared foundation that works for any of
-the three: agents that read a mailbox, call tools, write to a small CRM and show every step live.
+See `docs/challenges/5u.md`. A digital air forwarder: it reads the 5U mailbox, prices every request from the
+portal, the rate sheets and carrier bids, replies in human words and books, all night, on its own.
+The model reads and writes language; every number is computed in code.
 
 ## Key times
 
 | When | What |
 | --- | --- |
 | Sat 13:00 | Hacking starts |
-| Sat ~15:00 | 5U AI: first emails, then one every 6 minutes all night |
+| Sat 16:00 | 5U AI: first RFQ, then one every 6 minutes all night |
 | Sat 16:00 | Recruiting hour |
 | Sun 12:45 | **Hard submission deadline** |
 | Sun 13:15 | Demos: 3 min pitch, 2 min Q&A |
@@ -20,31 +21,30 @@ the three: agents that read a mailbox, call tools, write to a small CRM and show
 ## Run it
 
 ```sh
-cp .env.example .env              # add LLM_API_KEY (OpenAI credits) or the challenge gateway
+cp .env.example .env              # team key from the kit card, OpenAI key for dev
 make install
-make api                          # http://127.0.0.1:8000  (backend, FastAPI)
-make web                          # http://127.0.0.1:5173  (dashboard, Vite + React)
-make test
+make test                         # pricing rules + the whole flow against a fake 5U
+make sim                          # realistic mails, real model (OpenAI direct, not scored), fake 5U
+make api                          # http://127.0.0.1:8000  API only
+make live                         # THE production forwarder (one machine only!)
+make web                          # http://127.0.0.1:5173  sessions UI
 ```
-
-Try the loop without any API: set `WORKER=1`, drop a JSON mail into `backend/data/inbox/`
-(`{"from": "a@b.c", "subject": "...", "body": "..."}`) and watch it appear in the dashboard.
 
 ## What is in here
 
 | Path | What it does |
 | --- | --- |
-| `backend/app/llm.py` | All model calls. OpenAI-compatible, so OpenAI, a challenge gateway or OpenRouter. Logs tokens per call. |
-| `backend/app/ai/` | Ported from Sempli: OpenAI/Anthropic adapters, per-stage model profiles, USD cost per call, budget stop at 90 %. |
-| `backend/app/agent.py` | Small tool-calling loop. `@tool` turns a typed function into a tool. Every step is logged. |
-| `backend/app/store.py` | SQLite: `events` (agent timeline, tokens) and `records` (generic CRM: quotes, shipments, suppliers…). |
-| `backend/app/channels/mail.py` | Mailbox interface + `FakeMail` (local files). One adapter per challenge goes here. |
-| `backend/app/worker.py` | Background loop: poll → route → handle. One bad item never stops the loop. |
-| `backend/app/main.py` | API for the dashboard: `/api/events`, `/api/usage`, `/api/records`, `/api/tick`. |
-| `frontend/` | Agent console: live timeline, runs, token count. The base for the demo UI. |
-| `docs/challenges/` | The problem sets as presented, one file per challenge. |
-| `docs/sempli-crm-reuse.md` | What we can reuse from Sam's Sempli CRM. Original TS files in `reference/sempli-ai/` (private, delete before going public). |
-| `reference/siever-mail/` | Mattia's SIEVER Mail vision (Italian original) and an English README with the agent-architecture principles that carry over to 5U (private, delete before going public). |
+| `backend/app/forwarder.py` | The loop: mail in, route by sender, rfq / bid / booking / tracking / tariff handlers. |
+| `backend/app/pricing.py` | Every number: chargeable weight, next weight break, minimum, surcharges, cheapest / fastest / balanced. |
+| `backend/app/language.py` + `prompts/` | The forms the model fills and the mails it writes (amount checked in code). |
+| `backend/app/llm.py` | The only model client: 5U gateway in production, OpenAI direct for dev. Tokens and USD per call. |
+| `backend/app/fiveu.py` / `fake5u.py` | The 5U API (rate limit, outbound caps) and a local copy for tests. |
+| `backend/app/kit.py` | Carriers, pickup zones, rate sheets (`docs/challenges/5u-kit/tariffs.json`), portal lanes. |
+| `backend/app/store.py` | SQLite register: mails, records (rfq, booking, tariff), event log. |
+| `backend/app/main.py` | API for the sessions UI: `/api/rfqs`, `/api/rfqs/{id}`, `/api/bookings`, `/api/board`, `/api/events`. |
+| `frontend/` | Sessions UI (base): live timeline, cost. |
+| `docs/challenges/` | The 5U brief, slides, kit, API spec, counted facts. `docs/discussion-*.md`: team decisions. |
+| `reference/` | Sempli AI layer (Sam) and SIEVER Mail vision (Mattia). Private, delete before going public. |
 | `docs/transcripts/` | Raw Whisper transcripts of the talks (noisy, but complete). |
 
 ## Working together
