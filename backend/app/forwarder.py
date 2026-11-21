@@ -1,12 +1,12 @@
-"""The forwarder. One loop; all work is derived from the register, so a restart loses nothing and repeats nothing.
+"""The system under the forwarder agent: it guarantees, the agent decides.
 
-    mail in -> stored -> classified by sender (code) -> one task per kind:
-      customer  rfq: read (LLM) -> ask carriers by mail + portal + sheets (code) -> wait for bids -> price (code)
-                     -> write (LLM) -> reply in the customer's thread. Follow-ups: accept -> book, questions -> reply.
-      bid       read (LLM) -> offers attached to the rfq
-      tracking  answer from the CRM (code) in human words (LLM)
-      tariff    attachment -> text -> lanes (LLM) -> pricing module
-Invariant per rfq: exactly one quote, or one question when facts are missing. A quote is never sent twice.
+    mail in -> register -> routed by sender and thread (code)
+      customer / tracking   -> the forwarder agent, one session per thread (agent.py), with tools (tools.py)
+      carrier / rate desk   -> read into offers on the deal (small model), wakes nobody (no cascades)
+      tariff                -> pricing module          booking confirmation -> CRM
+
+Work is derived from the register: a restart loses nothing and repeats nothing. One lane per thread.
+The engine below is what the tools run: carriers asked, portal priced, sheets computed, options built, bookings.
 """
 import json
 import re
@@ -15,22 +15,20 @@ import time
 import traceback
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
-from . import docs, kit, language, pricing, store
+from . import agent, docs, kit, language, pricing, store
 from .config import settings
 from .pricing import Offer
 
-TRACKING = "tracking@hackloop.mail"
-RATEDESK = "ratedesk@hackloop.mail"
+from .kit import RATEDESK, TRACKING
 
 
 class Forwarder:
     def __init__(self, api: Any):
         self.api = api
-        self.pool = ThreadPoolExecutor(max_workers=16)
+        self.pool = ThreadPoolExecutor(max_workers=24)
         self.inflight: set[str] = set()
         self.lock = threading.Lock()
         self.stop = threading.Event()
@@ -60,18 +58,16 @@ class Forwarder:
         msgs, nxt = self.api.poll(since)
         for m in msgs:
             if store.save_mail(m, "in"):
-                store.log("router", "mail_in", f"{m['from']}: {m.get('subject', '')}"[:200],
-                          {"id": m["id"]}, run_id=_run(m))
+                store.log("router", "mail_in", f"{m['from']}: {m.get('subject', '')}"[:200], {"id": m["id"]},
+                          run_id=f"deal-{_root(m)}")
         if nxt and nxt != since:
             store.kv_set("since_id", str(nxt))
         for m in store.unhandled():
             if float(store.kv_get(f"retry_at:{m['id']}", "0") or 0) > time.time():
                 continue
-            # one lane per thread: mails of the same thread are handled in order, threads in parallel
-            self.submit(f"thread:{m['root']}", self.handle, m)
-        for rec in store.records("rfq", "collecting"):
-            if self.ready(rec):
-                self.submit(f"quote:{rec['id']}", self.send_quote, rec["id"])
+            self.submit(f"thread:{m['root']}", self.handle, m)  # one lane per thread, threads in parallel
+        for box in store.records("inbox", "pending"):  # a person, or news from the world, for a session
+            self.submit(f"thread:{box['data']['root']}", agent.resume_inbox, self, box["id"])
         now = time.time()
         if now - self._last_portal > 900:
             self._last_portal = now
@@ -96,10 +92,10 @@ class Forwarder:
                     self.inflight.discard(key)
         self.pool.submit(job)
 
-    # ---- routing (code, by sender) -------------------------------------------------------------------------
+    # ---- routing (code, by sender and thread) --------------------------------------------------------------
 
     def classify(self, m: dict) -> str:
-        """By sender and thread, never by what the mail claims: unknown senders are customers."""
+        """By sender and thread, never by what a mail claims about itself. Unknown senders are customers."""
         sender = m["sender"].lower()
         subject = (m["subject"] or "").strip()
         if sender == TRACKING:
@@ -108,7 +104,7 @@ class Forwarder:
             return "ratedesk"
         if re.match(r"^booking\s+\S+\s+confirmed", subject, re.I):
             return "booking"
-        if self.rfq_for_bid(m):
+        if self.deal_for_bid(m):
             return "bid"
         if kit.world().carrier_by_email(sender):
             if m.get("attachments") or re.search(r"tariff|rate sheet|rates", subject, re.I):
@@ -118,55 +114,61 @@ class Forwarder:
 
     def handle(self, m: dict) -> None:
         kind = self.classify(m)
-        store.log("router", "decision", f"mail {m['id']} -> {kind}", run_id=_run(m))
+        store.log("router", "decision", f"mail {m['id']} -> {kind}", run_id=f"deal-{m['root']}")
         try:
-            {"customer": self.on_customer, "bid": self.on_bid, "ratedesk": self.on_ratedesk,
-             "tracking": self.on_tracking, "tariff": self.on_tariff, "booking": self.on_booking_mail,
-             "other": lambda _m: None}[kind](m)
+            if kind in ("customer", "tracking"):
+                agent.on_mail(self, m, kind)
+            else:
+                {"bid": self.on_bid, "ratedesk": self.on_ratedesk, "tariff": self.on_tariff,
+                 "booking": self.on_booking_mail, "other": lambda _m: None}[kind](m)
         except Exception:
             tries = int(store.kv_get(f"tries:{m['id']}", "0") or 0) + 1
             store.kv_set(f"tries:{m['id']}", str(tries))
-            if tries < 3:  # transient (model or network): try again in 5 s, then 20 s
+            if tries < 3:  # transient: try again in 5 s, then 20 s
                 store.kv_set(f"retry_at:{m['id']}", str(time.time() + (5 if tries == 1 else 20)))
                 raise
         store.mark_handled(m["id"], kind)
 
-    # ---- customer ------------------------------------------------------------------------------------------
+    # ---- engine: offers ------------------------------------------------------------------------------------
 
-    def on_customer(self, m: dict) -> None:
-        rid = f"rfq-{m['root']}"
-        rec = store.get(rid)
-        parsed = language.read_customer(thread_text(m["root"], self.api), run_id=rid)
-        store.log("rfq", "info", f"intent {parsed['intent']}", parsed, run_id=rid)
-        status = rec["status"] if rec else None
-        if status in ("quoted", "booking", "booked", "lost"):
-            return self.follow_up(rec, m, parsed)
-        if status in ("collecting", "quoting", "held"):
-            return  # the quote is on its way (or a person holds it); only the first one counts
-        if status == "pricing":  # an earlier attempt stopped half way: quote with what it has, never ask twice
-            store.update(rid, lambda r: ("collecting", {**r["data"], "deadline": time.time() + 20}))
-            return
-        self.start_rfq(rid, m, parsed)
-
-    def start_rfq(self, rid: str, m: dict, p: dict) -> None:
+    def collect_offers(self, deal_id: str, shipment: dict | None, preference: str, wait: float) -> dict:
+        """Ask everyone who can carry it (mail, portal, sheets), wait for the answers, return priced options."""
         w = kit.world()
-        req = normalise(p, w)
-        data = {"root": m["root"], "customer": m["sender"], "subject": m["subject"], "received_at": m["received_at"],
-                "last_customer_mail": m["id"], "parsed": p, "request": req, "offers": [], "asked": {}, "replied": [],
-                "started": time.time()}
-        if req["missing"]:
-            store.put(rid, "rfq", "waiting_customer", data)
-            body = language.write("question", {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
-                                               "missing": req["missing"], "their_request": p.get("notes")}, rid)
-            self.reply_customer(rid, m, body)
-            return
-        store.put(rid, "rfq", "pricing", data)
+        deal = store.get(deal_id)
+        if shipment is not None:
+            req = normalise(shipment, w)
+            if req["missing"]:
+                return {"missing": req["missing"], "understood": req,
+                        "hint": "ask the customer for these, or call again with them"}
+            same = deal and deal["data"].get("request") and all(
+                deal["data"]["request"].get(k) == req.get(k)
+                for k in ("origin", "destination", "chargeable_kg", "pickup_zone", "volume_cbm"))
+            if not same:
+                self._ask_everyone(deal_id, req)
+        deal = store.get(deal_id)
+        if not deal or not deal["data"].get("request"):
+            return {"error": "no shipment yet: call get_offers with the shipment"}
+        end = time.time() + max(0.0, float(wait))
+        while time.time() < end:
+            if not waiting_for(store.get(deal_id)["data"]):
+                break
+            self.wait_step()
+        return self.options(deal_id, preference)
+
+    def wait_step(self) -> None:
+        """While a tool waits for carriers, the loop's other threads read their replies."""
+        time.sleep(0.5)
+
+    def _ask_everyone(self, deal_id: str, req: dict) -> None:
+        w = kit.world()
         o, d, cw = req["origin"], req["destination"], Decimal(req["chargeable_kg"])
         kg, cbm = Decimal(req["weight_kg"]), Decimal(req["volume_cbm"]) if req["volume_cbm"] else None
         offers: list[Offer] = []
         for lane in w.sheet(o, d):  # known prices, instantly
             total, billed = pricing.sheet_price(lane, kg, cbm)
             offers.append(Offer("air", lane["airline"], total, Decimal(lane["transit_days"]), "sheet", None, billed))
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "request": req, "offers": [x.as_dict() for x in offers],
+                                                       "asked": {}, "replied": [], "asked_at": time.time()}))
         asked: dict[str, str] = {}
         with_sheet = {l["airline"] for l in w.sheet_lanes}
         for c in w.email_airlines(o, d):  # carriers that quote by mail
@@ -174,25 +176,66 @@ class Forwarder:
             if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
                 weights += pricing.breaks_to_try(cw)
             for wt in weights:
-                asked[str(self.ask_airline(rid, c, o, d, wt, cbm, req))] = c.email
+                asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
-                asked[str(self.ask_trucker(rid, c, req))] = c.email
-        portal, failed = self.portal_offers(rid, o, d, kg, cbm, cw)
-        offers += portal
-        for name in failed:  # portal down or over the limit for this airline: ask the airline by mail instead
+                asked[str(self.ask_trucker(deal_id, c, req))] = c.email
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked}}))
+        portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
+        for name in failed:  # portal down or over the limit for this airline: ask the airline by mail
             c = w.carrier_by_name(name)
             if c and c.email not in asked.values():
-                asked[str(self.ask_airline(rid, c, o, d, cw, cbm, req))] = c.email
-        store.update(rid, lambda r: ("collecting", {**r["data"], "asked": asked,
-                                                    "offers": r["data"]["offers"] + [x.as_dict() for x in offers],
-                                                    "deadline": time.time() + settings.bid_wait_seconds}))
-        store.log("rfq", "info", f"{o}-{d} {cw} kg: {len(offers)} prices now, asked {len(asked)} by mail",
-                  run_id=rid)
+                asked[str(self.ask_airline(deal_id, c, o, d, cw, cbm, req))] = c.email
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
+                                                       "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
+        store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",
+                  run_id=deal_id)
 
-    def ask_airline(self, rid: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
+    def options(self, deal_id: str, preference: str) -> dict:
+        """The priced options as the agent sees them. Every number here is computed by code."""
+        d = store.get(deal_id)["data"]
+        req = d["request"]
+        offers = [Offer.of(x) for x in d.get("offers", [])]
+        air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
+        pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
+        needs_pickup = bool(req["pickup_zone"])
+        table: dict[str, dict] = {}
+        rows = []
+        variants = pickup_variants(pickups) if needs_pickup else [("", None)]
+        for i, a in enumerate(air, 1):
+            for tag, p in variants:
+                if needs_pickup and p is None:
+                    continue
+                oid = f"A{i}{tag}"
+                total = pricing.money(a.total + (p.total if p else 0))
+                table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
+                              "total_text": pricing.fmt(total)}
+                rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
+                             "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
+                             "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
+                             "carrier_note": (a.extra or {}).get("note")})
+        rec = {}
+        for pref in ("cheapest", "fastest", "balanced"):
+            cand = [Offer("air", k, Decimal(v["total"]),
+                          Decimal(v["air"]["days"]) + (Decimal(v["pickup"]["days"]) if v["pickup"] else 0), "x")
+                    for k, v in table.items()]
+            best = pricing.pick(cand, pref if pref != "balanced" else "unspecified", settings.balance_rule)
+            if best:
+                rec[pref] = best.carrier
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "options": table}))
+        waiting = waiting_for(d)
+        pref_key = preference if preference in ("cheapest", "fastest") else settings.unspecified_rule
+        return {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
+                                                 "pieces", "pickup_zone", "pickup_postcode")},
+                "options": rows, "recommended": rec.get(pref_key), "recommended_for": pref_key,
+                "recommended_by_preference": rec,
+                "pickup_alternatives": [{"trucker": p.carrier, "total": pricing.fmt(p.total),
+                                         "pickup_hours": round(float(p.days) * 24, 1)} for p in pickups],
+                "still_waiting_for": waiting}
+
+    def ask_airline(self, deal_id: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
                     req: dict) -> int:
-        # labelled lines: the carriers' desks read "total weight in kg" (live: "320 kg chargeable" was not read)
+        # labelled lines: the carriers' desks read "Total weight: N kg" (live: "320 kg chargeable" was not read)
         body = (f"Hello {c.name} team,\n\nplease quote air freight for this shipment:\n"
                 f"Route: {o} to {d}\nTotal weight: {billed:.0f} kg\n"
                 + (f"Volume: {cbm:.2f} cbm\n" if cbm else "")
@@ -200,13 +243,9 @@ class Forwarder:
                 f"Ready: {req.get('ready_date') or 'now'}\n\n"
                 "Please send your all-in total, currency, transit time, rate reference and validity.\n\n"
                 f"Thanks,\n{settings.persona}, {settings.company}")
-        sent = self.api.send(c.email, f"Rate request {o}-{d} {billed:.0f} kg", body)
-        store.kv_set(f"bidreq:{sent['id']}", rid)
-        store.save_mail(sent, "out", "bid_request", handled=True)
-        store.log("bids", "mail_out", f"asked {c.name}", {"mail": sent["id"]}, run_id=rid)
-        return sent["id"]
+        return self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {billed:.0f} kg", body)
 
-    def ask_trucker(self, rid: str, c: kit.Carrier, req: dict) -> int:
+    def ask_trucker(self, deal_id: str, c: kit.Carrier, req: dict) -> int:
         z = kit.world().zones.get(req["pickup_zone"], {})
         body = (f"Hello {c.name} team,\n\nplease quote a pickup from {req.get('pickup_postcode') or ''} "
                 f"{z.get('area', '')} (zone {req['pickup_zone']}) to {z.get('airport', req['origin'])} airport.\n"
@@ -215,13 +254,18 @@ class Forwarder:
                 + f"Pieces: {req.get('pieces') or 1}\nPickup: {req.get('ready_date') or 'as soon as possible'}\n\n"
                 f"Please send your total, currency, pickup time and offer reference.\n\nThanks,\n"
                 f"{settings.persona}, {settings.company}")
-        sent = self.api.send(c.email, f"Pickup quote zone {req['pickup_zone']} to {z.get('airport', '')}", body)
-        store.kv_set(f"bidreq:{sent['id']}", rid)
-        store.save_mail(sent, "out", "bid_request", handled=True)
-        store.log("bids", "mail_out", f"asked {c.name}", {"mail": sent["id"]}, run_id=rid)
+        return self.mail_carrier(deal_id, c.email, f"Pickup quote zone {req['pickup_zone']} to {z.get('airport', '')}",
+                                 body)
+
+    def mail_carrier(self, deal_id: str, to: str, subject: str, body: str, in_reply_to: int | None = None) -> int:
+        """Every mail to a carrier belongs to a deal: its answer comes back to that deal's offers."""
+        sent = self.api.send(to, subject, body, in_reply_to=in_reply_to)
+        store.kv_set(f"bidreq:{sent['id']}", deal_id)
+        store.save_mail(sent, "out", "to_carrier", handled=True)
+        store.log("bids", "mail_out", f"to {to}: {subject}", {"mail": sent["id"], "body": body}, run_id=deal_id)
         return sent["id"]
 
-    def portal_offers(self, rid: str, o: str, d: str, kg: Decimal, cbm: Decimal | None,
+    def portal_offers(self, deal_id: str, o: str, d: str, kg: Decimal, cbm: Decimal | None,
                       cw: Decimal) -> tuple[list[Offer], set[str]]:
         """Portal prices at the chargeable weight and at the next break; airlines the portal failed for."""
         w, out, failed = kit.world(), [], set()
@@ -233,8 +277,8 @@ class Forwarder:
             for wt in weights:
                 r = self.api.rate(o, d, a["code"], wt, cbm)
                 if r.get("error"):
-                    store.log("rfq", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
-                              run_id=rid)
+                    store.log("bids", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
+                              run_id=deal_id)
                     if r["status"] in (429, 500, 502, 503, 504) and wt == kg:
                         failed.add(a["name"])
                     continue
@@ -246,139 +290,53 @@ class Forwarder:
                                  extra={"code": a["code"], "valid_until": r["valid_until"], "weight": str(wt)}))
         return out, failed
 
-    def ready(self, rec: dict) -> bool:
-        d = rec["data"]
-        if time.time() >= d.get("deadline", 0):
-            return True
-        # every request mail answered: a carrier asked at two weights answers twice
-        asked, replied = Counter(d["asked"].values()), Counter(d["replied"])
-        return all(replied[email] >= n for email, n in asked.items())
+    # ---- engine: booking -----------------------------------------------------------------------------------
 
-    def send_quote(self, rid: str) -> None:
-        claimed = store.update(rid, lambda r: ("quoting", r["data"]) if r["status"] == "collecting" else None)
-        if not claimed or claimed["status"] != "quoting":
-            return
-        d = claimed["data"]
-        req = d["request"]
-        offers = [Offer.of(x) for x in d["offers"]]
-        q = pricing.quote([x for x in offers if x.leg == "air"], [x for x in offers if x.leg == "pickup"],
-                          req["preference"], bool(req["pickup_zone"]))
-        m = store.mail(d["last_customer_mail"])
-        p = d["parsed"]
-        if q is None:
-            if time.time() - d["started"] < 3 * settings.bid_wait_seconds:  # nothing yet: give carriers more time
-                store.update(rid, lambda r: ("collecting", {**r["data"], "deadline": time.time() + 15}))
-                return
-            body = language.write("decline", {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
-                                              "reason": f"no carrier offers {req['origin']} to {req['destination']}"},
-                                  rid)
-            self.reply_customer(rid, m, body)
-            store.update(rid, lambda r: ("lost", {**r["data"], "reason": "no offer"}))
-            return
-        amount = pricing.fmt(Decimal(q["total"]), q["currency"])
-        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
-                 "route": f"{req['origin']} to {req['destination']}", "airline": q["air"]["carrier"],
-                 "transit_days": q["transit_days"], "preference": req["preference"],
-                 "cargo": f"{req.get('pieces') or ''} pcs {Decimal(req['weight_kg']):.0f} kg".strip(),
-                 "pickup": f"truck pickup from {req.get('pickup_postcode') or req['pickup_zone']} by "
-                           f"{q['pickup']['carrier']}" if q["pickup"] else None,
-                 "commodity": p.get("commodity")}
-        body = language.write("quote", facts, rid, amount)
-        sent = self.reply_customer(rid, m, body)
-        took = time.time() - _ts(d["received_at"])
-        store.update(rid, lambda r: ("quoted", {**r["data"], "quote": q, "amount": amount, "quote_mail": sent["id"],
-                                                "quoted_at": time.time(), "response_seconds": round(took, 1)}))
-        store.log("rfq", "decision", f"quoted {amount} ({q['air']['carrier']}, {q['transit_days']} d) in {took:.0f}s",
-                  q, run_id=rid)
-
-    def reply_customer(self, rid: str, m: dict, body: str) -> dict:
-        subject = m["subject"] if (m["subject"] or "").lower().startswith("re:") else f"Re: {m['subject']}"
-        sent = self.api.send(m["sender"], subject, body, in_reply_to=m["id"])
-        store.save_mail(sent, "out", "reply", handled=True)
-        store.log("rfq", "mail_out", f"to {m['sender']}: {body[:120]}", {"mail": sent["id"], "body": body},
-                  run_id=rid)
-        return sent
-
-    def follow_up(self, rec: dict, m: dict, p: dict) -> None:
-        rid, d = rec["id"], rec["data"]
-        store.update(rid, lambda r: (r["status"], {**r["data"], "last_customer_mail": m["id"]}))
-        if p["intent"] == "accept" and rec["status"] == "quoted" and d.get("quote"):
-            return self.book(rid, m)
-        if p["intent"] == "decline":
-            store.update(rid, lambda r: ("lost", {**r["data"], "reason": p.get("notes") or "declined"}))
-            return
-        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
-                 "their_message": p.get("notes"), "status": rec["status"], "our_quote": d.get("amount"),
-                 "airline": (d.get("quote") or {}).get("air", {}).get("carrier"),
-                 "transit_days": (d.get("quote") or {}).get("transit_days"),
-                 "booking": d.get("booking")}
-        self.reply_customer(rid, m, language.write("reply", facts, rid, d.get("amount")))
-
-    # ---- booking -------------------------------------------------------------------------------------------
-
-    def book(self, rid: str, m: dict) -> None:
-        rec = store.update(rid, lambda r: ("booking", r["data"]) if r["status"] == "quoted" else None)
-        if not rec or rec["status"] != "booking":
-            return
-        d = rec["data"]
-        air = d["quote"]["air"]
+    def book_option(self, deal_id: str, option_id: str) -> dict:
+        deal = store.get(deal_id)
+        d = deal["data"]
+        opt = (d.get("options") or {}).get(option_id)
+        if not opt:
+            return {"error": f"unknown option {option_id}", "options": list((d.get("options") or {}).keys())}
+        air, req = opt["air"], d["request"]
         ref = f"SM-{d['root']}"
-        status, body = (0, {})
+        status, body = 0, {}
         if air.get("rate_id"):
             status, body = self.api.book(air["rate_id"], ref)
-            if status == 410 and air.get("extra", {}).get("code"):  # expired: fresh rate, same airline and weight
-                req = d["request"]
+            if status == 410 and (air.get("extra") or {}).get("code"):  # expired: fresh rate, same airline and weight
                 r = self.api.rate(req["origin"], req["destination"], air["extra"]["code"],
                                   air["extra"].get("weight") or req["weight_kg"], req.get("volume_cbm"))
                 if not r.get("error"):
                     status, body = self.api.book(r["rate_id"], ref)
-        store.log("booking", "info", f"portal booking {air.get('rate_id')}: {status}", body, run_id=rid)
-        booking = {"team_reference": ref, "rfq": rid, "customer": d["customer"], "airline": air["carrier"],
-                   "route": f"{d['request']['origin']}-{d['request']['destination']}",
-                   "transit_days": d["quote"]["transit_days"], "amount": d["amount"], "booked_at": time.time(),
-                   "ready_date": d["request"].get("ready_date"), "pickup": d["quote"].get("pickup"),
-                   "weight_kg": d["request"]["weight_kg"], "pieces": d["request"].get("pieces"),
-                   "rate_id": air.get("rate_id")}
+                    body = {**body, "note": f"the quoted rate had expired; booked a fresh rate at {r['total']} "
+                                            f"{r['currency']}"}
+        store.log("booking", "info", f"portal booking {air.get('rate_id')}: {status}", body, run_id=deal_id)
+        booking = {"team_reference": ref, "deal": deal_id, "customer": d["customer"], "airline": air["carrier"],
+                   "route": f"{req['origin']}-{req['destination']}", "transit_days": air["days"],
+                   "amount": opt["total_text"], "option": option_id, "booked_at": time.time(),
+                   "ready_date": req.get("ready_date"), "pickup": opt.get("pickup"), "weight_kg": req["weight_kg"],
+                   "pieces": req.get("pieces"), "rate_id": air.get("rate_id")}
         if status in (200, 201):
-            booking.update(booking_reference=body.get("booking_reference"), status="booked", via="portal")
-        elif air.get("email"):  # book by mail with the airline, in its bid thread
-            text = (f"Hello,\n\nwe would like to book your offer {air.get('rate_id') or ''} "
-                    f"({booking['route']}, {Decimal(d['request']['weight_kg']):.0f} kg). Our reference: {ref}.\n\n"
+            booking.update(booking_reference=body.get("booking_reference"), status="booked", via="portal",
+                           price=body.get("price"), currency=body.get("currency"), note=body.get("note"))
+        elif air.get("email") or kit.world().carrier_by_name(air["carrier"]):  # by mail with the airline
+            air = {**air, "email": air.get("email") or kit.world().carrier_by_name(air["carrier"]).email}
+            text = (f"Hello,\n\nwe would like to book your offer {air.get('rate_id') or ''} ({booking['route']}, "
+                    f"{Decimal(air.get('billed_kg') or req['weight_kg']):.0f} kg). Our reference: {ref}.\n\n"
                     f"Thanks,\n{settings.persona}, {settings.company}")
-            sent = self.api.send(air["email"], f"Booking {air.get('rate_id') or ref}", text,
-                                 in_reply_to=air.get("reply_mail"))
-            store.save_mail(sent, "out", "booking_request", handled=True)
-            store.kv_set(f"bidreq:{sent['id']}", rid)
-            booking.update(status="requested", via="email")
+            self.mail_carrier(deal_id, air["email"], f"Booking {air.get('rate_id') or ref}", text,
+                              in_reply_to=air.get("reply_mail"))
+            booking.update(status="requested", via="email", portal_answer={"status": status, "body": body})
         else:
-            booking.update(status="failed", via="portal", error=body)
+            booking.update(status="failed", via="portal", error={"status": status, "body": body})
         store.put(f"booking-{d['root']}", "booking", booking["status"], booking)
-        store.update(rid, lambda r: ("booked" if booking["status"] != "failed" else "quoted",
-                                     {**r["data"], "booking": booking}))
-        p = d["parsed"]
-        facts = {"customer_name": p.get("customer_name"), "language": p.get("language"), "their_mail": _body(m),
-                 "booking_reference": booking.get("booking_reference") or ref, "our_reference": ref,
-                 "airline": booking["airline"], "route": booking["route"], "transit_days": booking["transit_days"],
-                 "pickup_by": (booking.get("pickup") or {}).get("carrier")}
         if booking["status"] != "failed":
-            self.reply_customer(rid, m, language.write("booked", facts, rid))
+            store.update(deal_id, lambda r: ("booked", {**r["data"], "booking": booking}))
+        return booking
 
-    def on_booking_mail(self, m: dict) -> None:
-        text = f"{m['subject']}\n{m['body']}"
-        for rec in store.records("booking"):
-            b = rec["data"]
-            if any(x and x in text for x in (b.get("rate_id"), b.get("team_reference"), b.get("booking_reference"))):
-                ref = re.search(r"Booking\s+(\S+)\s+confirmed", m["subject"] or "", re.I)
-                b = {**b, "status": "confirmed", "confirmation_mail": m["id"],
-                     "booking_reference": b.get("booking_reference") or (ref.group(1) if ref else None)}
-                store.put(rec["id"], "booking", "confirmed", b)
-                store.log("booking", "info", f"confirmed {b.get('booking_reference')}", run_id=b["rfq"])
-                return
-        store.log("booking", "info", f"confirmation not matched: {m['subject']}")
+    # ---- carrier mail (system tasks, no agent) -------------------------------------------------------------
 
-    # ---- bids ----------------------------------------------------------------------------------------------
-
-    def rfq_for_bid(self, m: dict) -> str | None:
+    def deal_for_bid(self, m: dict) -> str | None:
         for k in (m.get("in_reply_to"), m.get("root")):
             if k is not None:
                 rid = store.kv_get(f"bidreq:{k}")
@@ -387,19 +345,22 @@ class Forwarder:
         return None
 
     def on_bid(self, m: dict) -> None:
-        rid = self.rfq_for_bid(m)
-        if rid is None:
+        deal_id = self.deal_for_bid(m)
+        if deal_id is None:
             return
-        rec = store.get(rid)
-        if rec and rec["status"] in ("booking", "booked") and re.search(r"confirm|booked", m["body"], re.I):
-            return self.on_booking_mail(m)
+        rec = store.get(deal_id)
+        if rec and rec["data"].get("booking") and re.search(r"\bconfirm|\bbooked\b", m["body"], re.I):
+            self.on_booking_mail(m)
         carrier = kit.world().carrier_by_email(m["sender"])
-        offers = [self.offer(o, m, carrier) for o in language.read_bid(m["sender"], m["subject"], m["body"], rid)]
-        offers = [o for o in offers if o is not None]
-        store.update(rid, lambda r: (r["status"], {**r["data"], "replied": r["data"]["replied"] + [m["sender"]],
-                                                   "offers": r["data"]["offers"] + [o.as_dict() for o in offers]}))
-        store.log("bids", "info", f"{m['sender']}: " + ", ".join(f"{o.carrier} {o.total}" for o in offers) or "no offer",
-                  run_id=rid)
+        raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
+        offers = [o for o in (self.offer(x, m, carrier) for x in raw) if o is not None]
+        notes = [{"from": m["sender"], "mail": m["id"], "text": m["body"][:2000]}] if not offers else []
+        store.update(deal_id, lambda r: (r["status"], {
+            **r["data"], "replied": r["data"].get("replied", []) + [m["sender"]],
+            "offers": r["data"].get("offers", []) + [o.as_dict() for o in offers],
+            "carrier_messages": r["data"].get("carrier_messages", []) + notes}))
+        store.log("bids", "info", f"{m['sender']}: " + (", ".join(f"{o.carrier} {o.total}" for o in offers)
+                                                        or "no price (see carrier_messages)"), run_id=deal_id)
 
     def offer(self, o: dict, m: dict, carrier: kit.Carrier | None) -> Offer | None:
         if not o.get("available") or o.get("total") is None:
@@ -408,65 +369,55 @@ class Forwarder:
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
-        days = (Decimal(str(o["pickup_hours"])) / 24).quantize(Decimal("0.001")) if trucker and o.get("pickup_hours") is not None else \
-            Decimal(str(o.get("transit_days") or 0))
-        # a carrier answering for itself is named as in the carrier list (so its mail bid and its sheet price
-        # are recognised as the same carrier); the rate desk names the airlines it lists
+        days = (Decimal(str(o["pickup_hours"])) / 24).quantize(Decimal("0.001")) \
+            if trucker and o.get("pickup_hours") is not None else Decimal(str(o.get("transit_days") or 0))
+        # a carrier answering for itself is named as in the carrier list (its mail bid and its sheet are one
+        # carrier); the rate desk names the airlines it lists
         name = carrier.name if carrier else (o.get("carrier") or m["sender"])
         return Offer("pickup" if trucker else "air", name, total, days, "email", o.get("reference"),
-                     reply_mail=m["id"], email=m["sender"], extra={"valid_until": o.get("valid_until"),
-                                                                   "note": o.get("note")})
+                     reply_mail=m["id"], email=m["sender"] if carrier else None,
+                     extra={"valid_until": o.get("valid_until"), "note": o.get("note")})
 
     def on_ratedesk(self, m: dict) -> None:
         lane = re.search(r"\b([A-Z]{3})-([A-Z]{3})\b", m["subject"] or "")
         if not lane:
             return
-        for rec in store.records("rfq", "collecting"):
-            req = rec["data"]["request"]
-            if (req["origin"], req["destination"]) == lane.groups():
-                offers = [self.offer(o, m, None) for o in language.read_bid(m["sender"], m["subject"], m["body"],
-                                                                             rec["id"])]
-                offers = [o for o in offers if o is not None]
+        for rec in store.records("deal"):
+            req = rec["data"].get("request") or {}
+            if (req.get("origin"), req.get("destination")) == lane.groups() and rec["status"] in ("new", "pricing"):
+                offers = [o for o in (self.offer(x, m, None) for x in language.read_bid(
+                    m["sender"], m["subject"], m["body"], rec["id"])) if o is not None]
                 for o in offers:
                     o.source = "ratedesk"
                 store.update(rec["id"], lambda r: (r["status"], {
-                    **r["data"], "replied": r["data"]["replied"] + [RATEDESK],
-                    "offers": r["data"]["offers"] + [o.as_dict() for o in offers]}))
+                    **r["data"], "replied": r["data"].get("replied", []) + [RATEDESK],
+                    "offers": r["data"].get("offers", []) + [o.as_dict() for o in offers]}))
+
+    def on_booking_mail(self, m: dict) -> None:
+        text = f"{m['subject']}\n{m['body']}"
+        for rec in store.records("booking"):
+            b = rec["data"]
+            if any(x and x in text for x in (b.get("rate_id"), b.get("team_reference"), b.get("booking_reference"))):
+                ref = re.search(r"Booking\s+(\S+)\s+confirmed", m["subject"] or "", re.I)
+                found = re.search(r"\b(?:booking reference|reference)\s*:?\s*([A-Z0-9][A-Z0-9-]{3,})", m["body"], re.I)
+                b = {**b, "status": "confirmed", "confirmation_mail": m["id"],
+                     "booking_reference": b.get("booking_reference") or (ref.group(1) if ref else None)
+                     or (found.group(1) if found else None)}
+                store.put(rec["id"], "booking", "confirmed", b)
+                store.update(b["deal"], lambda r: (r["status"], {**r["data"], "booking": b}))
+                store.log("booking", "info", f"confirmed {b.get('booking_reference')}", run_id=b["deal"])
+                # news from the world for this deal: its session hears it (and decides whether the customer should)
+                agent.notify(f"session-{store.get(b['deal'])['data']['root']}",
+                             f"The airline confirmed the booking (their mail {m['id']}): booking reference "
+                             f"{b.get('booking_reference')}. Mail:\n{m['body'][:1500]}")
+                return
+        store.log("booking", "info", f"confirmation not matched: {m['subject']}")
 
     def eur(self, amount: Decimal, currency: str, fx: Any) -> Decimal | None:
         total = pricing.to_eur(amount, currency, fx, self.fx)
         if total is None:
             store.log("bids", "error", f"cannot convert {amount} {currency} to EUR: no exchange rate seen")
         return total
-
-    # ---- tracking ------------------------------------------------------------------------------------------
-
-    def on_tracking(self, m: dict) -> None:
-        text = f"{m['subject']}\n{m['body']}"
-        match = None
-        for rec in store.records("booking"):
-            b = rec["data"]
-            if any(x and str(x) in text for x in (b.get("booking_reference"), b.get("team_reference"),
-                                                   b.get("rate_id"))):
-                match = b
-                break
-        facts: dict[str, Any] = {"question": m["body"][:1500]}
-        if match:
-            booked = datetime.fromtimestamp(match["booked_at"], timezone.utc)
-            facts.update({k: match.get(k) for k in ("booking_reference", "team_reference", "airline", "route",
-                                                    "transit_days", "weight_kg", "pieces", "status")})
-            facts["booked_on"] = booked.strftime("%d %b %Y %H:%M UTC")
-            facts["estimated_arrival"] = (booked + timedelta(days=float(match["transit_days"]))).strftime("%d %b %Y")
-            facts["pickup_by"] = (match.get("pickup") or {}).get("carrier")
-        else:
-            facts["note"] = "no booking with that reference in our system; ask for the booking reference"
-        run = match["rfq"] if match else f"tracking-{m['id']}"
-        body = language.write("tracking", facts, run)
-        subj = m["subject"] or "Your shipment"
-        sent = self.api.send(m["sender"], subj if subj.lower().startswith("re:") else f"Re: {subj}", body,
-                             in_reply_to=m["id"])
-        store.save_mail(sent, "out", "tracking_answer", handled=True)
-        store.log("tracking", "mail_out", f"answered {m['id']}", {"body": body, "facts": facts}, run_id=run)
 
     # ---- tariffs -------------------------------------------------------------------------------------------
 
@@ -477,13 +428,13 @@ class Forwarder:
             name = (a.get("filename") or "").lower()
             try:
                 raw = self.api.attachment(m["id"], a.get("id"))
-                if name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):  # a scanned sheet: the model looks at it
+                if name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):  # a scanned sheet: the model looks
                     images.append(("image/png" if name.endswith(".png") else "image/jpeg", raw))
                 else:
                     parts.append(f"[{a.get('filename')}]\n" + docs.text(name, raw))
             except Exception as e:
                 store.log("tariff", "error", f"attachment {a.get('filename')}: {e!r}")
-        out = language.read_tariff("\n\n".join(parts)[:60000], run_id=f"tariff-{m['id']}", images=images or None)
+        out = language.read_tariff("\n\n".join(parts), run_id=f"tariff-{m['id']}", images=images or None)
         airline = carrier.name if carrier else (out.get("airline") or m["sender"])
         lanes = []
         for l in out["lanes"]:
@@ -500,7 +451,7 @@ class Forwarder:
         store.log("tariff", "info", f"{airline}: {len(lanes)} lanes ingested", {"notes": out.get("notes")},
                   run_id=f"tariff-{m['id']}")
 
-    # ---- watcher -------------------------------------------------------------------------------------------
+    # ---- watcher: how the field judges us ------------------------------------------------------------------
 
     def watch_board(self) -> None:
         board = self.api.board_me()
@@ -510,64 +461,66 @@ class Forwarder:
             key = f"{r.get('round')}:{r.get('verdict')}"
             if key not in seen and r.get("verdict") not in ("open", "pending"):
                 seen.add(key)
-                store.log("watcher", "info", f"round {r.get('round')}: {r.get('verdict')} {r.get('reason') or ''}"
-                          f" points {r.get('points')}"[:300], r)
+                store.log("watcher", "info", f"round {r.get('round')}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
 
-def normalise(p: dict, w: kit.World) -> dict:
-    """From what the customer wrote (as read by the model) to the facts code prices with."""
-    pieces = p.get("pieces")
-    kg = language.weight_kg(p.get("weight") or {}, pieces)
-    cbm = language.volume_cbm(p.get("volume") or {}, p.get("dimensions") or [], pieces)
+def waiting_for(d: dict) -> list[str]:
+    """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""
+    asked, replied = Counter(d.get("asked", {}).values()), Counter(d.get("replied", []))
+    return sorted(email for email, n in asked.items() if replied[email] < n)
+
+
+def pickup_variants(pickups: list[Offer]) -> list[tuple[str, Offer | None]]:
+    """Which truckers an option may carry, by PICKUP_RULE (docs/research/pricing.md).
+    asked: the cheapest, and the fastest as an option of its own (suffix f), so the customer's preference picks.
+    cheapest: only the cheapest. balanced: only the 50/50 pick (BALANCE_RULE)."""
+    if not pickups:
+        return [("", None)]
+    if settings.pickup_rule == "balanced":
+        return [("", pricing.balanced(pickups, settings.balance_rule))]
+    cheap, fast = pricing.pick(pickups, "cheapest"), pricing.pick(pickups, "fastest")
+    if settings.pickup_rule == "cheapest" or cheap is fast:
+        return [("", cheap)]
+    return [("", cheap), ("f", fast)]
+
+
+def normalise(s: dict, w: kit.World) -> dict:
+    """From the shipment as the agent passes it (the customer's words and units) to the facts code prices with."""
+    pieces = s.get("pieces")
+    kg = language.weight_kg(s.get("weight") or {}, pieces)
+    cbm = language.volume_cbm(s.get("volume") or {}, s.get("dimensions") or [], pieces)
+    pickup = s.get("pickup") or {}
     zone = None
-    postcode = re.sub(r"\D", "", p.get("pickup_postcode") or "")
-    if p.get("pickup_needed") and len(postcode) >= 2:
-        zone = postcode[:2] if postcode[:2] in w.zones else None
-    if p.get("pickup_needed") and not zone and p.get("pickup_city"):  # "pickup in Darmstadt": the zone's area
-        city = p["pickup_city"].strip().lower()
+    postcode = re.sub(r"\D", "", pickup.get("postcode") or "")
+    if len(postcode) >= 2 and postcode[:2] in w.zones:
+        zone = postcode[:2]
+    if pickup and not zone and pickup.get("city"):  # "pickup in Darmstadt": that zone's area
+        city = pickup["city"].strip().lower()
         zone = next((z for z, v in w.zones.items() if v["area"].lower() == city), None) or \
             next((z for z, v in w.zones.items() if city in v["area"].lower() or v["area"].lower() in city), None)
-    origin = (p.get("origin_airport") or "").upper() or None
-    if zone and not origin:
-        origin = w.zones[zone]["airport"]
-    if zone and origin and w.zones[zone]["airport"] != origin:
-        origin = w.zones[zone]["airport"]  # the truck goes to the zone's airport
-    dest = (p.get("destination_airport") or "").upper() or None
+    origin = (s.get("origin_airport") or "").upper() or None
+    if zone:
+        origin = w.zones[zone]["airport"]  # the truck goes to its zone's airport
+    dest = (s.get("destination_airport") or "").upper() or None
     missing = []
     if not origin or origin not in w.origins():
-        missing.append("the pickup address or departure airport in Germany")
-    if p.get("pickup_needed") and not zone:
-        missing.append("the pickup postcode")
+        missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
+                       f"pickup postcodes start with {', '.join(sorted(w.zones))})")
+    if pickup and (pickup.get("postcode") or pickup.get("city")) and not zone:
+        missing.append("a pickup postcode inside our pickup zones")
     if not dest:
-        missing.append("the destination airport or city")
+        missing.append("destination airport")
     if kg is None:
-        missing.append("the total weight")
+        missing.append("total weight")
     cw = pricing.chargeable(kg, cbm) if kg else None
     return {"origin": origin, "destination": dest, "weight_kg": str(kg) if kg else None,
             "volume_cbm": str(cbm.quantize(Decimal("0.001"))) if cbm else None,
             "chargeable_kg": str(cw) if cw else None, "pieces": pieces, "pickup_zone": zone,
-            "pickup_postcode": p.get("pickup_postcode"), "preference": p.get("preference") or "unspecified",
-            "ready_date": p.get("ready_date"), "commodity": p.get("commodity"), "flags": p.get("flags") or [],
-            "missing": sorted(set(missing))}
-
-
-def thread_text(root: int, api: Any = None) -> str:
-    """The whole thread as the model reads it, attachments included (a packing list, a spec sheet)."""
-    out = []
-    for x in store.thread(root):
-        who = "US (the forwarder)" if x["direction"] == "out" else x["sender"]
-        text = f"--- mail {x['id']} from {who} at {x['received_at'] or ''}\nSubject: {x['subject']}\n\n{x['body']}"
-        for a in (x.get("attachments") or []) if api is not None and x["direction"] == "in" else []:
-            try:
-                text += f"\n\n[attachment {a.get('filename')}]\n" + docs.text(a.get("filename", ""), api.attachment(
-                    x["id"], a.get("id")))[:6000]
-            except Exception as e:
-                store.log("rfq", "error", f"attachment {a.get('filename')}: {e!r}")
-        out.append(text)
-    return "\n\n".join(out)[-16000:]
+            "pickup_postcode": pickup.get("postcode"), "ready_date": (s.get("cargo") or {}).get("ready_date"),
+            "commodity": (s.get("cargo") or {}).get("commodity"), "missing": missing}
 
 
 def _num(x: Any) -> str | None:
@@ -583,19 +536,6 @@ def _num(x: Any) -> str | None:
         return None
 
 
-def _body(m: dict | None) -> str:
-    return ((m or {}).get("body") or "")[:1500]
-
-
-def _run(m: dict) -> str:
-    if m.get("root"):
-        return f"rfq-{m['root']}"
+def _root(m: dict) -> int:
     refs = m.get("references") or []
-    return f"rfq-{refs[0] if refs else m['id']}"
-
-
-def _ts(iso: str | None) -> float:
-    try:
-        return datetime.fromisoformat(iso).timestamp() if iso else time.time()
-    except ValueError:
-        return time.time()
+    return refs[0] if refs else m["id"]

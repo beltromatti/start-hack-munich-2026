@@ -34,14 +34,15 @@ make web                          # http://127.0.0.1:5173  sessions UI
 
 | Path | What it does |
 | --- | --- |
-| `backend/app/forwarder.py` | The loop: mail in, route by sender, rfq / bid / booking / tracking / tariff handlers. |
+| `backend/app/agent.py` + `tools.py` | The forwarder agent: one session per thread (quote, book, track), tools over the engine. |
+| `backend/app/forwarder.py` | The system under it: mail loop, routing, carrier replies, tariffs, bookings, the offer engine. |
 | `backend/app/pricing.py` | Every number: chargeable weight, next weight break, minimum, surcharges, cheapest / fastest / balanced. |
-| `backend/app/language.py` + `prompts/` | The forms the model fills and the mails it writes (amount checked in code). |
+| `backend/app/prompts/` | The agent's identity and tasks (soft guidance), plus the readers for carrier mails and tariffs. |
 | `backend/app/llm.py` | The only model client: 5U gateway in production, OpenAI direct for dev. Tokens and USD per call. |
 | `backend/app/fiveu.py` / `fake5u.py` | The 5U API (rate limit, outbound caps) and a local copy for tests. |
 | `backend/app/kit.py` | Carriers, pickup zones, rate sheets (`docs/challenges/5u-kit/tariffs.json`), portal lanes. |
 | `backend/app/store.py` | SQLite register: mails, records (rfq, booking, tariff), event log. |
-| `backend/app/main.py` | API for the sessions UI: `/api/rfqs`, `/api/rfqs/{id}`, `/api/bookings`, `/api/board`, `/api/events`. |
+| `backend/app/main.py` | API for the sessions UI: `/api/deals`, `/api/deals/{id}`, `/api/sessions/{id}` (+ `/message`), `/api/board`. |
 | `frontend/` | Sessions UI (base): live timeline, cost. |
 | `docs/challenges/` | The 5U brief, slides, kit, API spec, counted facts. `docs/discussion-*.md`: team decisions. |
 | `reference/` | Sempli AI layer (Sam) and SIEVER Mail vision (Mattia). Private, delete before going public. |

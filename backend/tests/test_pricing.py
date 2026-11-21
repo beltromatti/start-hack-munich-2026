@@ -45,13 +45,6 @@ def test_quote_adds_pickup_and_keeps_one_offer_per_carrier():
     assert pricing.quote(air, [], "cheapest", True) is None
 
 
-def test_money_check_in_written_mails():
-    assert language.money_ok("Your price is 1026.00 EUR all-in.", "1026.00 EUR")
-    assert not language.money_ok("1026.00 EUR, of which fuel 120.00 EUR", "1026.00 EUR")
-    assert not language.money_ok("about 1,000 euros", "1026.00 EUR")
-    assert language.money_ok("Booked, reference BK-1.", None)
-
-
 def test_units():
     assert language.weight_kg({"value": 1000, "unit": "lb", "per_piece": False}, None) == D("453.59237")
     assert language.weight_kg({"value": 50, "unit": "kg", "per_piece": True}, 4) == 200
@@ -61,18 +54,11 @@ def test_units():
 
 def test_pickup_city_maps_to_zone():
     from app.forwarder import normalise
-    p = {"pieces": 1, "weight": {"value": 100, "unit": "kg", "per_piece": False}, "volume": {}, "dimensions": [],
-         "pickup_needed": True, "pickup_postcode": None, "pickup_city": "Darmstadt", "origin_airport": None,
-         "destination_airport": "JFK", "preference": "cheapest"}
+    p = {"pieces": 1, "weight": {"value": 100, "unit": "kg", "per_piece": False}, "volume": None, "dimensions": [],
+         "pickup": {"postcode": None, "city": "Darmstadt"}, "origin_airport": None, "destination_airport": "JFK",
+         "cargo": {"commodity": None, "ready_date": None, "notes": None}}
     r = normalise(p, kit.world())
     assert r["pickup_zone"] == "64" and r["origin"] == "FRA" and not r["missing"]
-
-
-def test_money_check_other_kinds():
-    assert language.money_ok("Booked, all good.", "900.00 EUR", required=False)
-    assert language.money_ok("Your 900.00 EUR quote is booked.", "900.00 EUR", required=False)
-    assert not language.money_ok("Booked for 950.00 EUR.", "900.00 EUR", required=False)
-    assert not language.money_ok("All good.", "900.00 EUR", required=True)
 
 
 def test_live_bid_beats_stale_sheet():
