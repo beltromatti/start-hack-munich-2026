@@ -72,13 +72,22 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
             return "\n".join(rows)
         if name.endswith(".xls"):  # the old Excel format: on 5U's own list of attachment types, and not a zip
             import xlrd
+            if not raw.startswith(b"\xd0\xcf\x11\xe0"):  # a text or html export that was only named .xls
+                return _plain(filename, raw)
             wb = xlrd.open_workbook(file_contents=raw)
+
+            def shown(c) -> str:  # a cell as a person sees it: a date as a date, 320.0 as 320
+                if c.ctype == xlrd.XL_CELL_DATE:
+                    t = xlrd.xldate_as_datetime(c.value, wb.datemode)
+                    return t.strftime("%Y-%m-%d" if (t.hour, t.minute, t.second) == (0, 0, 0) else "%Y-%m-%d %H:%M")
+                if c.ctype == xlrd.XL_CELL_NUMBER and c.value == int(c.value):
+                    return str(int(c.value))
+                return "" if c.value in ("", None) else str(c.value)
             rows = []
             for ws in wb.sheets():
                 rows.append(f"# sheet {ws.name}")
                 for i in range(ws.nrows):
-                    cells = [("" if c in ("", None) else str(int(c)) if isinstance(c, float) and c == int(c) else str(c))
-                             for c in ws.row_values(i)]
+                    cells = [shown(c) for c in ws.row(i)]
                     if any(cells):
                         rows.append("\t".join(cells))
             return "\n".join(rows)
@@ -120,7 +129,11 @@ def _pdf(filename: str, raw: bytes, run_id: str | None) -> str:
     from pypdf import PdfReader
     out = []
     for i, page in enumerate(PdfReader(io.BytesIO(raw)).pages, 1):
-        t = (page.extract_text() or "").strip()
+        try:
+            t = (page.extract_text() or "").strip()
+        except Exception as e:  # one page that cannot be read costs that page, not the ones before it
+            out.append(f"[page {i} could not be read: {e!r}]")
+            continue
         if len(t) < 200:  # a scanned page: its text is in its pictures (also under a letterhead or a page number)
             from . import llm
             try:

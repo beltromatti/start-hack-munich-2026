@@ -634,7 +634,10 @@ class Forwarder:
                 seen.add(key)
                 store.log("watcher", "info", f"round {rnd}: {r.get('verdict')} {r.get('reason') or ''}"[:300], r)
         store.kv_set("board_seen", ",".join(sorted(x for x in seen if x)))
-        self.watch_scoring(me, public)
+        try:
+            self.watch_scoring(me, public)
+        except Exception as e:  # a board in a shape we did not foresee is itself news, and must cost nothing else
+            store.log("watcher", "error", f"scoring: the board could not be compared: {e!r}"[:300])
 
     def watch_scoring(self, me: dict, public: dict) -> None:
         """How 5U scores changes without a word (Sat 18:36 quote points at the round's end, 21:00 the cost window 18
@@ -643,7 +646,8 @@ class Forwarder:
         an earlier round that moved, a quote answered inside two minutes that does not take the full time points.
         Each is logged once, as an error so that it stands out in the journal. `prompts/forwarder.md` ("how our
         work is judged") tells the agent the scoring: when this fires, that paragraph is the place to follow."""
-        reqs = me.get("requests") or []
+        rows = lambda x: [r for r in x if isinstance(r, dict)] if isinstance(x, list) else []
+        reqs, rounds, ranking = rows(me.get("requests")), rows(public.get("rounds")), rows(public.get("ranking"))
         before = json.loads(store.kv_get("board_scoring") or "null")
         old = (before or {}).get("points", {})
         points = {**old, **{str(r.get("round_no")): r.get("points") or {} for r in reqs}}
@@ -651,9 +655,8 @@ class Forwarder:
                "points": points, "kinds": sorted({k for p in points.values() for k in p}),
                "reasons": sorted({str(r["reason"]) for r in reqs if r.get("reason")}
                                  | set((before or {}).get("reasons", []))),
-               "fields": sorted({f"{part}.{k}" for part, rows in (("requests", reqs), ("rounds", public.get("rounds")),
-                                                                  ("ranking", public.get("ranking")))
-                                 for r in rows or [] if isinstance(r, dict) for k in r}
+               "fields": sorted({f"{part}.{k}" for part, some in (("requests", reqs), ("rounds", rounds),
+                                                                  ("ranking", ranking)) for r in some for k in r}
                                 | set((before or {}).get("fields", []))),
                "multipliers": dict((before or {}).get("multipliers", {}))}
         # Sun 00:27, 5U: from round 84 a round that only one, two or three teams get right pays them a multiple of
@@ -661,21 +664,24 @@ class Forwarder:
         # is the first one to read. The field's name is not in the spec, so any field named like a multiplier counts.
         mine = {str(r.get("round_no")): r for r in reqs}
         multiplied = []
-        for r in list(public.get("rounds") or []) + reqs:
+        for r in rounds + reqs:
             n = str(r.get("round_no"))
+            if not mine.get(n, {}).get("closed"):  # said once, when the round is settled: its multiple and our
+                continue                             # verdict are final then, not while teams are still answering
             for k, v in r.items():
                 if "multipl" in k.lower() and v not in (None, 1, 1.0, "1", "1.0", "x1") and n not in now["multipliers"]:
                     now["multipliers"][n] = v
                     multiplied.append((n, v, r.get("accepted"), mine.get(n, {})))
         store.kv_set("board_scoring", json.dumps(now))
-        if before is None:  # the first look after this code starts is the baseline: nothing changed yet
-            return
+        # also on the first look after a start: deployed mid-game, the multiplied rounds so far are what to read first
         for n, v, accepted, r in multiplied:
             won = r.get("verdict") == "accepted"
             store.log("watcher", "info" if won else "error",
                       f"scoring: round {n} pays a multiple ({v})" + (f", {accepted} teams accepted" if accepted is not None
                                                                      else "")
                       + f"; ours: {r.get('verdict') or 'not seen yet'} {r.get('reason') or ''}".rstrip(), r)
+        if before is None:  # for everything else the first look is the baseline: nothing changed yet
+            return
         said = []
         if set(now["fields"]) - set(before.get("fields", now["fields"])):
             said.append(f"new field on the board: {', '.join(sorted(set(now['fields']) - set(before['fields'])))}")
@@ -691,7 +697,8 @@ class Forwarder:
                  if k in old.get(n, {}) and old[n][k] != v]
         if moved:  # a kind that arrives later (cost, tracking) is not a move; a value that was there and changed is
             said.append(f"points of {len(moved)} earlier results moved: {'; '.join(moved[:8])}")
-        full = (now["rules"] or {}).get("time_points")
+        full = now["rules"].get("time_points") if isinstance(now["rules"], dict) else None
+        full = full if isinstance(full, (int, float)) else None
         slow = []
         for r in reqs:  # the brief: full time points inside 2 minutes. Less than full there is another time scale
             n, t = str(r.get("round_no")), (r.get("points") or {}).get("time")

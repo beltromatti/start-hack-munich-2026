@@ -223,15 +223,29 @@ def book(ctx: Ctx, option_id: str, deal_id: str | None = None) -> dict:
     offer lives on the deal of the thread we quoted in. That deal can be booked from here when it is this
     customer's own (the same permission as `deal` and `crm`)."""
     _ensure_deal(ctx)
+    target = ctx.deal_id
     if deal_id and deal_id != ctx.deal_id:
         rec = store.get(deal_id)
         if not rec or rec["type"] != "deal":
             return {"error": "no such deal"}
-        if not _visible(ctx, rec):
+        # seeing a deal is not the right to book it: only the customer the offer was made to, writing now, in a
+        # customer thread (the tracking desk sees every deal and books none)
+        writer = (ctx.mail or _last_inbound(ctx.root) or {}).get("sender")
+        owner = rec["data"].get("customer")
+        if ctx.task != "customer" or not owner or writer != owner or not _visible(ctx, rec):
             return {"error": "that deal belongs to another customer"}
-        return ctx.fw.book_option(deal_id, option_id)
-    out = ctx.fw.book_option(ctx.deal_id, option_id)
-    if out.get("error") and not out.get("options"):
+        target = deal_id
+    # one booking per deal: a second yes (the same acceptance in two threads, a repeated call) must not reach the
+    # airline as a second booking request. A failed booking can be tried again.
+    held = store.get(f"booking-{store.get(target)['data']['root']}")
+    if held and held["status"] != "failed":
+        if held["data"].get("option") == option_id:
+            return {**held["data"], "already_booked": True}
+        return {"error": f"this deal is already booked (option {held['data'].get('option')}, "
+                         f"{held['data'].get('booking_reference') or held['data'].get('team_reference')}); a change "
+                         "goes to the airline with mail_carrier"}
+    out = ctx.fw.book_option(target, option_id)
+    if target == ctx.deal_id and out.get("error") and out.get("options") == []:
         out["hint"] = ("this thread's deal has no priced options. If they accept an offer from another thread of "
                        "theirs, find its deal with crm and pass its deal_id")
     return out
