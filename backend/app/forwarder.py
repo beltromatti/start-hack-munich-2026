@@ -167,7 +167,12 @@ class Forwarder:
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
                 asked[str(self.ask_trucker(rid, c, req))] = c.email
-        offers += self.portal_offers(rid, o, d, kg, cbm, cw)
+        portal, failed = self.portal_offers(rid, o, d, kg, cbm, cw)
+        offers += portal
+        for name in failed:  # portal down or over the limit for this airline: ask the airline by mail instead
+            c = w.carrier_by_name(name)
+            if c and c.email not in asked.values():
+                asked[str(self.ask_airline(rid, c, o, d, cw, cbm, req))] = c.email
         store.update(rid, lambda r: ("collecting", {**r["data"], "asked": asked,
                                                     "offers": r["data"]["offers"] + [x.as_dict() for x in offers],
                                                     "deadline": time.time() + settings.bid_wait_seconds}))
@@ -176,9 +181,11 @@ class Forwarder:
 
     def ask_airline(self, rid: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
                     req: dict) -> int:
+        # labelled lines: the carriers' desks read "total weight in kg" (live: "320 kg chargeable" was not read)
         body = (f"Hello {c.name} team,\n\nplease quote air freight for this shipment:\n"
-                f"Route: {o} to {d}\nCargo: {req.get('pieces') or 1} pieces, {req.get('commodity') or 'general cargo'}, "
-                f"{billed:.0f} kg chargeable" + (f", {cbm:.2f} cbm" if cbm else "") + "\n"
+                f"Route: {o} to {d}\nTotal weight: {billed:.0f} kg\n"
+                + (f"Volume: {cbm:.2f} cbm\n" if cbm else "")
+                + f"Pieces: {req.get('pieces') or 1}\nCargo: general cargo\n"
                 f"Ready: {req.get('ready_date') or 'now'}\n\n"
                 "Please send your all-in total, currency, transit time, rate reference and validity.\n\n"
                 f"Thanks,\n{settings.persona}, {settings.company}")
@@ -192,9 +199,9 @@ class Forwarder:
         z = kit.world().zones.get(req["pickup_zone"], {})
         body = (f"Hello {c.name} team,\n\nplease quote a pickup from {req.get('pickup_postcode') or ''} "
                 f"{z.get('area', '')} (zone {req['pickup_zone']}) to {z.get('airport', req['origin'])} airport.\n"
-                f"Cargo: {req.get('pieces') or 1} pieces, {Decimal(req['weight_kg']):.0f} kg"
-                + (f", {Decimal(req['volume_cbm']):.2f} cbm" if req.get("volume_cbm") else "") + ".\n"
-                f"Pickup: {req.get('ready_date') or 'as soon as possible'}.\n\n"
+                f"Total weight: {Decimal(req['weight_kg']):.0f} kg\n"
+                + (f"Volume: {Decimal(req['volume_cbm']):.2f} cbm\n" if req.get("volume_cbm") else "")
+                + f"Pieces: {req.get('pieces') or 1}\nPickup: {req.get('ready_date') or 'as soon as possible'}\n\n"
                 f"Please send your total, currency, pickup time and offer reference.\n\nThanks,\n"
                 f"{settings.persona}, {settings.company}")
         sent = self.api.send(c.email, f"Pickup quote zone {req['pickup_zone']} to {z.get('airport', '')}", body)
@@ -203,8 +210,10 @@ class Forwarder:
         store.log("bids", "mail_out", f"asked {c.name}", {"mail": sent["id"]}, run_id=rid)
         return sent["id"]
 
-    def portal_offers(self, rid: str, o: str, d: str, kg: Decimal, cbm: Decimal | None, cw: Decimal) -> list[Offer]:
-        w, out = kit.world(), []
+    def portal_offers(self, rid: str, o: str, d: str, kg: Decimal, cbm: Decimal | None,
+                      cw: Decimal) -> tuple[list[Offer], set[str]]:
+        """Portal prices at the chargeable weight and at the next break; airlines the portal failed for."""
+        w, out, failed = kit.world(), [], set()
         for a in w.portal.get((o, d), []):
             weights = [kg]
             nb = pricing.next_break(w.brackets.get(a["code"], []), cw)
@@ -215,6 +224,8 @@ class Forwarder:
                 if r.get("error"):
                     store.log("rfq", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
                               run_id=rid)
+                    if r["status"] in (429, 500, 502, 503, 504) and wt == kg:
+                        failed.add(a["name"])
                     continue
                 total = self.eur(Decimal(r["total"]), r["currency"], r.get("fx_eur_per_usd"))
                 if total is None:
@@ -222,7 +233,7 @@ class Forwarder:
                 out.append(Offer("air", r["airline"], total, Decimal(r["transit_days"]), "portal", r["rate_id"],
                                  Decimal(r["chargeable_weight_kg"]),
                                  extra={"code": a["code"], "valid_until": r["valid_until"], "weight": str(wt)}))
-        return out
+        return out, failed
 
     def ready(self, rec: dict) -> bool:
         d = rec["data"]
