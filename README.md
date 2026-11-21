@@ -17,6 +17,28 @@ git worktree add ../start-hack-competitors research/competitors
 Not in git: the downloaded videos (`video/clips/`, 234 MB). The links are in `BRIEF.md` section 5; frames,
 contact sheets, subtitles and transcripts are here.
 
+## Analysing it with your AI
+
+**Claude Code or Codex:** open the folder from the worktree above and start with: "Read README.md, BRIEF.md,
+VISION-VS-CODE.md and everything in transcripts/. Then answer my questions from these files only, and name the
+file for every claim."
+
+**ChatGPT or Claude in the browser:** upload `BRIEF.md`, `VISION-VS-CODE.md` and the 11 files in `transcripts/`
+(about 280 KB of text together). For the look, add the screenshots from the table "The screens that matter most"
+below.
+
+Questions that pay off for tomorrow:
+
+1. "Which questions will the 5U founders most likely ask after a 3-minute pitch? For each, the answer our system
+   supports, and where VISION-VS-CODE.md says our code does not back it yet."
+2. "Rewrite these pitch lines in 5U's own words (AI Worker, decision record, human in the loop, time to first
+   response). No 'workflow', 'pipeline' or 'bot': their CEO calls workflows jails for agents."
+3. "Zauber, Nexcade, cargo.one, Pallet: one thing each shows that we can also show live, one thing we do better."
+
+Two checks before anything goes to the jury: a fact about a competitor needs its source (listed at the end of
+`BRIEF.md`), and a claim about our code needs the current `main`, because `VISION-VS-CODE.md` is a snapshot of
+Saturday 16:31.
+
 ## Read in this order for UI work
 
 1. `BRIEF.md`, section 2 "UI patterns worth copying": which screen of which company, with the file to open.
