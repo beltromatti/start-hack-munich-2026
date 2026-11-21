@@ -397,8 +397,7 @@ class Forwarder:
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
-        days = (Decimal(str(o["pickup_hours"])) / 24).quantize(Decimal("0.001")) \
-            if trucker and o.get("pickup_hours") is not None else Decimal(str(o.get("transit_days") or 0))
+        days = language.days(o.get("time_value"), o.get("time_unit")) or Decimal(0)
         # a carrier answering for itself is named as in the carrier list (its mail bid and its sheet are one
         # carrier); the rate desk names the airlines it lists
         name = carrier.name if carrier else (o.get("carrier") or m["sender"])

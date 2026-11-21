@@ -12,7 +12,7 @@ def fake_llm(name, system, user, schema):
     if name == "bid":
         if "do not serve" in user:
             return {"offers": [{"carrier": "x", "airline_code": None, "available": False, "total": None,
-                                "currency": None, "transit_days": None, "pickup_hours": None, "reference": None,
+                                "currency": None, "time_value": None, "time_unit": None, "reference": None,
                                 "valid_until": None, "note": None}]}
         if "confirmed" in user.lower():
             return {"offers": []}
@@ -22,8 +22,8 @@ def fake_llm(name, system, user, schema):
         ref = re.search(r"\b(R-\S+?|TRK-\d+)\b", user)
         return {"offers": [{"carrier": re.search(r"From: (\S+)", user).group(1), "airline_code": None,
                             "available": True, "total": float(total.group(1)) if total else None, "currency": "EUR",
-                            "transit_days": int(days.group(1)) if days else None,
-                            "pickup_hours": int(hours.group(1)) if hours else None,
+                            "time_value": int(hours.group(1)) if hours else int(days.group(1)) if days else None,
+                            "time_unit": "hours" if hours else "days" if days else None,
                             "reference": ref.group(1) if ref else None, "valid_until": None, "note": None}]}
     raise AssertionError(name)
 

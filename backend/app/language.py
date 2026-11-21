@@ -16,7 +16,9 @@ BID = strict({"offers": {"type": "array", "items": strict({
     "fx_eur_per_unit": N,
     # when there is no total, the parts it is made of (code computes the total for the weight we asked)
     "rate_per_kg": N, "minimum_charge": N, "surcharges_per_kg": N, "fixed_fees": N, "billed_kg": N,
-    "transit_days": N, "pickup_hours": N, "reference": S, "valid_until": S, "note": S})}})
+    # how long it takes, as written: "8 hours" -> 8, "hours"; "4 days" -> 4, "days" (code converts)
+    "time_value": N, "time_unit": S,
+    "reference": S, "valid_until": S, "note": S})}})
 
 TARIFF = strict({"airline": S, "currency": S, "valid_from": S, "valid_to": S, "notes": S,
                  "lanes": {"type": "array", "items": strict({
@@ -77,3 +79,17 @@ def volume_cbm(q: dict, dims: list[dict], pieces: int | None) -> Decimal | None:
         f = LENGTH.get((d.get("unit") or "cm").lower(), Decimal("0.01"))
         total += (l * f) * (w * f) * (h * f) * (d.get("count") or 1)
     return total or None
+
+
+UNITS_PER_DAY = {"h": Decimal(24), "hr": Decimal(24), "hrs": Decimal(24), "hour": Decimal(24), "hours": Decimal(24),
+                 "stunde": Decimal(24), "stunden": Decimal(24), "min": Decimal(1440), "minutes": Decimal(1440),
+                 "d": Decimal(1), "day": Decimal(1), "days": Decimal(1), "tag": Decimal(1), "tage": Decimal(1),
+                 "week": Decimal("0.142857"), "weeks": Decimal("0.142857")}
+
+
+def days(value, unit) -> Decimal | None:
+    """A duration as written (8, "hours") in days, by code: the model never converts units."""
+    v = to_decimal(value)
+    if v is None:
+        return None
+    return (v / UNITS_PER_DAY.get((unit or "days").strip().lower().rstrip("."), Decimal(1))).quantize(Decimal("0.001"))

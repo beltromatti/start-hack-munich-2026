@@ -270,7 +270,7 @@ def test_a_bid_quoted_per_kg_gets_its_total_from_code():
     store.kv_set("bidweight:41", "300")
     o = {"carrier": "x", "available": True, "total": None, "currency": "EUR", "fx_eur_per_unit": None,
          "rate_per_kg": 2.42, "minimum_charge": 110, "surcharges_per_kg": 0.77, "fixed_fees": 25, "billed_kg": None,
-         "transit_days": 4, "pickup_hours": None, "reference": "R-9", "valid_until": None, "note": None}
+         "time_value": 4, "time_unit": "days", "reference": "R-9", "valid_until": None, "note": None}
     m = {"id": 42, "in_reply_to": 41, "sender": "yellowtail-air-freight@hackloop.mail"}
     off = f.offer(o, m, kit.world().carrier_by_email(m["sender"]))
     assert str(off.total) == "982.00"  # 300 x 2.42 + 300 x 0.77 + 25
@@ -307,3 +307,15 @@ def test_market_is_empty_on_a_quiet_market_and_carries_what_other_deals_saw():
     assert m["our_recent_losses"] == [{"round": 7, "verdict": "rejected", "reason": "price_above_market"}]
     # a carrier this deal does not use is not its news
     assert "live_vs_sheet" not in forwarder.market("deal-new", req, [Offer("air", "Fjordline", D(1), D(1), "sheet")])
+
+
+def test_the_server_asks_for_the_team_password(monkeypatch):
+    import base64
+    from fastapi.testclient import TestClient
+    from app import main
+    monkeypatch.setattr(main, "_PASSWORD", "s3cret")
+    c = TestClient(main.app)
+    assert c.get("/api/health").status_code == 200
+    assert c.get("/api/deals").status_code == 401
+    ok = {"Authorization": "Basic " + base64.b64encode(b"team:s3cret").decode()}
+    assert c.get("/api/deals", headers=ok).status_code == 200
