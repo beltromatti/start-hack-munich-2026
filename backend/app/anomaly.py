@@ -20,6 +20,8 @@ from app import kit, llm, store
 
 OPS_MODEL = os.getenv("OPS_MODEL", "gpt-5.5")
 SLOW_S = 75  # baseline: about 30 s after our mail
+Z_MIN, BASE_N, MIN_BASE, SD_FLOOR = 3.0, 10, 3, 0.02  # price shocks: own last 10 deals, at least 3
+FIRST_GAP = 0.15  # first live price this far off the sheet: the sheet is likely stale
 AMOUNT = re.compile(r"(\d[\d,.]*\d)\s*(EUR|USD|GBP|CHF|CNY|JPY)\b|\b(EUR|USD|GBP|CHF|CNY|JPY)\s*(\d[\d,.]*\d)")
 GOOD = {"accepted", "correct", "ok", "open", "pending", "won", "booked", "scored"}
 # 5U booth, Sat 15:50: news play no role, but customers' replies may name problems that point to a disruption.
@@ -44,7 +46,37 @@ def _ts(s: str | None) -> float | None:
         return None
 
 
-def signals(mails: list[dict], events: list[dict], board: dict | None) -> list[dict]:
+def price_shocks(deals: list[dict]) -> list[dict]:
+    """A carrier's live price (portal, mail) against its own sheet price on the same deal: the ratio removes
+    weight and lane, so every deal is one point on the carrier's series. A shock is a jump against the
+    carrier's own earlier points (z >= Z_MIN, method from trend_scout sim/shocks.py), or, before enough
+    points exist, a first live price far off the sheet (a new tariff, catalog 1)."""
+    series: dict[str, list[tuple[float, float, str]]] = {}
+    for rec in sorted(deals, key=lambda r: r.get("updated_at") or 0):
+        offers = [o for o in rec["data"].get("offers", []) if o.get("leg") == "air"]
+        sheet = {o["carrier"]: float(o["total"]) for o in offers if o.get("source") == "sheet"}
+        for o in offers:
+            if o.get("source") in ("portal", "email") and sheet.get(o["carrier"]):
+                series.setdefault(o["carrier"], []).append((float(o["total"]) / sheet[o["carrier"]],
+                                                             float(o["total"]), rec["id"]))
+    out = []
+    for carrier, pts in series.items():
+        for i, (ratio, total, deal) in enumerate(pts):
+            base = [p[0] for p in pts[max(0, i - BASE_N):i]]
+            if len(base) >= MIN_BASE:
+                mu = sum(base) / len(base)
+                sd = max((sum((b - mu) ** 2 for b in base) / len(base)) ** 0.5, SD_FLOOR)
+                z = (ratio - mu) / sd
+                if abs(z) >= Z_MIN:
+                    out.append({"carrier": carrier, "deal": deal, "ratio": round(ratio, 3), "z": round(z, 1),
+                                "base_ratio": round(mu, 3), "total": total})
+            elif i == 0 and abs(ratio - 1) >= FIRST_GAP:
+                out.append({"carrier": carrier, "deal": deal, "ratio": round(ratio, 3), "z": None,
+                            "base_ratio": 1.0, "total": total})
+    return out
+
+
+def signals(mails: list[dict], events: list[dict], board: dict | None, deals: list[dict] = ()) -> list[dict]:
     """Everything that differs from the baseline, one entry per (kind, subject). Pure: tests feed it data."""
     out: dict[str, dict] = {}
 
@@ -94,6 +126,9 @@ def signals(mails: list[dict], events: list[dict], board: dict | None) -> list[d
         if "DIRECT (gateway down)" in text:
             hit("gateway-down", "0", "the 5U gateway failed, calls went to OpenAI directly (no time points)",
                 {"event": e["id"], "summary": text[:200]})
+    for s in price_shocks(list(deals)):
+        hit(f"price:{s['carrier']}", "1", f"{s['carrier']} live price at {s['ratio']}x its sheet "
+            f"(usual {s['base_ratio']}x)", s)
     for r in (board or {}).get("requests", []):
         verdict = str(r.get("verdict") or "").lower()
         if verdict and verdict not in GOOD:
@@ -135,7 +170,7 @@ def diagnose(s: dict) -> dict:
 def check(diagnose_new: bool = True) -> list[dict]:
     """Scan the register; open an incident per new signal, diagnose it once. Returns the incidents opened."""
     board = json.loads(store.kv_get("board_me") or "null")
-    found = signals(store.mails(500), store.events(limit=500), board)
+    found = signals(store.mails(500), store.events(limit=500), board, store.records("deal", limit=300))
     opened = []
     for s in found:
         rid = "incident-" + re.sub(r"[^\w-]+", "-", s["key"])[:80]

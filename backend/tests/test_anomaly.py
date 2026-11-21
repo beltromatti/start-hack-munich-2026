@@ -44,6 +44,21 @@ def test_customer_reply_naming_a_problem_is_a_signal():
     assert s["key"] == "customer:1" and s["change"] == "15" and "sciopero" in s["what"]
 
 
+def deal(i, sheet, live, carrier="Elbflug"):
+    return {"id": f"deal-{i}", "updated_at": i, "data": {"offers": [
+        {"leg": "air", "carrier": carrier, "total": str(sheet), "source": "sheet"},
+        {"leg": "air", "carrier": carrier, "total": str(live), "source": "portal"}]}}
+
+
+def test_price_jump_against_the_carriers_own_history():
+    steady = [deal(i, 1000, 1010 + i) for i in range(5)]  # live about 1 % over sheet, every deal
+    assert anomaly.price_shocks(steady) == []
+    [s] = anomaly.price_shocks(steady + [deal(9, 1000, 1180)])  # +18 %: a new tariff
+    assert s["deal"] == "deal-9" and s["z"] >= 3
+    [first] = anomaly.price_shocks([deal(1, 1000, 1300)])  # first live price 30 % off: sheet stale
+    assert first["z"] is None and first["ratio"] == 1.3
+
+
 def test_check_opens_once_and_reopens_on_new_evidence():
     store.save_mail({"id": 1, "from": "start-milan@hackloop.mail", "to": AIR, "subject": "rate", "body": "q",
                      "received_at": "2026-11-21T15:00:00+00:00"}, "out")
