@@ -34,6 +34,14 @@ class Settings:
     poll_seconds: float = float(os.getenv("POLL_SECONDS", "1.5"))
     # How long get_offers waits for carrier and trucker replies by default (the agent may ask for less or more).
     bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "85"))
+    # How 5U scores the pick is only half documented ("price and speed weigh 50/50"). These three switches let
+    # production follow what /v1/board/me shows, with a restart instead of new code. Defaults = behaviour so far.
+    # See docs/research/pricing.md.
+    # Rounds 1 and 2 (Sat 16:00, 16:07): only `balanced` + `ratio` explains both best prices (round 1 fastest
+    # trucker, round 2 cheapest): "among carrier bids, the right one is the most balanced".
+    pickup_rule: str = os.getenv("PICKUP_RULE", "balanced")           # asked | cheapest | balanced
+    balance_rule: str = os.getenv("BALANCE_RULE", "ratio")            # ratio | minmax
+    unspecified_rule: str = os.getenv("UNSPECIFIED_RULE", "balanced")  # balanced | cheapest | fastest
     persona: str = os.getenv("PERSONA_NAME", "Giulia")
     company: str = os.getenv("COMPANY_NAME", "START Milan Forwarding")
 

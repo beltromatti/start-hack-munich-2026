@@ -31,9 +31,13 @@ def nullable(o: dict) -> dict:
 QUANTITY = obj({"value": N, "unit": S, "per_piece": {"type": "boolean"}})
 SHIPMENT = obj({
     "origin_airport": {**S, "description": "IATA code of the German departure airport, if the customer names one"},
-    "pickup": nullable(obj({"postcode": S, "city": S}, "door-to-port: where the truck collects the goods")),
-    "destination_airport": {**S, "description": "IATA code of the destination airport. A city means its cargo "
-                                                "airport (New Delhi -> DEL, Chicago -> ORD, Tokyo -> NRT, Sao Paulo -> GRU)"},
+    "pickup": nullable(obj({"postcode": S, "city": S},
+                           "door-to-port, only when the customer asks us to collect the goods (pickup, trucking, "
+                           "from our site, ab Werk): where the truck collects them. An address in a signature or "
+                           "letterhead is not a pickup request: null")),
+    "destination_airport": {**S, "description": "IATA code of the destination airport. A city is its airport in "
+                                                "our network: " + ", ".join(
+                                                    f"{c} {n}" for c, n in kit.DESTINATIONS.items())},
     "pieces": I,
     "weight": {**QUANTITY, "description": "as written: value, unit (kg, lb, t), per piece or total"},
     "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or total; null values if unknown"},
@@ -54,7 +58,8 @@ TOOLS = [
        "portal and our rate sheets, waits for the answers and returns the priced options, all-in totals computed by "
        "code (chargeable weight, cheaper weight breaks, minimums, surcharges, pickup leg), with the option that fits "
        "each preference. Pass the shipment as the customer described it, units as written. With shipment null it "
-       "only waits for the replies still missing and returns the options again. Carriers answer in 15-60 s (live, "
+       "only waits for the replies still missing and returns the options again (or, when there is nothing to "
+       "price, what the carriers answered). Carriers answer in 15-60 s (live, "
        "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. "
        "wait_seconds is how long to wait at most: it returns as soon as everyone answered.",
        {"shipment": nullable(SHIPMENT),
@@ -127,7 +132,7 @@ def run(ctx: Ctx, name: str, args: dict) -> dict:
 
 def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: float) -> dict:
     _ensure_deal(ctx)
-    store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" else r["status"],
+    store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" and shipment is not None else r["status"],
                                          {**r["data"], "preference": preference}))
     out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds)
     if out.get("missing"):
@@ -162,14 +167,33 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
     return result
 
 
+MONEY = re.compile(r"(?:€|\$|£|\b(?:EUR|USD|GBP|CHF)\b)\s*\d[\d.,']*|\d[\d.,']*\s*(?:€|\$|£|\b(?:EUR|USD|GBP|CHF|euros?|dollars?)\b)",
+                   re.IGNORECASE)
+
+
+def _quote_amounts(ctx: Ctx, option_id: str | None, body: str) -> str | None:
+    """None when the quote carries exactly one amount of money, the option's total. Else what to change."""
+    d = store.get(ctx.deal_id)["data"] if store.get(ctx.deal_id) else {}
+    opt = (d.get("options") or {}).get(option_id or "")
+    if not opt:
+        return None  # no option to check against (recorded as such by _record_quote)
+    found = MONEY.findall(body)
+    if body.count(opt["total_text"]) == 1 and len(found) == 1:
+        return None
+    return (f"not sent: a quote carries exactly one amount of money, the total of option {option_id} written as "
+            f"{opt['total_text']}, once. This text has {len(found)}: {found[:4]}. One mail, one option, one total; "
+            f"another option can be named in words (airline, days) without its price")
+
+
 def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dict:
     d = store.get(ctx.deal_id)["data"] if store.get(ctx.deal_id) else {}
     opt = (d.get("options") or {}).get(option_id or "")
     if not opt:
         store.log("forwarder", "info", f"quote sent without a known option ({option_id})", run_id=ctx.deal_id)
         return {"note": "no option recorded with this quote (option_id unknown): the CRM has no price for it"}
-    if opt["total_text"] not in body:  # diagnostics, not a rule: we measure, the prompt teaches
-        store.log("forwarder", "info", f"quote text does not contain {opt['total_text']}", run_id=ctx.deal_id)
+    wrong = _quote_amounts(ctx, option_id, body)  # diagnostics, not a gate: we measure, the prompt teaches
+    if wrong:
+        store.log("forwarder", "error", f"quote mail amounts: {wrong}"[:400], run_id=ctx.deal_id)
     first = not d.get("quote")
     took = time.time() - _ts(d.get("received_at"))
     q = {"option": option_id, "amount": opt["total_text"], "total": opt["total"], "air": opt["air"],
@@ -297,6 +321,7 @@ def _summary(rec: dict, b: dict | None) -> dict:
             "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",
                                                    "transit_days", "status", "via", "pickup", "amount",
                                                    "carrier_status")},
+                         "airline_email": getattr(kit.world().carrier_by_name(bd.get("airline") or ""), "email", None),
                          "booked_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(bd["booked_at"])),
                          "estimated_arrival": eta(bd)} if bd else None)}
 

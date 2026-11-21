@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
+from .config import settings
+
 KG_PER_CBM = Decimal("167")
 CENT = Decimal("0.01")
 
@@ -21,6 +23,24 @@ def money(x: Any) -> Decimal:
 def fmt(amount: Decimal, currency: str = "EUR") -> str:
     """The one way a total is written to a customer: `1026.00 EUR` (no thousands separator to misread)."""
     return f"{money(amount):.2f} {currency}"
+
+
+def to_eur(amount: Any, currency: str | None, fx: Any, rates: dict[str, Decimal]) -> Decimal | None:
+    """Any price in EUR, or None when it cannot be converted (never guessed).
+    `fx` is the rate stated with this price: EUR per 1 unit of its currency (the portal's `fx_eur_per_usd` field
+    carries it for whatever currency the price is in). `rates` remembers the last stated rate per currency and
+    stands in when a later price in that currency states none."""
+    cur = (currency or "EUR").upper()
+    if cur == "EUR":
+        return money(amount)
+    try:
+        rate = Decimal(str(fx)) if fx else None
+    except ArithmeticError:
+        rate = None
+    if rate and rate > 0:
+        rates[cur] = rate
+    rate = rates.get(cur)
+    return money(Decimal(str(amount)) * rate) if rate else None
 
 
 def chargeable(weight_kg: Decimal, volume_cbm: Decimal | None) -> Decimal:
@@ -43,6 +63,16 @@ def sheet_price(lane: dict, weight_kg: Decimal, volume_cbm: Decimal | None) -> t
             best = (total, billed)
     assert best is not None
     return best
+
+
+COMMON_BREAKS = (45, 100, 250, 300, 500, 1000, 2000)  # every break on the 10 sheets and the 15 portal airlines
+
+
+def breaks_to_try(cw: Decimal, factor: Decimal = Decimal("1.35")) -> list[Decimal]:
+    """For a carrier whose breaks we do not know (no sheet, not on the portal): the breaks above the chargeable
+    weight at which billing can still be cheaper. Rate plus surcharges never falls by more than 1.33x between
+    two breaks on any sheet, so a break further away than `factor` cannot win."""
+    return [Decimal(b) for b in COMMON_BREAKS if cw < b < cw * factor]
 
 
 def next_break(breaks: list[int], cw: Decimal) -> Decimal | None:
@@ -77,18 +107,35 @@ class Offer:
                      d.get("extra") or {})
 
 
-def pick(offers: list[Offer], preference: str) -> Offer | None:
+def pick(offers: list[Offer], preference: str, balance: str | None = None) -> Offer | None:
     """cheapest: lowest total, then fastest. fastest: fewest days, then cheapest.
-    Otherwise the most balanced: price and speed weigh 50/50, each relative to the best on offer."""
+    Anything else: the most balanced, price and speed weigh 50/50 (see `balanced`)."""
     if not offers:
         return None
     if preference == "cheapest":
         return min(offers, key=lambda o: (o.total, o.days))
     if preference == "fastest":
         return min(offers, key=lambda o: (o.days, o.total))
-    p0 = min(o.total for o in offers) or Decimal(1)
-    d0 = min(o.days for o in offers) or Decimal("0.1")
-    return min(offers, key=lambda o: (o.total / p0 + o.days / d0, o.total))
+    return balanced(offers, balance or settings.balance_rule)
+
+
+def balanced(offers: list[Offer], rule: str = "ratio") -> Offer:
+    """Price and speed 50/50. The brief does not say how the two are made comparable, and the rules disagree:
+    ratio   each relative to the best on offer (total / lowest + days / fewest). Speed dominates when one
+            offer is much faster (3 h against 26 h), so it mostly picks the fastest.
+    minmax  each scaled 0..1 between the best and the worst on offer. Picks a middle offer when there is one;
+            cheapest and fastest tie at 0.5, the tie goes to the cheaper."""
+    p_lo, p_hi = min(o.total for o in offers), max(o.total for o in offers)
+    d_lo, d_hi = min(o.days for o in offers), max(o.days for o in offers)
+    if rule == "minmax":
+        def score(o: Offer) -> Decimal:
+            p = (o.total - p_lo) / (p_hi - p_lo) if p_hi > p_lo else Decimal(0)
+            d = (o.days - d_lo) / (d_hi - d_lo) if d_hi > d_lo else Decimal(0)
+            return p + d
+    else:
+        def score(o: Offer) -> Decimal:
+            return o.total / (p_lo or Decimal(1)) + o.days / (d_lo or Decimal("0.1"))
+    return min(offers, key=lambda o: (score(o), o.total))
 
 
 def best_by_carrier(offers: list[Offer]) -> list[Offer]:
@@ -106,14 +153,24 @@ def best_by_carrier(offers: list[Offer]) -> list[Offer]:
     return list(best.values())
 
 
-def quote(air: list[Offer], pickup: list[Offer], preference: str, needs_pickup: bool) -> dict | None:
-    """The one option we offer: best air leg (+ best pickup leg for door-to-port). None if it can't be priced."""
-    a = pick(best_by_carrier(air), preference)
+def quote(air: list[Offer], pickup: list[Offer], preference: str, needs_pickup: bool,
+          pickup_rule: str | None = None, balance: str | None = None, unspecified: str | None = None) -> dict | None:
+    """The one option we offer: best air leg (+ best pickup leg for door-to-port). None if it can't be priced.
+
+    pickup_rule  which trucker goes into the all-in total: `asked` (cheapest, or the fastest when the customer
+                 asked for fastest), `cheapest` (always) or `balanced` (always the 50/50 pick).
+    unspecified  what a request without "cheapest" or "fastest" gets: `balanced`, `cheapest` or `fastest`."""
+    pickup_rule, balance = pickup_rule or settings.pickup_rule, balance or settings.balance_rule
+    if preference not in ("cheapest", "fastest"):
+        preference = unspecified or settings.unspecified_rule
+    a = pick(best_by_carrier(air), preference, balance)
     if a is None:
         return None
     p = None
     if needs_pickup:
-        p = pick(best_by_carrier(pickup), "fastest" if preference == "fastest" else "cheapest")
+        how = {"asked": "fastest" if preference == "fastest" else "cheapest", "cheapest": "cheapest"}.get(
+            pickup_rule, "balanced")
+        p = pick(best_by_carrier(pickup), how, balance)
         if p is None:
             return None
     total = money(a.total + (p.total if p else 0))

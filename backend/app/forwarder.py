@@ -13,6 +13,7 @@ import re
 import threading
 import time
 import traceback
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Any, Callable
@@ -31,7 +32,7 @@ class Forwarder:
         self.inflight: set[str] = set()
         self.lock = threading.Lock()
         self.stop = threading.Event()
-        self.fx_eur_per_usd: Decimal | None = None
+        self.fx: dict[str, Decimal] = {}  # EUR per 1 unit of a currency, as last stated with a price
         self._last_portal = time.time()
         self._last_board = 0.0
 
@@ -138,8 +139,6 @@ class Forwarder:
             req = normalise(shipment, w)
             if req["missing"]:
                 return {"missing": req["missing"], "understood": req,
-                        "destinations_we_fly_to": sorted({d for c in w.carriers if c.kind == "airline"
-                                                          for d in c.serves} | {d for _, d in w.portal}),
                         "hint": "if the customer's words already say it (a city is its airport), call again with it; "
                                 "otherwise ask the customer for exactly this"}
             same = deal and deal["data"].get("request") and all(
@@ -149,14 +148,18 @@ class Forwarder:
                 self._ask_everyone(deal_id, req)
         deal = store.get(deal_id)
         if not deal or not deal["data"].get("request"):
+            if deal and deal["data"].get("asked"):  # nothing to price (a tracking thread): wait for the answers
+                self._wait(deal_id, wait)
+                d = store.get(deal_id)["data"]
+                return {"carrier_messages": d.get("carrier_messages", []), "still_waiting_for": waiting_for(d)}
             return {"error": "no shipment yet: call get_offers with the shipment"}
-        end = time.time() + max(0.0, float(wait))
-        while time.time() < end:
-            d = store.get(deal_id)["data"]
-            if set(d.get("asked", {}).values()) <= set(d.get("replied", [])):
-                break
-            self.wait_step()
+        self._wait(deal_id, wait)
         return self.options(deal_id, preference)
+
+    def _wait(self, deal_id: str, wait: float) -> None:
+        end = time.time() + max(0.0, float(wait))
+        while time.time() < end and waiting_for(store.get(deal_id)["data"]):
+            self.wait_step()
 
     def wait_step(self) -> None:
         """While a tool waits for carriers, the loop's other threads read their replies."""
@@ -171,11 +174,15 @@ class Forwarder:
             total, billed = pricing.sheet_price(lane, kg, cbm)
             offers.append(Offer("air", lane["airline"], total, Decimal(lane["transit_days"]), "sheet", None, billed))
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "request": req, "offers": [x.as_dict() for x in offers],
-                                                       "asked": {}, "replied": [], "asked_at": time.time()}))
+                                                       "asked": {}, "replied": [], "declined": [], "asked_at": time.time()}))
         asked: dict[str, str] = {}
+        with_sheet = {l["airline"] for l in w.sheet_lanes}
         for c in w.email_airlines(o, d):  # carriers that quote by mail
-            billed = next((x.billed_kg for x in offers if x.carrier == c.name), cw)
-            asked[str(self.ask_airline(deal_id, c, o, d, billed, cbm, req))] = c.email
+            weights = [next((x.billed_kg for x in offers if x.carrier == c.name), cw)]
+            if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
+                weights += pricing.breaks_to_try(cw)
+            for wt in weights:
+                asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
                 asked[str(self.ask_trucker(deal_id, c, req))] = c.email
@@ -194,17 +201,17 @@ class Forwarder:
         """The priced options as the agent sees them. Every number here is computed by code."""
         d = store.get(deal_id)["data"]
         req = d["request"]
-        offers = [Offer.of(x) for x in d.get("offers", [])]
+        declined = {n.lower() for n in d.get("declined", [])}
+        offers = [x for x in (Offer.of(x) for x in d.get("offers", []))
+                  if not (x.source == "sheet" and x.carrier.lower() in declined)]
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
         needs_pickup = bool(req["pickup_zone"])
         table: dict[str, dict] = {}
         rows = []
+        variants = pickup_variants(pickups, preference) if needs_pickup else [("", None)]
         for i, a in enumerate(air, 1):
-            p_cheap = pricing.pick(pickups, "cheapest") if needs_pickup else None
-            p_fast = pricing.pick(pickups, "fastest") if needs_pickup else None
-            for tag, p in ([("", p_cheap)] if not needs_pickup or p_cheap is p_fast else
-                           [("", p_cheap), ("f", p_fast)]):
+            for tag, p in variants:
                 if needs_pickup and p is None:
                     continue
                 oid = f"A{i}{tag}"
@@ -214,25 +221,30 @@ class Forwarder:
                 rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
                              "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
                              "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
+                             "billed_kg": float(a.billed_kg) if a.billed_kg is not None else None,
                              "carrier_note": (a.extra or {}).get("note")})
         rec = {}
         for pref in ("cheapest", "fastest", "balanced"):
             cand = [Offer("air", k, Decimal(v["total"]),
                           Decimal(v["air"]["days"]) + (Decimal(v["pickup"]["days"]) if v["pickup"] else 0), "x")
                     for k, v in table.items()]
-            best = pricing.pick(cand, pref if pref != "balanced" else "unspecified")
+            best = pricing.pick(cand, pref if pref != "balanced" else "unspecified", settings.balance_rule)
             if best:
                 rec[pref] = best.carrier
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "options": table}))
-        waiting = sorted(set(d.get("asked", {}).values()) - set(d.get("replied", [])))
-        pref_key = preference if preference in ("cheapest", "fastest") else "balanced"
+        waiting = waiting_for(d)
+        pref_key = preference if preference in ("cheapest", "fastest") else settings.unspecified_rule
         return {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
                                                  "pieces", "pickup_zone", "pickup_postcode")},
                 "options": rows, "recommended": rec.get(pref_key), "recommended_for": pref_key,
                 "recommended_by_preference": rec,
                 "pickup_alternatives": [{"trucker": p.carrier, "total": pricing.fmt(p.total),
                                          "pickup_hours": round(float(p.days) * 24, 1)} for p in pickups],
-                "still_waiting_for": waiting}
+                "still_waiting_for": waiting,
+                # answers that change the picture: a carrier we had a price for says no, or a carrier asks back
+                "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
+                                           for c in d.get("carrier_messages", [])
+                                           if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
 
     def ask_airline(self, deal_id: str, c: kit.Carrier, o: str, d: str, billed: Decimal, cbm: Decimal | None,
                     req: dict) -> int:
@@ -355,10 +367,17 @@ class Forwarder:
         carrier = kit.world().carrier_by_email(m["sender"])
         raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
         offers = [o for o in (self.offer(x, m, carrier) for x in raw) if o is not None]
-        notes = [{"from": m["sender"], "mail": m["id"], "text": m["body"][:2000]}] if not offers else []
+        # what a carrier says now beats its sheet, also when it says no (lane closed, flights suspended): its
+        # sheet price is no longer on offer. A carrier that only asks back for facts keeps it.
+        said_no = bool(carrier and not offers and any(x.get("available") is False for x in raw))
+        had_sheet = bool(carrier and rec and any(o["source"] == "sheet" and o["carrier"] == carrier.name
+                                                 for o in rec["data"].get("offers", [])))
+        notes = [{"from": m["sender"], "mail": m["id"], "text": m["body"][:2000], "declined": said_no,
+                  "had_sheet_price": had_sheet}] if not offers else []
         store.update(deal_id, lambda r: (r["status"], {
             **r["data"], "replied": r["data"].get("replied", []) + [m["sender"]],
             "offers": r["data"].get("offers", []) + [o.as_dict() for o in offers],
+            "declined": sorted(set(r["data"].get("declined", []) + ([carrier.name] if said_no else []))),
             "carrier_messages": r["data"].get("carrier_messages", []) + notes}))
         store.log("bids", "info", f"{m['sender']}: " + (", ".join(f"{o.carrier} {o.total}" for o in offers)
                                                         or "no price (see carrier_messages)"), run_id=deal_id)
@@ -366,7 +385,7 @@ class Forwarder:
     def offer(self, o: dict, m: dict, carrier: kit.Carrier | None) -> Offer | None:
         if not o.get("available") or o.get("total") is None:
             return None
-        total = self.eur(Decimal(str(o["total"])), o.get("currency") or "EUR", None)
+        total = self.eur(Decimal(str(o["total"])), o.get("currency") or "EUR", o.get("fx_eur_per_unit"))
         if total is None:
             return None
         trucker = carrier is not None and carrier.kind == "trucker"
@@ -415,15 +434,10 @@ class Forwarder:
         store.log("booking", "info", f"confirmation not matched: {m['subject']}")
 
     def eur(self, amount: Decimal, currency: str, fx: Any) -> Decimal | None:
-        cur = (currency or "EUR").upper()
-        if fx:
-            self.fx_eur_per_usd = Decimal(str(fx))
-        if cur == "EUR":
-            return pricing.money(amount)
-        if cur == "USD" and self.fx_eur_per_usd:
-            return pricing.money(amount * self.fx_eur_per_usd)
-        store.log("bids", "error", f"cannot convert {amount} {cur} to EUR")
-        return None
+        total = pricing.to_eur(amount, currency, fx, self.fx)
+        if total is None:
+            store.log("bids", "error", f"cannot convert {amount} {currency} to EUR: no exchange rate seen")
+        return total
 
     # ---- tariffs -------------------------------------------------------------------------------------------
 
@@ -481,6 +495,27 @@ class Forwarder:
 
 # ---- helpers -----------------------------------------------------------------------------------------------
 
+def waiting_for(d: dict) -> list[str]:
+    """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""
+    asked, replied = Counter(d.get("asked", {}).values()), Counter(d.get("replied", []))
+    return sorted(email for email, n in asked.items() if replied[email] < n)
+
+
+def pickup_variants(pickups: list[Offer], preference: str = "cheapest") -> list[tuple[str, Offer | None]]:
+    """The one trucker an option carries, by PICKUP_RULE (docs/research/pricing.md, round-log.md).
+    asked: the fastest when the customer asked for fastest (round 1: full accuracy), else the cheapest.
+    cheapest: always the cheapest. balanced: always the 50/50 pick (BALANCE_RULE).
+    One variant only: with two on the table the agent took the fast trucker for a "cheapest" request because the
+    goods were "ready tomorrow 9:00" (stress test m08, 10.9 % over the best price)."""
+    if not pickups:
+        return [("", None)]
+    if settings.pickup_rule == "balanced":
+        return [("", pricing.balanced(pickups, settings.balance_rule))]
+    if settings.pickup_rule == "asked" and preference == "fastest":
+        return [("", pricing.pick(pickups, "fastest"))]
+    return [("", pricing.pick(pickups, "cheapest"))]
+
+
 def normalise(s: dict, w: kit.World) -> dict:
     """From the shipment as the agent passes it (the customer's words and units) to the facts code prices with."""
     pieces = s.get("pieces")
@@ -498,7 +533,7 @@ def normalise(s: dict, w: kit.World) -> dict:
     origin = (s.get("origin_airport") or "").upper() or None
     if zone:
         origin = w.zones[zone]["airport"]  # the truck goes to its zone's airport
-    dest = (s.get("destination_airport") or "").upper() or None
+    dest = kit.destination_code(s.get("destination_airport"))  # a city name is its airport in our network
     missing = []
     if not origin or origin not in w.origins():
         missing.append(f"departure airport or pickup place in Germany (we fly from {', '.join(sorted(w.origins()))}; "
@@ -506,7 +541,8 @@ def normalise(s: dict, w: kit.World) -> dict:
     if pickup and (pickup.get("postcode") or pickup.get("city")) and not zone:
         missing.append("a pickup postcode inside our pickup zones")
     if not dest:
-        missing.append("destination airport")
+        missing.append("destination airport (we fly to: " + ", ".join(
+            f"{c} {n.split(' / ')[0]}" for c, n in kit.DESTINATIONS.items()) + ")")
     if kg is None:
         missing.append("total weight")
     cw = pricing.chargeable(kg, cbm) if kg else None

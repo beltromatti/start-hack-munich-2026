@@ -127,6 +127,9 @@ class FakeFiveU:
         if m["subject"].lower().startswith("shipment status"):
             return {**base, "body": "Hello,\n\nyour shipment departed on schedule and is in transit over the "
                                     "Atlantic. Expected arrival: 25 Nov 2026, 14:00 local time.\n\n" + c.name}
+        if re.search(r"\bstatus\b|where is", f"{m['subject']} {m['body']}", re.I):  # wording assumed: no live one seen
+            return {**base, "body": f"Hello,\n\nthe shipment departed on schedule and is in transit, currently at "
+                                    f"the transfer hub. No delay expected.\n\nBest regards\n{c.name}"}
         if m["subject"].lower().startswith("booking"):
             return {**base, "body": f"Booking confirmed. Booking reference BK-MAIL-{m['id']}.\n\n{c.name}"}
         lane = re.search(r"Route: ([A-Z]{3}) to ([A-Z]{3})", m["body"])

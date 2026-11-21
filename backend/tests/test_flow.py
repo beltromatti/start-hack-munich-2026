@@ -100,3 +100,151 @@ def test_restart_mid_turn_keeps_the_session_valid():
              {"type": "function_call_output", "call_id": "a", "output": "{}"}]
     agent._close_dangling(items)
     assert [i.get("call_id") for i in items[3:]] == ["a", "b"] and items[-1]["type"] == "function_call_output"
+
+
+# ---- research/pricing: which weight to ask, when to price, which trucker (docs/research/pricing.md) --------
+
+def test_sheetless_airline_is_also_asked_at_the_next_break():
+    # Zephyr, Himalaya and Pampero fly to KTM, have no sheet and are not on the portal: their breaks are unknown.
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("carl@gamma.example", "Quote FRA to KTM", "Please quote 280 kg, FRA to KTM, cheapest.")
+    run(f)
+    assert [m["subject"] for m in to(api, "zephyr-steppe-cargo@hackloop.mail")] == [
+        "Rate request FRA-KTM 280 kg", "Rate request FRA-KTM 300 kg"]
+    deal = store.get(f"deal-{rfq['id']}")
+    assert deal["status"] == "quoted" and deal["data"]["quote"]["amount"] == "1534.40 EUR"  # cheaper of the two
+
+
+def test_a_sheet_airline_is_asked_once_at_its_cheapest_billed_weight():
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    api.customer("anna@acme.example", "Quote FRA to ORD", "Please quote 240 kg, FRA to ORD, cheapest.")
+    run(f)
+    assert [m["subject"] for m in to(api, "yellowtail-air-freight@hackloop.mail")] == ["Rate request FRA-ORD 250 kg"]
+
+
+def test_a_carrier_asked_twice_has_to_answer_twice():
+    from app.forwarder import waiting_for
+    asked = {"11": "zephyr@x", "12": "zephyr@x", "13": "pampero@x"}
+    assert waiting_for({"asked": asked, "replied": ["zephyr@x", "pampero@x"]}) == ["zephyr@x"]
+    assert waiting_for({"asked": asked, "replied": ["zephyr@x", "pampero@x", "zephyr@x"]}) == []
+    assert waiting_for({}) == []
+
+
+def test_pickup_rule_decides_which_trucker_the_recommended_option_carries(monkeypatch):
+    from dataclasses import replace
+    from app import forwarder
+    from app.pricing import Offer
+    from decimal import Decimal as D
+    f = Sync(FakeFiveU())
+    air = [Offer("air", "Slow", D(700), D(5), "sheet"), Offer("air", "Fast", D(900), D(2), "sheet")]
+    # live trucker bids, zone 60 -> FRA, Sat 21 Nov 14:10 UTC (mails 164-168)
+    trucks = [Offer("pickup", n, D(p), (D(h) / 24).quantize(D("0.001")), "email") for n, p, h in [
+        ("Bodenseefracht", "88.60", 26), ("Westfalenroute", "96.80", 23), ("Isarwelle Spedition", "129.80", 16),
+        ("Domblick Kurierdienst", "151.60", 15), ("Taunusfracht", "177.40", 3)]]
+    req = {"origin": "FRA", "destination": "ORD", "weight_kg": "320", "volume_cbm": None, "chargeable_kg": "320",
+           "pieces": 1, "pickup_zone": "60", "pickup_postcode": "60311"}
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req, "offers": [o.as_dict() for o in air + trucks]})
+
+    base = forwarder.settings
+
+    def recommended(preference, **rules):
+        monkeypatch.setattr(forwarder, "settings", replace(base, **rules))
+        out = f.options("deal-1", preference)
+        row = next(o for o in out["options"] if o["option"] == out["recommended"])
+        return row["airline"], row["pickup"]["trucker"], row["total"]
+
+    # `asked`: the trucker follows the customer's preference
+    assert recommended("cheapest", pickup_rule="asked") == ("Slow", "Bodenseefracht", "788.60 EUR")
+    assert recommended("fastest", pickup_rule="asked") == ("Fast", "Taunusfracht", "1077.40 EUR")
+    # the fastest trucker is 88.80 EUR more: 9 % on this shipment, outside the 5 % band if 5U expects another
+    assert recommended("fastest", pickup_rule="cheapest") == ("Fast", "Bodenseefracht", "988.60 EUR")
+    assert recommended("fastest", pickup_rule="balanced", balance_rule="minmax") == ("Fast", "Westfalenroute", "996.80 EUR")
+    assert recommended("cheapest", pickup_rule="balanced", balance_rule="minmax") == ("Slow", "Westfalenroute", "796.80 EUR")
+    # a request without a stated preference
+    assert recommended("unspecified", pickup_rule="cheapest", unspecified_rule="cheapest")[0] == "Slow"
+    assert recommended("unspecified", pickup_rule="cheapest")[0] == "Fast"  # default: ratio balance, speed dominates
+
+
+# ---- research: tracking needs the airline's word (5U at the booth, docs/research/README.md) ------------------
+
+def test_a_tracking_session_can_ask_the_airline_and_wait_for_its_status():
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    ctx = tools.Ctx(f, "session-900", "deal-900", 900, "tracking", None)   # a tracking thread: nothing to price
+    assert "error" in tools.get_offers(ctx, None, "unspecified", 1)        # nobody asked yet: nothing to wait for
+    tools.mail_carrier(ctx, "yellowtail-air-freight@hackloop.mail", "Status of booking BK-1",
+                       "Hello, where is the shipment under booking BK-1 (FRA-ORD) now?", None)
+    out = tools.get_offers(ctx, None, "unspecified", 5)
+    assert out["still_waiting_for"] == [] and "in transit" in out["carrier_messages"][0]["text"]
+    assert store.get("deal-900")["status"] == "new"                         # not shown as a deal being priced
+
+
+def test_crm_gives_the_airlines_address_for_a_status_question():
+    from app import tools
+    f = Sync(FakeFiveU())
+    booking = {"booking_reference": "BK-7", "team_reference": "SM-5", "airline": "Yellowtail Air Freight",
+               "route": "FRA-ORD", "transit_days": "4", "status": "confirmed", "booked_at": 1795273200.0}
+    store.put("deal-5", "deal", "booked", {"root": 5, "customer": "anna@acme.example", "booking": booking})
+    store.put("booking-5", "booking", "confirmed", booking)
+    out = tools.crm(tools.Ctx(f, "session-9", "deal-9", 9, "tracking", None), "BK-7")
+    assert out["matches"][0]["booking"]["airline_email"] == "yellowtail-air-freight@hackloop.mail"
+
+
+def test_a_carrier_that_says_no_takes_its_sheet_price_with_it():
+    from decimal import Decimal as D
+    from app.pricing import Offer
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    req = {"origin": "FRA", "destination": "BKK", "weight_kg": "260", "volume_cbm": "1.300", "chargeable_kg": "260",
+           "pieces": 1, "pickup_zone": None, "pickup_postcode": None}
+    sheet = [Offer("air", "Yellowtail Air Freight", D("930.80"), D(2), "sheet"),
+             Offer("air", "Orion Cargo Air", D("990.00"), D(3), "sheet")]
+    yl = "yellowtail-air-freight@hackloop.mail"
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req, "offers": [o.as_dict() for o in sheet],
+                                             "asked": {"7": yl}, "replied": []})
+    store.kv_set("bidreq:7", "deal-1")
+    assert [o["airline"] for o in f.options("deal-1", "fastest")["options"]] == ["Yellowtail Air Freight", "Orion Cargo Air"]
+    api._deliver(yl, api.mailbox, "Re: Rate request FRA-BKK 260 kg",
+                 "Hello, we do not serve this lane now: all flights to Bangkok are suspended (tsunami warning).", 7)
+    run(f)
+    out = f.options("deal-1", "fastest")
+    assert [o["airline"] for o in out["options"]] == ["Orion Cargo Air"] and out["recommended"] == "A1"
+    assert "suspended" in out["carriers_without_price"][0]["says"] and out["still_waiting_for"] == []
+
+
+def test_a_city_is_its_airport_and_a_signature_is_no_pickup():
+    from app.forwarder import normalise
+    kg = {"value": 650, "unit": "kg", "per_piece": False}
+    ship = {"origin_airport": "CGN", "pickup": None, "destination_airport": "Lagos, Nigeria", "pieces": 6,
+            "weight": kg, "volume": None, "dimensions": [], "cargo": {"commodity": None, "ready_date": None, "notes": None}}
+    r = normalise(ship, kit.world())
+    assert r["destination"] == "LOS" and not r["missing"] and r["pickup_zone"] is None
+    assert normalise({**ship, "destination_airport": "Peking"}, kit.world())["destination"] == "PEK"
+    assert normalise({**ship, "destination_airport": "pek"}, kit.world())["destination"] == "PEK"
+    hint = normalise({**ship, "destination_airport": None}, kit.world())["missing"][0]
+    assert "LOS Lagos" in hint and "PEK Beijing" in hint
+
+
+def test_a_quote_with_two_amounts_is_sent_and_flagged():
+    """No gate on the model's text (the prompt teaches one total); the diagnostics flag it for the team."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("sam@lumen.example", "Quote", "1200 kg MUC to LAX, cheapest and fastest please")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    opt = {"air": {"carrier": "Yellowtail Air Freight"}, "pickup": None, "total": "2748.00", "total_text": "2748.00 EUR"}
+    store.put(ctx.deal_id, "deal", "pricing", {"root": rfq["id"], "received_at": None, "options": {"A1": opt}})
+    two = "Hi Sam,\n\nCheapest: 2748.00 EUR all-in\nFastest: 3336.00 EUR all-in\n\nGiulia"
+    out = tools.send_mail(ctx, "quote", two, "A1", None)
+    assert out["recorded_quote"] == "2748.00 EUR" and len(to(api, "sam@lumen.example")) == 1
+    assert any("quote mail amounts" in e["summary"] for e in store.events() if e["kind"] == "error")

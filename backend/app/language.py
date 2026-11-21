@@ -13,6 +13,7 @@ S, N, I, B = {"type": ["string", "null"]}, {"type": ["number", "null"]}, {"type"
 
 BID = strict({"offers": {"type": "array", "items": strict({
     "carrier": {"type": "string"}, "airline_code": S, "available": B, "total": N, "currency": S,
+    "fx_eur_per_unit": N,
     "transit_days": N, "pickup_hours": N, "reference": S, "valid_until": S, "note": S})}})
 
 TARIFF = strict({"airline": S, "currency": S, "valid_from": S, "valid_to": S, "notes": S,
