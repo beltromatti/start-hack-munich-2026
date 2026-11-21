@@ -139,8 +139,15 @@ def load(api=None) -> World:
 
 
 def refresh_portal(api, w: World | None = None) -> None:
+    """The portal's lanes and weight breaks. The portal can be down (Sat 20:26: /ports answered 503 at a restart):
+    then we keep what we knew and carry on; the next refresh tries again, and prices come by mail meanwhile."""
     w = w or _world
-    lanes = api.ports()
+    try:
+        lanes = api.ports()
+    except Exception as e:
+        w.portal_at = time.time()
+        store.log("kit", "error", f"portal lanes not refreshed: {e}"[:300])
+        return
     w.portal = {(l["origin"], l["destination"]): l["airlines"] for l in lanes}
     for code in {a["code"] for l in lanes for a in l["airlines"]}:
         b = api.brackets(code)

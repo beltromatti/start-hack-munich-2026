@@ -5,6 +5,7 @@ Rules the code enforces, whatever a model or a mail says:
 - outbound mail is capped per recipient and per minute, so nobody gets spammed.
 """
 import threading
+import re
 import time
 from collections import defaultdict, deque
 from typing import Any
@@ -23,6 +24,7 @@ class FiveU:
         self._rate_left: int | None = None
         self._rate_reset = 0.0
         self._sent: dict[str, deque] = defaultdict(deque)
+        self._last_poll = time.time()  # after a restart the old process may have just polled: wait one gap
         self._send_lock = threading.Lock()
 
     def _req(self, method: str, path: str, **kw: Any) -> httpx.Response:
@@ -43,8 +45,30 @@ class FiveU:
 
     # ---- mailbox -------------------------------------------------------------------------------------------
 
+    poll_gap = 5.5      # seconds between mailbox polls: 5U's limit ("one poll per 5 seconds", Sat 20:30) plus 10 % for
+    #                     network jitter (a 5.0 s gap still drew a 429 at 20:40), raised by a 429
+    _last_poll = 0.0
+
     def poll(self, since_id: int) -> tuple[list[dict], int]:
+        """New mail since since_id. Keeps to 5U's poll limit: never polls sooner than it allows, and a 429 is a
+        'not yet' (it sets the gap from 5U's own words and waits) and an alert, never a crash."""
+        if time.time() - self._last_poll < self.poll_gap:
+            return [], since_id
+        self._last_poll = time.time()
         r = self._req("GET", "/v1/mailbox/messages", params={"since_id": since_id, "limit": 200})
+        if r.status_code == 429:
+            try:
+                d = r.json()
+            except Exception:
+                d = {}
+            m = re.search(r"per\s+(\d+(?:\.\d+)?)\s*second", str(d.get("detail", "")))
+            self.poll_gap = max(self.poll_gap, (float(m.group(1)) if m else 5.0) * 1.1)
+            self._last_poll = time.time()  # the next poll waits a full gap from now
+            # we keep to the limit, so a 429 means someone else polls with our team key, or 5U tightened it:
+            # an error, so the team hears of it (it costs us time on every reply)
+            store.log("router", "error", f"mailbox 429 '{d.get('detail', '')}': another client polling with our key, "
+                      f"or a new limit; polling every {self.poll_gap:g}s")
+            return [], since_id
         r.raise_for_status()
         d = r.json()
         return d["messages"], d["next_since_id"]

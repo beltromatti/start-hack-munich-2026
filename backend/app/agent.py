@@ -9,6 +9,7 @@ and one stop: an execution that turns 10 times in a row without anything succeed
 steps, which tools, how long the mail, is the model's.
 """
 import json
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -43,8 +44,9 @@ def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> 
     rec = store.get(sid)
     if rec is None or "items" not in rec["data"]:
         earlier = _earlier(root, mail)  # a thread that started before this session (a restart, a migration)
+        known = _customer_notes(root, mail) if task == "customer" else ""
         s = {"root": root, "task": task, "seen": [], "executions": 0,
-             "items": [_user(f"{llm.prompt('tasks/' + task)}\n\n{_context()}\n\n{earlier}{event}")]}
+             "items": [_user(f"{llm.prompt('tasks/' + task)}\n\n{_context()}\n\n{known}{earlier}{event}")]}
     else:
         s = rec["data"]
         _close_dangling(s["items"])
@@ -162,6 +164,24 @@ def _earlier(root: int, mail: dict | None) -> str:
     lines = [f"--- mail {x['id']} {'from us' if x['direction'] == 'out' else 'from ' + x['sender']} at "
              f"{x['received_at']}\nSubject: {x['subject']}\n\n{x['body']}" for x in prior]
     return "Earlier in this thread:\n\n" + "\n\n".join(lines) + "\n\n"
+
+
+def _customer_notes(root: int, mail: dict | None) -> str:
+    """What we noted in this customer's earlier deals: a wish that holds for their later requests (an airline they
+    refuse, round 42) lives in those notes, and a new thread is a new session. The agent judges what still applies."""
+    who = (mail or {}).get("sender")
+    if not who:
+        return ""
+    notes = []
+    for rec in store.records("deal"):
+        d = rec["data"]
+        if d.get("customer") == who and d.get("root") != root:
+            notes += [(n.get("at", 0), d.get("subject") or rec["id"], n["text"]) for n in d.get("notes", [])]
+    if not notes:
+        return ""
+    lines = [f"- {time.strftime('%d %b %H:%M', time.localtime(at))} ({subject}): {text}"
+             for at, subject, text in sorted(notes, reverse=True)[:8]]
+    return "Our notes from this customer's earlier deals (what still applies is your call):\n" + "\n".join(lines) + "\n\n"
 
 
 def _close_dangling(items: list[dict]) -> None:
