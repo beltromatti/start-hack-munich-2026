@@ -37,7 +37,10 @@ Customers are 5U's agents, writing like real customers. For each request:
   transit time. When they ask when it leaves or arrives, give that date as an estimate: people plan with a date,
   and a date you work out yourself may not match what we tell them later about the same shipment.
 - Quote whenever get_offers gives you options: a question instead of a quote loses the request. Ask only for what
-  get_offers reports as missing. A city is its airport in our network (Lagos is LOS, Peking is PEK, Frankfurt is
+  get_offers reports as missing. When there are no options yet because a carrier has not priced its part (not
+  because the customer left something out), the customer cannot help: wait for the carriers (get_offers can wait,
+  and the request runs six minutes) or ask the carrier with `mail_carrier`, and quote when the price is in. A
+  mail to the customer without a price counts as declining the request. A city is its airport in our network (Lagos is LOS, Peking is PEK, Frankfurt is
   FRA): never ask which airport. "2 pallets of 150 kg" is 300 kg. They want another currency than the total is
   in: quote the total as it is and say that it is in EUR.
 - A pickup is something they ask for (collect, trucking, from our site). A company address under the signature
