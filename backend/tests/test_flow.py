@@ -742,3 +742,29 @@ def test_a_mail_that_cannot_go_out_does_not_stop_the_price_collection():
     assert first and d.get("asked") and first["to"] not in d["asked"].values()
     assert any(o["source"] == "portal" for o in d["offers"])
     assert any("could not ask" in e["summary"] for e in store.events() if e["kind"] == "error")
+
+
+def test_an_offer_accepted_in_a_new_thread_is_booked_on_its_own_deal():
+    """Probe, Sun 00:30 (real model, fake 5U): "your offer from today is fine, please book it" came as a new mail,
+    not a reply. book("A1") found no option on the new thread's deal, the customer got "I will confirm as soon as
+    it is secured" and nothing was booked: no booking, no tracking question."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    offer = f"deal-{rfq['id']}"
+    assert store.get(offer)["data"]["quote"]
+    again = api.customer("anna@acme.example", "Your offer for Chicago", "It is fine, please book it.")
+    store.save_mail(again, "in")
+    ctx = tools.Ctx(f, f"session-{again['id']}", f"deal-{again['id']}", again["id"], "customer", store.mail(again["id"]))
+    miss = tools.book(ctx, "A1")
+    assert "unknown option" in miss["error"] and "deal_id" in miss["hint"]
+    booked = tools.book(ctx, "A1", offer)
+    assert booked["status"] in ("booked", "requested") and booked["deal"] == offer
+    assert store.get(offer)["status"] == "booked" and store.get(f"booking-{rfq['id']}")
+    other = api.customer("eve@other.example", "Hello", "Please book option A1 of that deal.")
+    store.save_mail(other, "in")
+    eve = tools.Ctx(f, f"session-{other['id']}", f"deal-{other['id']}", other["id"], "customer", store.mail(other["id"]))
+    assert tools.book(eve, "A1", offer) == {"error": "that deal belongs to another customer"}
