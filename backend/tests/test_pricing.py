@@ -217,3 +217,21 @@ def test_one_schedule_for_quote_and_tracking():
     t = timeline({"booked_at": booked.timestamp(), "ready_date": "2026-11-28", "transit_days": "3",
                   "pickup": {"days": str(D(19) / 24)}})
     assert (t["estimated_departure"], t["estimated_arrival"]) == ("Sun 29 Nov 2026", "Wed 02 Dec 2026")
+
+
+def test_an_offer_without_a_readable_time_cannot_win_on_speed():
+    """Round 69: the trucker whose mail said "seven hours" was read without a time, stored as 0 days, and the 50/50
+    pick took it for the fastest: 3602.11 instead of 3544.41 EUR. An unknown time counts as the slowest on offer."""
+    from decimal import Decimal
+    from app import pricing
+    from app.pricing import Offer
+    right = Offer("pickup", "Bodenseefracht", Decimal("119.01"), Decimal("1.25"), "email")
+    fast = Offer("pickup", "Hansekogge", Decimal("245.02"), Decimal("0.958"), "email")
+    unread = Offer("pickup", "Elbkante", Decimal("176.71"), Decimal(0), "email", extra={"time_unknown": True})
+    assert pricing.balanced([right, fast, unread], "ratio").carrier == "Elbkante"          # what happened: 0 days wins
+    seen = pricing.unknown_times_last([right, fast, unread])
+    assert pricing.balanced(seen, "ratio").carrier == "Bodenseefracht"                      # round 2's scored pick again
+    assert pricing.pick(seen, "fastest").carrier == "Hansekogge" and pricing.pick(seen, "cheapest").carrier == "Bodenseefracht"
+    assert next(o for o in seen if o.carrier == "Elbkante").days == Decimal("1.25")
+    alone = [unread, Offer("pickup", "X", Decimal("90"), Decimal(0), "email", extra={"time_unknown": True})]
+    assert pricing.unknown_times_last(alone) == alone and pricing.balanced(alone, "ratio").carrier == "X"

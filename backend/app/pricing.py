@@ -6,7 +6,7 @@ Rules (start kit, same on every sheet; the portal behaves the same, see docs/cha
 - billing at a higher break is allowed and is often cheaper: we take the cheapest billed weight >= chargeable;
 - the minimum applies to the freight before surcharges; fuel and security are per kg of billed weight.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -154,6 +154,18 @@ def balanced(offers: list[Offer], rule: str = "ratio") -> Offer:
         def score(o: Offer) -> Decimal:
             return o.total / (p_lo or Decimal(1)) + o.days / (d_lo or Decimal("0.1"))
     return min(offers, key=lambda o: (score(o), o.total))
+
+
+def unknown_times_last(offers: list[Offer]) -> list[Offer]:
+    """An offer whose time nobody could read is stored with 0 days, and 0 wins every comparison on speed: the 50/50
+    pick and "fastest" then choose the carrier we know least about (round 69: the trucker who said "seven hours"
+    was read without a time and took the place of the right one, 1.6 % too expensive; round 63 the same way).
+    Until its time is known it counts as the slowest on offer for its leg, so it can win on price only. When no
+    offer states a time, speed cannot decide and they stay equal."""
+    known = [o.days for o in offers if not (o.extra or {}).get("time_unknown")]
+    if not known or len(known) == len(offers):
+        return offers
+    return [replace(o, days=max(known)) if (o.extra or {}).get("time_unknown") else o for o in offers]
 
 
 def best_by_carrier(offers: list[Offer]) -> list[Offer]:
