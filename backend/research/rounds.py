@@ -62,7 +62,8 @@ def bid(m: dict, carrier: kit.Carrier) -> dict:
             "total": amount.group(1).replace(",", "") if amount else None, "currency": amount.group(2) if amount else None,
             "hours": hours.group(1) if hours and carrier.kind == "trucker" else None,
             "days": days.group(1) if days and carrier.kind == "airline" else None, "ref": ref.group(1) if ref else None,
-            "no": "do not serve" in body or "To quote we need" in body, "at": m["received_at"], "re": m.get("in_reply_to")}
+            "no": "do not serve" in body or "To quote we need" in body, "at": m["received_at"],
+            "re": m.get("in_reply_to"), "text": body[:300]}
 
 
 def rounds(mails: list[dict]) -> list[dict]:
@@ -80,10 +81,35 @@ def rounds(mails: list[dict]) -> list[dict]:
             else:
                 by_root[root] = r = {"root": root, "rfq": m, "bids": [], "follow_ups": [], "desk": []}
                 out.append(r)
-        elif out and c is not None:
+        elif out and c is not None and m.get("in_reply_to"):
             out[-1]["bids"].append(bid(m, c))
         elif out:
-            out[-1]["desk"].append(m)
+            out[-1]["desk"].append(m)  # rate desk, tracking, and carrier mail that answers nothing (a tariff)
+    return out
+
+
+def signals(r: dict) -> list[str]:
+    """What differs from the baseline measured before 16:00 (docs/learnings-carriers.md): every carrier answers
+    about 30 s after our request, in EUR, with a price. A change here is the earliest sign of a new setup."""
+    out, t0 = [], ts(r["rfq"])
+    waits = [ts({"received_at": b["at"]}) - t0 for b in r["bids"]]
+    if waits:
+        out.append(f"replies {min(waits):.0f}-{max(waits):.0f} s after the request ({len(waits)} mails)")
+        if max(waits) > 75:
+            out.append("SLOW: a carrier needed more than 75 s (baseline about 35 s after the request)")
+    other = sorted({b["currency"] for b in r["bids"] if b["currency"] and b["currency"] != "EUR"})
+    if other:
+        out.append(f"CURRENCY: bids in {', '.join(other)}")
+    unread = [b["carrier"] for b in r["bids"] if not b["no"] and not b["total"]]
+    if unread:
+        out.append(f"FORMAT: no amount found in the reply of {', '.join(unread)}")
+    asks = [b["carrier"] for b in r["bids"] if "To quote we need" in b.get("text", "")]
+    if asks:
+        out.append(f"ASKED BACK: {', '.join(asks)} needs more facts")
+    notices = [d for d in r["desk"] if d["from"].lower() not in DESKS]
+    if notices:
+        out.append("NOTICE: " + "; ".join(f"{d['from']}: {d['subject']} ({len(d.get('attachments') or [])} files)"
+                                          for d in notices))
     return out
 
 
@@ -112,9 +138,10 @@ def show() -> None:
         for b in r["bids"]:
             if b["no"] or not b["total"]:
                 continue
-            took = ""
             print(f"    {b['kind']:7} {b['carrier']:28} {b['total']:>9} {b['currency']} "
-                  f"{(b['days'] + ' d') if b['days'] else (str(b['hours']) + ' h')}  {b['ref'] or ''}  {b['at'][11:19]}{took}")
+                  f"{(b['days'] + ' d') if b['days'] else (str(b['hours']) + ' h')}  {b['ref'] or ''}  {b['at'][11:19]}")
+        for line in signals(r):
+            print("    signal:", line)
         picks = trucker_picks(r["bids"])
         if picks:
             print("    pickup by rule: " + ", ".join(f"{k} {o.carrier} {o.total}" for k, o in picks.items()))
