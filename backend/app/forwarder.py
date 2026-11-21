@@ -218,8 +218,11 @@ class Forwarder:
                 total = pricing.money(a.total + (p.total if p else 0))
                 table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
                               "total_text": pricing.fmt(total)}
+                _, leaves, arrives = pricing.schedule(req.get("ready_date"), float(p.days) * 24 if p else 0, a.days)
                 rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
                              "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
+                             "estimated_departure": leaves.strftime(pricing.DATE),
+                             "estimated_arrival": arrives.strftime(pricing.DATE),
                              "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
                              "billed_kg": float(a.billed_kg) if a.billed_kg is not None else None,
                              "carrier_note": (a.extra or {}).get("note")})
