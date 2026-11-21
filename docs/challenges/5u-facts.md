@@ -196,3 +196,10 @@ The +10 % held for that hour only: round 53 (21:18) booked on the portal at the 
 not available for Nova Atlas Cargo. Please book by email with nova-atlas-cargo@hackloop.mail.` (Tamarind in round
 52). We book by mail with the rate reference; the airline replies in our thread ("thank you for your booking ...
 Price: 4466.52 EUR", the flight price as quoted, no +10 %), then mails "Booking BK-... confirmed".
+
+**Offers and requests as attachments (Sat from 22:17, round 63):** the RFQ came as a PDF ("please find our request
+attached"); the truckers answered "You find our price offer in the attachment" as a PDF, a Word letter
+(`offer-letter-TRK-5778.docx`) and a voice message (`voice-message.mp3`, Bodenseefracht). Times are written as
+"Lead time 29 hours from order to collection" or "Our driver can be at the pickup address 13 hours after your
+order". The gateway has no audio model and its chat API takes only text and images. Our question to the customer
+("cannot price the collection yet") was scored `rejected declined_in_scope`; the quote sent after it did not count.

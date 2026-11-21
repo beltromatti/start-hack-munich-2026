@@ -189,6 +189,12 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **Where to collect is what they say about the pickup.** A signature town is where they write from (round 15).
 - **A wish for future inquiries outlives the thread** (round 42; 5U corrected its verdict by hand, +120).
 - **Tracking comes from our own records;** the airlines answer status questions with their quote form.
+- **A carrier's mail is its body and its attachments** (round 63: truckers priced in a PDF, a Word letter and a
+  voice message, and a body-only reader saw no price). Every carrier and rate desk mail is read with its
+  attachments; a voice message cannot be read (the gateway takes no audio), so it is named and the carrier
+  can be asked in writing. A trucker's time is the time until it collects, however it is put.
+- **A mail to the customer without a price is a decline** (round 63, `declined_in_scope`): when a carrier has
+  not priced yet, wait for it or ask it; the customer cannot help.
 - **Prices can move between the quote and the booking** (rounds 48-50): the customer hears it from us, in the
   confirmation, not from the invoice.
 - **Time:** every accepted quote inside 2 minutes took the full 15; speed beyond that is not worth accuracy.
