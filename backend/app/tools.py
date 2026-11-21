@@ -262,7 +262,10 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
                         f"{b.get('weight_kg')} kg, our reference {b['team_reference']})? Where is it now, and when do "
                         f"you expect it to arrive?\n\nThanks,\n{settings.persona}, {settings.company}")
     before = len(rec["data"].get("carrier_messages") or [])
-    mid = ctx.fw.mail_carrier(deal_id, to, f"Shipment status {ref}", body, in_reply_to=air.get("reply_mail"))
+    # in the airline's own booking thread when it confirmed by mail (its desk knows the booking there)
+    thread = b.get("confirmation_mail") or air.get("reply_mail")
+    subject = f"Re: Booking {ref} confirmed" if b.get("confirmation_mail") else f"Shipment status {ref}"
+    mid = ctx.fw.mail_carrier(deal_id, to, subject, body, in_reply_to=thread)
     end = time.time() + max(0.0, float(wait_seconds))
     reply = None
     while time.time() < end:
@@ -275,6 +278,10 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
     if not reply:
         return {"asked": mid, "carrier_reply": None, "note": "no answer yet; it will be stored on the deal when it "
                 "comes (deal tool)", "booking": facts["booking"]}
+    if re.search(r"to quote we need|please provide|we need:", reply["text"], re.I):
+        return {"carrier_reply": reply["text"], "booking": facts["booking"],
+                "note": "the airline answered with its quote form, not with a status (5U carriers did so on Sat "
+                        "16:13 too). Answer from our record: expected_stage_now and the dates, as our estimates."}
     status = {"text": reply["text"], "mail": reply["mail"], "at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())}
     store.update(deal_id, lambda r: (r["status"], {**r["data"], "booking": {**r["data"]["booking"],
                                                                            "carrier_status": status}}))
@@ -323,17 +330,38 @@ def _summary(rec: dict, b: dict | None) -> dict:
                                                    "carrier_status")},
                          "airline_email": getattr(kit.world().carrier_by_name(bd.get("airline") or ""), "email", None),
                          "booked_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(bd["booked_at"])),
-                         "estimated_arrival": eta(bd)} if bd else None)}
+                         "airline_confirmation": bd.get("confirmation_text"), **timeline(bd)} if bd else None)}
 
 
-def eta(booking: dict) -> str | None:
-    """Estimated arrival: booking time plus transit days (an estimate, and the agent says so)."""
+def timeline(booking: dict) -> dict:
+    """Where a booked shipment should be now, from our dates: it leaves when the goods are ready (not when we
+    booked), arrives transit days later. Estimates, and the agent says so. The airline's word, when it gives one,
+    wins (carrier_status)."""
     from datetime import datetime, timedelta, timezone
     try:
         booked = datetime.fromtimestamp(booking["booked_at"], timezone.utc)
-        return (booked + timedelta(days=float(booking["transit_days"]))).strftime("%a %d %b %Y")
+        ready = booked
+        try:
+            ready = max(booked, datetime.fromisoformat(str(booking.get("ready_date"))[:10]).replace(
+                hour=9, tzinfo=timezone.utc))
+        except ValueError:
+            pass
+        pickup_h = float((booking.get("pickup") or {}).get("days") or 0) * 24
+        departure = ready + timedelta(hours=pickup_h)
+        arrival = departure + timedelta(days=float(booking["transit_days"]))
     except (KeyError, TypeError, ValueError):
-        return None
+        return {}
+    now = datetime.now(timezone.utc)
+    stage = ("booked, waiting for the goods to be ready" + (" and collected" if pickup_h else "")
+             if now < ready else "collected, on its way to the airport" if now < departure
+             else "in transit" if now < arrival else "arrived")
+    fmt = "%a %d %b %Y"
+    return {"ready_date": ready.strftime(fmt), "estimated_departure": departure.strftime(fmt),
+            "estimated_arrival": arrival.strftime(fmt), "expected_stage_now": stage}
+
+
+def eta(booking: dict) -> str | None:
+    return timeline(booking).get("estimated_arrival")
 
 
 def _ts(iso: str | None) -> float:

@@ -143,3 +143,16 @@ def test_balanced_ratio_trucker_matches_the_scored_rounds():
     assert pricing.balanced(r1, "ratio").carrier == "Westfalenroute"
     assert pricing.balanced(r2, "ratio").carrier == "Bodenseefracht"
     assert pricing.pick(r1, "cheapest").carrier != "Westfalenroute" and pricing.balanced(r2, "minmax").carrier != "Bodenseefracht"
+
+
+def test_timeline_starts_when_the_goods_are_ready():
+    """Live round 1: booked Sat 21 Nov, ready 25 Nov, 1 day transit. Arrival is 26 Nov, not 22 Nov."""
+    import time as _t
+    from datetime import datetime, timezone
+    from app import tools
+    booked = datetime(2026, 11, 21, 15, 2, tzinfo=timezone.utc).timestamp()
+    b = {"booked_at": booked, "ready_date": "2026-11-25", "transit_days": "1",
+         "pickup": {"days": "0.458"}}
+    t = tools.timeline(b)
+    assert t["ready_date"] == "Wed 25 Nov 2026" and t["estimated_arrival"] == "Thu 26 Nov 2026"
+    assert t["expected_stage_now"].startswith("booked") if _t.time() < datetime(2026, 11, 25, 9, tzinfo=timezone.utc).timestamp() else True

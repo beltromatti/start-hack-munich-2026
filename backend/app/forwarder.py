@@ -420,7 +420,7 @@ class Forwarder:
             if any(x and x in text for x in (b.get("rate_id"), b.get("team_reference"), b.get("booking_reference"))):
                 ref = re.search(r"Booking\s+(\S+)\s+confirmed", m["subject"] or "", re.I)
                 found = re.search(r"\b(?:booking reference|reference)\s*:?\s*([A-Z0-9][A-Z0-9-]{3,})", m["body"], re.I)
-                b = {**b, "status": "confirmed", "confirmation_mail": m["id"],
+                b = {**b, "status": "confirmed", "confirmation_mail": m["id"], "confirmation_text": m["body"][:800],
                      "booking_reference": b.get("booking_reference") or (ref.group(1) if ref else None)
                      or (found.group(1) if found else None)}
                 store.put(rec["id"], "booking", "confirmed", b)
