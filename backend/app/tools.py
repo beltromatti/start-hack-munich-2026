@@ -188,10 +188,10 @@ def _quote_amounts(ctx: Ctx, option_id: str | None, body: str) -> str | None:
     opt = (d.get("options") or {}).get(option_id or "")
     if not opt:
         return None  # no option to check against (recorded as such by _record_quote)
-    found = MONEY.findall(body)
+    found = MONEY.findall(re.sub(r"(?<=\d)[ \u00a0\u202f](?=\d{3}(?!\d))", "", body))  # 6 270,02 is one amount
     if body.count(opt["total_text"]) == 1 and len(found) == 1:
         return None
-    return (f"not sent: a quote carries exactly one amount of money, the total of option {option_id} written as "
+    return (f"a quote carries exactly one amount of money, the total of option {option_id} written as "
             f"{opt['total_text']}, once. This text has {len(found)}: {found[:4]}. One mail, one option, one total; "
             f"another option can be named in words (airline, days) without its price")
 
