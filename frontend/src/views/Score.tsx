@@ -43,7 +43,7 @@ export default function Score({ w, b }: { w: World; b: BoardState }) {
             return (
               <div className="lever" key={l.key}>
                 <div className="lever-top"><span>{l.label}</span><b>{avg.toFixed(1)}<small> / {l.max}</small></b></div>
-                <div className="meter"><i style={{ width: `${(avg / l.max) * 100}%` }} /></div>
+                <div className="meter"><i style={{ transform: `scaleX(${Math.min(1, avg / l.max)})` }} /></div>
                 <span className="sub">{l.how}</span>
               </div>
             );
