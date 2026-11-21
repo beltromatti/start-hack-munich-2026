@@ -41,6 +41,16 @@ def destination_code(text: str | None) -> str | None:
     return t.upper() if len(t) == 3 and t.isalpha() else None
 
 
+# A real postcode in the town of each pickup zone. Truckers price a collection by zone but only answer a request
+# that carries a 5-digit postcode (probe Sat 18:14: "Augsburg" -> "we need the postcode", "area 86" -> no,
+# "86150 Augsburg" -> 261.43 EUR "from Augsburg"). Used only when the customer names the town, not the postcode.
+ZONE_POSTCODE = {
+    "60": "60311", "61": "61348", "63": "63065", "64": "64283", "65": "65183", "55": "55116", "35": "35390",
+    "36": "36037", "80": "80331", "81": "81541", "84": "84028", "85": "85049", "86": "86150", "93": "93047",
+    "40": "40213", "41": "41061", "42": "42103", "44": "44135", "45": "45127", "47": "47051", "20": "20095",
+    "21": "21335", "22": "22297", "24": "24103", "28": "28195", "70": "70173", "71": "71032", "72": "72070",
+    "73": "73728", "50": "50667", "51": "51465", "53": "53111"}
+
 TRACKING = "tracking@hackloop.mail"
 RATEDESK = "ratedesk@hackloop.mail"
 

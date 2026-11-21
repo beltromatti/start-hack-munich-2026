@@ -268,7 +268,8 @@ class Forwarder:
 
     def ask_trucker(self, deal_id: str, c: kit.Carrier, req: dict) -> int:
         z = kit.world().zones.get(req["pickup_zone"], {})
-        body = (f"Hello {c.name} team,\n\nplease quote a pickup from {req.get('pickup_postcode') or ''} "
+        postcode = req.get("pickup_postcode") or kit.ZONE_POSTCODE.get(req["pickup_zone"], "")  # a town: its postcode
+        body = (f"Hello {c.name} team,\n\nplease quote a pickup from {postcode} "
                 f"{z.get('area', '')} (zone {req['pickup_zone']}) to {z.get('airport', req['origin'])} airport.\n"
                 f"Total weight: {Decimal(req['weight_kg']):.0f} kg\n"
                 + (f"Volume: {Decimal(req['volume_cbm']):.2f} cbm\n" if req.get("volume_cbm") else "")

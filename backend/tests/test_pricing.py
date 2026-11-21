@@ -184,3 +184,11 @@ def test_durations_are_converted_by_code():
     t = lambda rows: [Offer("pickup", n, D(p), language.days(h, "hours"), "email") for n, p, h in rows]
     r9 = t([("Vogelsberg Haulage", "194.64", 29), ("Domblick Kurierdienst", "361.24", 8), ("Bodenseefracht", "429.80", 6)])
     assert pricing.balanced(r9, "ratio").carrier == "Domblick Kurierdienst"
+
+
+def test_every_pickup_zone_has_a_postcode_of_its_own_town():
+    """Truckers answer only a request with a 5-digit postcode (live probe Sat 18:14); a town the customer names is
+    asked with its zone's postcode."""
+    zones = kit.world().zones
+    assert set(kit.ZONE_POSTCODE) == set(zones)
+    assert all(len(p) == 5 and p.startswith(z) for z, p in kit.ZONE_POSTCODE.items())
