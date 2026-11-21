@@ -1,0 +1,14 @@
+name = "forwarder-overview"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+account_id = "9428423ecf14a5fa2aa4899739698b92"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+FIVEU_BASE_URL = "https://api.start-hack.5u.ai"
+
+# Secrets (never in git): wrangler secret put FIVEU_API_KEY / wrangler secret put PASSWORD

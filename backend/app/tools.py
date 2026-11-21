@@ -31,9 +31,13 @@ def nullable(o: dict) -> dict:
 QUANTITY = obj({"value": N, "unit": S, "per_piece": {"type": "boolean"}})
 SHIPMENT = obj({
     "origin_airport": {**S, "description": "IATA code of the German departure airport, if the customer names one"},
-    "pickup": nullable(obj({"postcode": S, "city": S}, "door-to-port: where the truck collects the goods")),
-    "destination_airport": {**S, "description": "IATA code of the destination airport. A city means its cargo "
-                                                "airport (New Delhi -> DEL, Chicago -> ORD, Tokyo -> NRT, Sao Paulo -> GRU)"},
+    "pickup": nullable(obj({"postcode": S, "city": S},
+                           "door-to-port, only when the customer asks us to collect the goods (pickup, trucking, "
+                           "from our site, ab Werk): where the truck collects them. An address in a signature or "
+                           "letterhead is not a pickup request: null")),
+    "destination_airport": {**S, "description": "IATA code of the destination airport. A city is its airport in "
+                                                "our network: " + ", ".join(
+                                                    f"{c} {n}" for c, n in kit.DESTINATIONS.items())},
     "pieces": I,
     "weight": {**QUANTITY, "description": "as written: value, unit (kg, lb, t), per piece or total"},
     "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or total; null values if unknown"},
@@ -54,7 +58,8 @@ TOOLS = [
        "portal and our rate sheets, waits for the answers and returns the priced options, all-in totals computed by "
        "code (chargeable weight, cheaper weight breaks, minimums, surcharges, pickup leg), with the option that fits "
        "each preference. Pass the shipment as the customer described it, units as written. With shipment null it "
-       "only waits for the replies still missing and returns the options again. Carriers answer in 15-60 s (live, "
+       "only waits for the replies still missing and returns the options again (or, when there is nothing to "
+       "price, what the carriers answered). Carriers answer in 15-60 s (live, "
        "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. "
        "wait_seconds is how long to wait at most: it returns as soon as everyone answered.",
        {"shipment": nullable(SHIPMENT),
@@ -127,7 +132,7 @@ def run(ctx: Ctx, name: str, args: dict) -> dict:
 
 def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: float) -> dict:
     _ensure_deal(ctx)
-    store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" else r["status"],
+    store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" and shipment is not None else r["status"],
                                          {**r["data"], "preference": preference}))
     out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds)
     if out.get("missing"):
@@ -162,14 +167,33 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
     return result
 
 
+MONEY = re.compile(r"(?:€|\$|£|\b(?:EUR|USD|GBP|CHF)\b)\s*\d[\d.,']*|\d[\d.,']*\s*(?:€|\$|£|\b(?:EUR|USD|GBP|CHF|euros?|dollars?)\b)",
+                   re.IGNORECASE)
+
+
+def _quote_amounts(ctx: Ctx, option_id: str | None, body: str) -> str | None:
+    """None when the quote carries exactly one amount of money, the option's total. Else what to change."""
+    d = store.get(ctx.deal_id)["data"] if store.get(ctx.deal_id) else {}
+    opt = (d.get("options") or {}).get(option_id or "")
+    if not opt:
+        return None  # no option to check against (recorded as such by _record_quote)
+    found = MONEY.findall(body)
+    if body.count(opt["total_text"]) == 1 and len(found) == 1:
+        return None
+    return (f"not sent: a quote carries exactly one amount of money, the total of option {option_id} written as "
+            f"{opt['total_text']}, once. This text has {len(found)}: {found[:4]}. One mail, one option, one total; "
+            f"another option can be named in words (airline, days) without its price")
+
+
 def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dict:
     d = store.get(ctx.deal_id)["data"] if store.get(ctx.deal_id) else {}
     opt = (d.get("options") or {}).get(option_id or "")
     if not opt:
         store.log("forwarder", "info", f"quote sent without a known option ({option_id})", run_id=ctx.deal_id)
         return {"note": "no option recorded with this quote (option_id unknown): the CRM has no price for it"}
-    if opt["total_text"] not in body:  # diagnostics, not a rule: we measure, the prompt teaches
-        store.log("forwarder", "info", f"quote text does not contain {opt['total_text']}", run_id=ctx.deal_id)
+    wrong = _quote_amounts(ctx, option_id, body)  # diagnostics, not a gate: we measure, the prompt teaches
+    if wrong:
+        store.log("forwarder", "error", f"quote mail amounts: {wrong}"[:400], run_id=ctx.deal_id)
     first = not d.get("quote")
     took = time.time() - _ts(d.get("received_at"))
     q = {"option": option_id, "amount": opt["total_text"], "total": opt["total"], "air": opt["air"],
@@ -238,7 +262,10 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
                         f"{b.get('weight_kg')} kg, our reference {b['team_reference']})? Where is it now, and when do "
                         f"you expect it to arrive?\n\nThanks,\n{settings.persona}, {settings.company}")
     before = len(rec["data"].get("carrier_messages") or [])
-    mid = ctx.fw.mail_carrier(deal_id, to, f"Shipment status {ref}", body, in_reply_to=air.get("reply_mail"))
+    # in the airline's own booking thread when it confirmed by mail (its desk knows the booking there)
+    thread = b.get("confirmation_mail") or air.get("reply_mail")
+    subject = f"Re: Booking {ref} confirmed" if b.get("confirmation_mail") else f"Shipment status {ref}"
+    mid = ctx.fw.mail_carrier(deal_id, to, subject, body, in_reply_to=thread)
     end = time.time() + max(0.0, float(wait_seconds))
     reply = None
     while time.time() < end:
@@ -251,6 +278,10 @@ def carrier_status(ctx: Ctx, deal_id: str, question: str | None, wait_seconds: f
     if not reply:
         return {"asked": mid, "carrier_reply": None, "note": "no answer yet; it will be stored on the deal when it "
                 "comes (deal tool)", "booking": facts["booking"]}
+    if re.search(r"to quote we need|please provide|we need:", reply["text"], re.I):
+        return {"carrier_reply": reply["text"], "booking": facts["booking"],
+                "note": "the airline answered with its quote form, not with a status (5U carriers did so on Sat "
+                        "16:13 too). Answer from our record: expected_stage_now and the dates, as our estimates."}
     status = {"text": reply["text"], "mail": reply["mail"], "at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())}
     store.update(deal_id, lambda r: (r["status"], {**r["data"], "booking": {**r["data"]["booking"],
                                                                            "carrier_status": status}}))
@@ -297,18 +328,40 @@ def _summary(rec: dict, b: dict | None) -> dict:
             "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",
                                                    "transit_days", "status", "via", "pickup", "amount",
                                                    "carrier_status")},
+                         "airline_email": getattr(kit.world().carrier_by_name(bd.get("airline") or ""), "email", None),
                          "booked_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(bd["booked_at"])),
-                         "estimated_arrival": eta(bd)} if bd else None)}
+                         "airline_confirmation": bd.get("confirmation_text"), **timeline(bd)} if bd else None)}
 
 
-def eta(booking: dict) -> str | None:
-    """Estimated arrival: booking time plus transit days (an estimate, and the agent says so)."""
+def timeline(booking: dict) -> dict:
+    """Where a booked shipment should be now, from our dates: it leaves when the goods are ready (not when we
+    booked), arrives transit days later. Estimates, and the agent says so. The airline's word, when it gives one,
+    wins (carrier_status)."""
     from datetime import datetime, timedelta, timezone
     try:
         booked = datetime.fromtimestamp(booking["booked_at"], timezone.utc)
-        return (booked + timedelta(days=float(booking["transit_days"]))).strftime("%a %d %b %Y")
+        ready = booked
+        try:
+            ready = max(booked, datetime.fromisoformat(str(booking.get("ready_date"))[:10]).replace(
+                hour=9, tzinfo=timezone.utc))
+        except ValueError:
+            pass
+        pickup_h = float((booking.get("pickup") or {}).get("days") or 0) * 24
+        departure = ready + timedelta(hours=pickup_h)
+        arrival = departure + timedelta(days=float(booking["transit_days"]))
     except (KeyError, TypeError, ValueError):
-        return None
+        return {}
+    now = datetime.now(timezone.utc)
+    stage = ("booked, waiting for the goods to be ready" + (" and collected" if pickup_h else "")
+             if now < ready else "collected, on its way to the airport" if now < departure
+             else "in transit" if now < arrival else "arrived")
+    fmt = "%a %d %b %Y"
+    return {"ready_date": ready.strftime(fmt), "estimated_departure": departure.strftime(fmt),
+            "estimated_arrival": arrival.strftime(fmt), "expected_stage_now": stage}
+
+
+def eta(booking: dict) -> str | None:
+    return timeline(booking).get("estimated_arrival")
 
 
 def _ts(iso: str | None) -> float:

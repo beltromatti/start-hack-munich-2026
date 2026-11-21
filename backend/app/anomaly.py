@@ -20,6 +20,7 @@ from app import kit, llm, store
 
 OPS_MODEL = os.getenv("OPS_MODEL", "gpt-5.5")
 SLOW_S = 75  # baseline: about 30 s after our mail
+WINDOW_S = 1800  # signals from the last 30 minutes: a change that is still happening
 Z_MIN, BASE_N, MIN_BASE, SD_FLOOR = 3.0, 10, 3, 0.02  # price shocks: own last 10 deals, at least 3
 FIRST_GAP = 0.15  # first live price this far off the sheet: the sheet is likely stale
 AMOUNT = re.compile(r"(\d[\d,.]*\d)\s*(EUR|USD|GBP|CHF|CNY|JPY)\b|\b(EUR|USD|GBP|CHF|CNY|JPY)\s*(\d[\d,.]*\d)")
@@ -174,7 +175,12 @@ def diagnose(s: dict) -> dict:
 def check(diagnose_new: bool = True) -> list[dict]:
     """Scan the register; open an incident per new signal, diagnose it once. Returns the incidents opened."""
     board = json.loads(store.kv_get("board_me") or "null")
-    found = signals(store.mails(500), store.events(limit=500), board, store.records("deal", limit=300))
+    # only what is recent: an old signal (fixed since) must not open incidents or spend a diagnosis again
+    since = time.time() - WINDOW_S
+    mails = [m for m in store.mails(500) if (_ts(m.get("received_at")) or time.time()) >= since]
+    events = [e for e in store.events(limit=500) if e["ts"] >= since]
+    deals = [d for d in store.records("deal", limit=300) if d["updated_at"] >= since]
+    found = signals(mails, events, board, deals)
     opened = []
     for s in found:
         rid = "incident-" + re.sub(r"[^\w-]+", "-", s["key"])[:80]

@@ -11,3 +11,5 @@ frontend/dist/
 
 # Personal notes and experiments (not shared)
 personal/
+overview/.dev.vars
+overview/.wrangler/
