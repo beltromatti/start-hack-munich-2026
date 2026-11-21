@@ -31,8 +31,13 @@ def nullable(o: dict) -> dict:
 QUANTITY = obj({"value": N, "unit": S, "per_piece": {"type": "boolean"}})
 SHIPMENT = obj({
     "origin_airport": {**S, "description": "IATA code of the German departure airport, if the customer names one"},
-    "pickup": nullable(obj({"postcode": S, "city": S}, "door-to-port: where the truck collects the goods")),
-    "destination_airport": {**S, "description": "IATA code of the destination airport"},
+    "pickup": nullable(obj({"postcode": S, "city": S},
+                           "door-to-port, only when the customer asks us to collect the goods (pickup, trucking, "
+                           "from our site, ab Werk): where the truck collects them. An address in a signature or "
+                           "letterhead is not a pickup request: null")),
+    "destination_airport": {**S, "description": "IATA code of the destination airport. A city is its airport in "
+                                                "our network: " + ", ".join(
+                                                    f"{c} {n}" for c, n in kit.DESTINATIONS.items())},
     "pieces": I,
     "weight": {**QUANTITY, "description": "as written: value, unit (kg, lb, t), per piece or total"},
     "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or total; null values if unknown"},
@@ -140,6 +145,10 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
                   m)
     subject = parent["subject"] or "Your shipment"
     subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+    if kind == "quote":  # the one thing 5U reads in a quote: one all-in total. Guaranteed here, before it is sent
+        wrong = _quote_amounts(ctx, option_id, body)
+        if wrong:
+            return {"error": wrong}
     sent = ctx.fw.api.send(to, subject, body, in_reply_to=parent["id"])
     store.save_mail(sent, "out", kind, handled=True)
     ctx.outcome.append(kind)
@@ -152,6 +161,24 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
     if kind == "quote":
         result.update(_record_quote(ctx, option_id, body, sent))
     return result
+
+
+MONEY = re.compile(r"(?:€|\$|£|\b(?:EUR|USD|GBP|CHF)\b)\s*\d[\d.,']*|\d[\d.,']*\s*(?:€|\$|£|\b(?:EUR|USD|GBP|CHF|euros?|dollars?)\b)",
+                   re.IGNORECASE)
+
+
+def _quote_amounts(ctx: Ctx, option_id: str | None, body: str) -> str | None:
+    """None when the quote carries exactly one amount of money, the option's total. Else what to change."""
+    d = store.get(ctx.deal_id)["data"] if store.get(ctx.deal_id) else {}
+    opt = (d.get("options") or {}).get(option_id or "")
+    if not opt:
+        return None  # no option to check against (recorded as such by _record_quote)
+    found = MONEY.findall(body)
+    if body.count(opt["total_text"]) == 1 and len(found) == 1:
+        return None
+    return (f"not sent: a quote carries exactly one amount of money, the total of option {option_id} written as "
+            f"{opt['total_text']}, once. This text has {len(found)}: {found[:4]}. One mail, one option, one total; "
+            f"another option can be named in words (airline, days) without its price")
 
 
 def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dict:

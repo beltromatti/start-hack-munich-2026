@@ -193,3 +193,58 @@ def test_crm_gives_the_airlines_address_for_a_status_question():
     store.put("booking-5", "booking", "confirmed", booking)
     out = tools.crm(tools.Ctx(f, "session-9", "deal-9", 9, "tracking", None), "BK-7")
     assert out["matches"][0]["booking"]["airline_email"] == "yellowtail-air-freight@hackloop.mail"
+
+
+def test_a_carrier_that_says_no_takes_its_sheet_price_with_it():
+    from decimal import Decimal as D
+    from app.pricing import Offer
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    req = {"origin": "FRA", "destination": "BKK", "weight_kg": "260", "volume_cbm": "1.300", "chargeable_kg": "260",
+           "pieces": 1, "pickup_zone": None, "pickup_postcode": None}
+    sheet = [Offer("air", "Yellowtail Air Freight", D("930.80"), D(2), "sheet"),
+             Offer("air", "Orion Cargo Air", D("990.00"), D(3), "sheet")]
+    yl = "yellowtail-air-freight@hackloop.mail"
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req, "offers": [o.as_dict() for o in sheet],
+                                             "asked": {"7": yl}, "replied": []})
+    store.kv_set("bidreq:7", "deal-1")
+    assert [o["airline"] for o in f.options("deal-1", "fastest")["options"]] == ["Yellowtail Air Freight", "Orion Cargo Air"]
+    api._deliver(yl, api.mailbox, "Re: Rate request FRA-BKK 260 kg",
+                 "Hello, we do not serve this lane now: all flights to Bangkok are suspended (tsunami warning).", 7)
+    run(f)
+    out = f.options("deal-1", "fastest")
+    assert [o["airline"] for o in out["options"]] == ["Orion Cargo Air"] and out["recommended"] == "A1"
+    assert "suspended" in out["carriers_without_price"][0]["says"] and out["still_waiting_for"] == []
+
+
+def test_a_city_is_its_airport_and_a_signature_is_no_pickup():
+    from app.forwarder import normalise
+    kg = {"value": 650, "unit": "kg", "per_piece": False}
+    ship = {"origin_airport": "CGN", "pickup": None, "destination_airport": "Lagos, Nigeria", "pieces": 6,
+            "weight": kg, "volume": None, "dimensions": [], "cargo": {"commodity": None, "ready_date": None, "notes": None}}
+    r = normalise(ship, kit.world())
+    assert r["destination"] == "LOS" and not r["missing"] and r["pickup_zone"] is None
+    assert normalise({**ship, "destination_airport": "Peking"}, kit.world())["destination"] == "PEK"
+    assert normalise({**ship, "destination_airport": "pek"}, kit.world())["destination"] == "PEK"
+    hint = normalise({**ship, "destination_airport": None}, kit.world())["missing"][0]
+    assert "LOS Lagos" in hint and "PEK Beijing" in hint
+
+
+def test_a_quote_with_two_amounts_is_not_sent():
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("sam@lumen.example", "Quote", "1200 kg MUC to LAX, cheapest and fastest please")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    opt = {"air": {"carrier": "Yellowtail Air Freight"}, "pickup": None, "total": "2748.00", "total_text": "2748.00 EUR"}
+    store.put(ctx.deal_id, "deal", "pricing", {"root": rfq["id"], "received_at": None, "options": {"A1": opt}})
+    two = "Hi Sam,\n\nCheapest: 2748.00 EUR all-in\nFastest: 3336.00 EUR all-in\n\nGiulia"
+    out = tools.send_mail(ctx, "quote", two, "A1", None)
+    assert "error" in out and not to(api, "sam@lumen.example"), "nothing went out"
+    one = "Hi Sam,\n\ncheapest is Yellowtail, 5 days. Fjordline would be there in 3.\n\nTotal: 2748.00 EUR all-in\n\nGiulia"
+    out = tools.send_mail(ctx, "quote", one, "A1", None)
+    assert out["recorded_quote"] == "2748.00 EUR" and len(to(api, "sam@lumen.example")) == 1

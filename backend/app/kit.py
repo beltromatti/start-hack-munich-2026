@@ -13,6 +13,34 @@ from . import store
 from .config import KIT
 
 START = KIT / "start-kit"
+# Every destination in the start kit (carrier list, sheets, portal), with the names customers use for it.
+DESTINATIONS = {
+    "ASU": "Asuncion", "ATL": "Atlanta", "BKK": "Bangkok", "BOG": "Bogota", "BOM": "Mumbai / Bombay", "CAI": "Cairo",
+    "DEL": "Delhi / New Delhi", "DFW": "Dallas", "DOH": "Doha", "DXB": "Dubai", "EZE": "Buenos Aires",
+    "GRU": "Sao Paulo", "HKG": "Hong Kong", "ICN": "Seoul", "JFK": "New York", "JNB": "Johannesburg",
+    "KTM": "Kathmandu", "KUL": "Kuala Lumpur", "LAX": "Los Angeles", "LIM": "Lima", "LOS": "Lagos",
+    "MEL": "Melbourne", "MEX": "Mexico City", "MIA": "Miami", "MNL": "Manila", "NBO": "Nairobi",
+    "NRT": "Tokyo", "ORD": "Chicago", "PEK": "Beijing / Peking", "PPT": "Papeete / Tahiti", "PVG": "Shanghai",
+    "RUH": "Riyadh", "SCL": "Santiago de Chile", "SGN": "Ho Chi Minh City / Saigon", "SIN": "Singapore",
+    "SYD": "Sydney", "TLV": "Tel Aviv", "TNR": "Antananarivo", "TPE": "Taipei", "ULN": "Ulaanbaatar",
+    "YYZ": "Toronto",
+}
+
+
+def destination_code(text: str | None) -> str | None:
+    """'LOS', 'Lagos', 'Lagos, Nigeria', 'Peking' -> the IATA code in our network; any other 3-letter code as is."""
+    t = (text or "").strip()
+    if not t:
+        return None
+    if t.upper() in DESTINATIONS:
+        return t.upper()
+    low = t.lower()
+    for code, names in DESTINATIONS.items():
+        if any(n.strip().lower() in low for n in names.split("/")):
+            return code
+    return t.upper() if len(t) == 3 and t.isalpha() else None
+
+
 TRACKING = "tracking@hackloop.mail"
 RATEDESK = "ratedesk@hackloop.mail"
 
