@@ -4,9 +4,8 @@ type Event = {
   id: number; ts: number; run_id: string | null; agent: string; kind: string;
   summary: string; data: unknown; tokens_in: number; tokens_out: number;
 };
-type Usage = { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number;
-  budget: { limit_usd: number | null; spent_usd: number; unpriced_calls: number } };
-type Health = { ok: boolean; model: string; worker: boolean; mail: string };
+type Usage = { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };
+type Health = { ok: boolean; worker: boolean; llm: string; models: { parse: string; bid: string; write: string } };
 
 const get = <T,>(path: string): Promise<T> => fetch(path).then((r) => r.json());
 const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -51,8 +50,8 @@ export default function App() {
       <header>
         <h1>Agent Console</h1>
         <div className="meta">
-          {offline ? <span className="bad">API offline</span> : health && <span>{health.model} · mail: {health.mail} · worker {health.worker ? "on" : "off"}</span>}
-          {usage && <span>{usage.llm_calls} calls · {usage.tokens_in + usage.tokens_out} tokens · ${usage.cost_usd.toFixed(4)}{usage.budget.limit_usd ? ` of $${usage.budget.limit_usd}` : ""}{usage.budget.unpriced_calls ? ` · ${usage.budget.unpriced_calls} unpriced` : ""}</span>}
+          {offline ? <span className="bad">API offline</span> : health && <span>{health.models.parse} · forwarder {health.worker ? "live" : "off"}</span>}
+          {usage && <span>{usage.llm_calls} calls · {usage.tokens_in + usage.tokens_out} tokens · ${usage.cost_usd.toFixed(4)}</span>}
         </div>
       </header>
       <main>

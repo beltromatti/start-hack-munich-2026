@@ -17,16 +17,32 @@ The team key never goes into the repo. It lives only in each person's `.env`.
 
 ## Architecture (keep it this simple)
 
-- `backend/` Python 3.12, FastAPI, SQLite, `uv`. Entry `app/main.py`.
-- Every model call goes through `app/llm.py` (`chat`, `ask_json`). Never instantiate a model client elsewhere:
-  token cost may be scored and a challenge may force its own gateway (`LLM_BASE_URL`).
-- Structured, cost-sensitive calls (extract, classify, write) use `app/ai/service.generate_structured` with a
-  stage profile from `app/ai/profiles.stage(...)`. Every call stores tokens and `cost_usd`; `LLM_BUDGET_USD` stops at 90 %.
-- Agents use `app/agent.py` (`@tool` + `run`). Tools do the work and enforce rules; the model decides.
-- Everything an agent does is logged with `store.log(...)`; the dashboard and the pitch depend on it.
-- Domain data goes into `store.upsert(type, data, status)` until a real schema is clearly needed.
-- New inputs (mailbox API, portal, supplier mail) are adapters in `app/channels/` behind a small interface,
-  with a fake for local testing.
+A workflow, not a free agent: the model reads and writes language, code does everything else.
+
+```
+mail in -> register (SQLite) -> router (code, by sender/thread) -> one handler per kind
+customer  read (LLM, strict JSON form) -> ask carriers by mail + portal API + sheets (code) -> wait for bids
+          -> price and pick (code: cheapest / fastest / 50-50 balanced) -> write (LLM) -> reply in the thread
+          follow-ups: accept -> book (portal by rate_id, else by mail to the airline); questions -> reply
+bid       read (LLM) -> offers on the rfq          tracking  answer from the CRM (code facts, LLM words)
+tariff    attachment -> text -> lanes (LLM) -> pricing module (replaces that airline's sheet)
+```
+
+- `backend/app/forwarder.py` the loop and the handlers. Work is derived from the register, so a restart loses
+  nothing and never quotes twice. One lane per thread, threads in parallel.
+- `pricing.py` every number a customer sees (Decimal, chargeable weight, next break, minimum, surcharges, pick).
+- `language.py` the forms the model fills (the flexibility layer: `flags`, `missing`, `notes` catch what does not
+  fit) and `write()`, which checks in code that a mail contains exactly the computed amount and no other.
+- `prompts/*.md` one prompt per step: goals and criteria, not procedures.
+- `llm.py` the only model client (5U gateway in production; `LLM_TARGET=openai` for dev and tests, never scored).
+  Models per step in `config.py`. Every call logs tokens and USD.
+- `fiveu.py` the 5U API (rate limit and outbound caps enforced here). `fake5u.py` a local 5U with carriers that
+  answer like the real ones: use it for all experiments.
+- `kit.py` carriers, zones, sheets (`docs/challenges/5u-kit/tariffs.json` + ingested tariffs), portal lanes.
+- `store.py` register: `mails`, `records` (rfq, booking, tariff), `events` (every step, the sessions UI reads it).
+- `main.py` API for the UI: `/api/rfqs`, `/api/rfqs/{id}` (mails, events, cost), `/api/bookings`, `/api/board`.
+- **Only one machine runs `make live`** (it polls and answers the real mailbox). Everyone else: `make sim`,
+  `make test`, the fake 5U. The portal rate limit (10/min) is shared by the whole team key.
 - `frontend/` Vite + React + TypeScript. Plain CSS in `src/styles.css`, light and dark.
 - How Mattia builds agent systems (state-driven work, the register as truth, tools enforce rules):
   `reference/siever-mail/README.md`. `personal/` is gitignored, for each person's private notes.
@@ -45,7 +61,9 @@ The team key never goes into the repo. It lives only in each person's `.env`.
 
 ```sh
 make install   # backend (uv) + frontend (npm)
-make api       # backend on :8000
+make api       # backend API on :8000, no forwarder loop
+make live      # production forwarder on the real mailbox (ONE machine only)
+make sim       # realistic mails, real model (OpenAI direct), fake 5U
 make web       # dashboard on :5173 (proxies /api)
 make test      # backend tests
 ```

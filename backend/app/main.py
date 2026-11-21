@@ -1,32 +1,41 @@
-"""HTTP API for the dashboard. Run: uv run uvicorn app.main:app --reload --port 8000"""
-import asyncio
+"""HTTP API for the sessions UI, and the forwarder loop when WORKER=1.
+
+Run: uv run uvicorn app.main:app --port 8000   (make api / make live)
+"""
+import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import store, worker
-from .ai import budget
-from .channels.mail import adapter
+from . import store
 from .config import settings
+
+forwarder = None
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global forwarder
     store.conn()
-    task = asyncio.create_task(worker.loop()) if settings.worker else None
+    if settings.worker:
+        from .fiveu import FiveU
+        from .forwarder import Forwarder
+        forwarder = Forwarder(FiveU())
+        forwarder.start()
     yield
-    if task:
-        task.cancel()
+    if forwarder:
+        forwarder.stop.set()
 
 
-app = FastAPI(title="START Hack Munich 2026", lifespan=lifespan)
+app = FastAPI(title="START Milan Forwarding", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "model": settings.llm_model, "worker": settings.worker, "mail": settings.mail_adapter}
+    return {"ok": True, "worker": settings.worker, "llm": settings.llm_base_url or "openai",
+            "models": {"parse": settings.model_parse, "bid": settings.model_bid, "write": settings.model_write}}
 
 
 @app.get("/api/events")
@@ -36,15 +45,36 @@ def events(since: int = 0, run_id: str | None = None) -> list[dict]:
 
 @app.get("/api/usage")
 def usage() -> dict:
-    return {**store.usage(), "budget": budget.status()}
+    return store.usage()
 
 
-@app.get("/api/records")
-def records(type: str | None = None) -> list[dict]:
-    return store.records(type)
+@app.get("/api/rfqs")
+def rfqs() -> list[dict]:
+    return [{"id": r["id"], "status": r["status"], "updated_at": r["updated_at"], "customer": r["data"].get("customer"),
+             "subject": r["data"].get("subject"), "request": r["data"].get("request"), "amount": r["data"].get("amount"),
+             "response_seconds": r["data"].get("response_seconds"), "cost": store.usage(r["id"])["cost_usd"]}
+            for r in store.records("rfq")]
 
 
-@app.post("/api/tick")
-def tick() -> dict:
-    """Run one worker cycle by hand (useful for demos and debugging)."""
-    return {"handled": worker.tick(adapter(settings.mail_adapter))}
+@app.get("/api/rfqs/{rid}")
+def rfq(rid: str) -> dict:
+    r = store.get(rid)
+    if not r:
+        raise HTTPException(404)
+    return {**r, "mails": store.thread(r["data"]["root"]), "events": store.events(run_id=rid),
+            "usage": store.usage(rid)}
+
+
+@app.get("/api/bookings")
+def bookings() -> list[dict]:
+    return store.records("booking")
+
+
+@app.get("/api/mails")
+def mails(limit: int = 200) -> list[dict]:
+    return store.mails(limit)
+
+
+@app.get("/api/board")
+def board() -> dict:
+    return json.loads(store.kv_get("board_me") or "{}")

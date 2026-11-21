@@ -1,0 +1,128 @@
+"""The 5U API: mailbox, rate portal, bookings, board. One client, transient errors retried here.
+
+Rules the code enforces, whatever a model or a mail says:
+- the portal's per-minute rate limit is respected (we wait for the next window instead of failing);
+- outbound mail is capped per recipient and per minute, so nobody gets spammed.
+"""
+import threading
+import time
+from collections import defaultdict, deque
+from typing import Any
+
+import httpx
+
+from . import store
+from .config import settings
+
+
+class FiveU:
+    def __init__(self, base_url: str | None = None, api_key: str | None = None):
+        self.http = httpx.Client(base_url=base_url or settings.fiveu_base_url,
+                                 headers={"X-API-Key": api_key or settings.fiveu_api_key}, timeout=20)
+        self._rate_lock = threading.Lock()
+        self._rate_left: int | None = None
+        self._rate_reset = 0.0
+        self._sent: dict[str, deque] = defaultdict(deque)
+        self._send_lock = threading.Lock()
+
+    def _req(self, method: str, path: str, **kw: Any) -> httpx.Response:
+        for attempt in range(4):
+            try:
+                r = self.http.request(method, path, **kw)
+            except httpx.TransportError as e:
+                if attempt == 3:
+                    raise
+                store.log("fiveu", "error", f"{method} {path}: {e!r}, retrying")
+                time.sleep(0.5 * 2 ** attempt)
+                continue
+            if r.status_code in (500, 502, 504) and attempt < 3:
+                time.sleep(0.5 * 2 ** attempt)
+                continue
+            return r
+        raise RuntimeError("unreachable")
+
+    # ---- mailbox -------------------------------------------------------------------------------------------
+
+    def poll(self, since_id: int) -> tuple[list[dict], int]:
+        r = self._req("GET", "/v1/mailbox/messages", params={"since_id": since_id, "limit": 200})
+        r.raise_for_status()
+        d = r.json()
+        return d["messages"], d["next_since_id"]
+
+    def send(self, to: str, subject: str, body: str, in_reply_to: int | None = None) -> dict:
+        with self._send_lock:
+            now = time.time()
+            q = self._sent[to]
+            while q and now - q[0] > 60:
+                q.popleft()
+            if len(q) >= 6:
+                raise RuntimeError(f"outbound limit: {to} already got 6 mails this minute")
+            q.append(now)
+        payload: dict[str, Any] = {"to": to, "subject": subject, "body": body}
+        if in_reply_to is not None:
+            payload["in_reply_to"] = in_reply_to
+        r = self._req("POST", "/v1/mailbox/messages", json=payload)
+        if r.status_code >= 400:
+            raise RuntimeError(f"send to {to} failed: {r.status_code} {r.text[:300]}")
+        return r.json()
+
+    def attachment(self, mail_id: int, attachment_id: Any) -> bytes:
+        r = self._req("GET", f"/v1/mailbox/messages/{mail_id}/attachments/{attachment_id}")
+        r.raise_for_status()
+        return r.content
+
+    # ---- portal --------------------------------------------------------------------------------------------
+
+    def ports(self) -> list[dict]:
+        r = self._req("GET", "/v1/portal/ports")
+        r.raise_for_status()
+        return r.json()["lanes"]
+
+    def brackets(self, airline: str) -> list[int] | None:
+        r = self._req("GET", "/v1/portal/brackets", params={"airline": airline})
+        return r.json()["breaks_kg"] if r.status_code == 200 else None
+
+    def rate(self, origin: str, destination: str, airline: str, weight_kg: Any, volume_cbm: Any = None) -> dict:
+        """One priced rate, or {"error", "status", "detail"}. Waits for the next window when the limit is used up."""
+        params = {"origin": origin, "destination": destination, "airline": airline, "weight_kg": str(weight_kg)}
+        if volume_cbm:
+            params["volume_cbm"] = str(volume_cbm)
+        with self._rate_lock:
+            for _ in range(3):
+                if self._rate_left == 0 and time.time() < self._rate_reset:
+                    time.sleep(self._rate_reset - time.time())
+                r = self._req("GET", "/v1/portal/rates", params=params)
+                left = r.headers.get("X-RateLimit-Remaining")
+                self._rate_left = int(left) if left is not None and left.isdigit() else None
+                if self._rate_left == 0:
+                    self._rate_reset = time.time() + 60
+                if r.status_code == 429:
+                    wait = float(r.headers.get("Retry-After") or 5)
+                    store.log("fiveu", "info", f"portal rate limit, waiting {wait:.0f}s")
+                    self._rate_left, self._rate_reset = 0, time.time() + wait
+                    continue
+                if r.status_code == 200:
+                    return r.json()
+                return {"error": True, "status": r.status_code, "detail": _detail(r)}
+        return {"error": True, "status": 429, "detail": "rate limit"}
+
+    def book(self, rate_id: str, team_reference: str) -> tuple[int, dict]:
+        r = self._req("POST", "/v1/portal/bookings", json={"rate_id": rate_id, "team_reference": team_reference})
+        try:
+            body = r.json()
+        except ValueError:
+            body = {"detail": r.text[:300]}
+        return r.status_code, body
+
+    def board_me(self) -> dict:
+        r = self._req("GET", "/v1/board/me")
+        r.raise_for_status()
+        return r.json()
+
+
+def _detail(r: httpx.Response) -> str:
+    try:
+        d = r.json()
+        return str(d.get("detail") or d)
+    except ValueError:
+        return r.text[:300]
