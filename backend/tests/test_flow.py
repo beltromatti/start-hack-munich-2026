@@ -316,3 +316,23 @@ def test_a_town_without_postcode_asks_the_truckers_with_its_postcode():
     trucker = next(c for c in kit.world().carriers if c.kind == "trucker" and "86" in c.serves)
     f.ask_trucker("deal-1", trucker, req)
     assert "86150 Augsburg" in api.outbox[-1]["body"]
+
+
+def test_a_misread_bid_amount_is_read_again(monkeypatch):
+    """Live Sat 18:27: '94.08 EUR' came back from the bid reader as 9408 and sat in the options."""
+    from app import language
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    req = {"origin": "STR", "destination": "EZE", "weight_kg": "544", "volume_cbm": "1.860", "chargeable_kg": "544",
+           "pieces": 11, "pickup_zone": "70", "pickup_postcode": "70498"}
+    store.put("deal-1", "deal", "pricing", {"root": 1, "request": req, "asked": {"9": "rheinufer-spedition@hackloop.mail"}})
+    store.kv_set("bidreq:9", "deal-1")
+    reads = iter([[{"available": True, "total": 9408, "currency": "EUR", "time_value": 28, "time_unit": "hours"}],
+                  [{"available": True, "total": 94.08, "currency": "EUR", "time_value": 28, "time_unit": "hours"}]])
+    monkeypatch.setattr(language, "read_bid", lambda *a: next(reads))
+    api._deliver("rheinufer-spedition@hackloop.mail", api.mailbox, "Re: Pickup quote zone 70 to STR",
+                 "Our total price for pickup in Stuttgart and delivery to STR Airport is 94.08 EUR. Pickup time: 28 hours", 9)
+    run(f)
+    offers = store.get("deal-1")["data"]["offers"]
+    assert [o["total"] for o in offers] == ["94.08"]

@@ -375,6 +375,21 @@ class Forwarder:
             self.on_booking_mail(m)
         carrier = kit.world().carrier_by_email(m["sender"])
         raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
+        if not all(read_in_mail(x, m["body"]) for x in raw):  # an amount the mail never wrote is a misread
+            store.log("bids", "error", f"{m['sender']}: amount not in the mail, reading it again", {"read": raw},
+                      run_id=deal_id)
+            raw = language.read_bid(m["sender"], m["subject"], m["body"], deal_id)
+            kept = []
+            for x in raw:
+                if not read_in_mail(x, m["body"]) and read_in_mail({**x, "total": None}, m["body"]) \
+                        and x.get("rate_per_kg") is not None:
+                    x = {**x, "total": None}  # the rate is in the mail: code computes the total from the parts
+                if read_in_mail(x, m["body"]):
+                    kept.append(x)
+                else:
+                    store.log("bids", "error", f"{m['sender']}: amount still not in the mail, offer left out",
+                              {"read": x}, run_id=deal_id)
+            raw = kept
         offers = [o for o in (self.offer(x, m, carrier) for x in raw) if o is not None]
         # what a carrier says now beats its sheet, also when it says no (lane closed, flights suspended): its
         # sheet price is no longer on offer. A carrier that only asks back for facts keeps it.
@@ -616,6 +631,31 @@ def _day(text: Any) -> str | None:
         return datetime.fromisoformat(t[:10]).date().isoformat()
     except ValueError:
         return None
+
+
+def amounts_in(text: str) -> set[Decimal]:
+    """Every amount a mail writes, read the ways it can be written: 1,234.50 / 1.234,50 / 94.08 / 3,71 / 9408."""
+    out: set[Decimal] = set()
+    text = re.sub(r"(?<=\d)[ \u00a0\u202f](?=\d{3}(?!\d))", "", text or "")  # 1 234,50 -> 1234,50
+    for tok in re.findall(r"\d[\d.,']*\d|\d", text):
+        t = tok.replace("'", "")
+        if re.fullmatch(r"\d{1,3}(,\d{3})*(\.\d+)?|\d+(\.\d+)?", t):  # 1,234.50  94.08
+            out.add(Decimal(t.replace(",", "")))
+        if re.fullmatch(r"\d{1,3}(\.\d{3})*(,\d+)?|\d+(,\d+)?", t):  # 1.234,50  3,71
+            out.add(Decimal(t.replace(".", "").replace(",", ".")))
+    return out
+
+
+def read_in_mail(x: dict, body: str) -> bool:
+    """The amount a reader took from a carrier mail is one the mail wrote (Sat 18:27: '94.08 EUR' read as 9408).
+    Code owns the numbers: a small model's misplaced decimal must not become a price."""
+    value = x.get("total") if x.get("total") is not None else x.get("rate_per_kg")
+    if not x.get("available") or value is None:
+        return True
+    try:
+        return Decimal(str(value)) in amounts_in(body)
+    except Exception:
+        return False
 
 
 def _num(x: Any) -> str | None:
