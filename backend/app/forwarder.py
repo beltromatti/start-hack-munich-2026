@@ -378,9 +378,10 @@ class Forwarder:
             text = (f"Hello,\n\nwe would like to book your offer {air.get('rate_id') or ''} ({booking['route']}, "
                     f"{kg_text(Decimal(air.get('billed_kg') or req['weight_kg']))} kg). Our reference: {ref}.\n\n"
                     f"Thanks,\n{settings.persona}, {settings.company}")
-            self.mail_carrier(deal_id, air["email"], f"Booking {air.get('rate_id') or ref}", text,
-                              in_reply_to=air.get("reply_mail"))
-            booking.update(status="requested", via="email", portal_answer={"status": status, "body": body})
+            asked = self.mail_carrier(deal_id, air["email"], f"Booking {air.get('rate_id') or ref}", text,
+                                      in_reply_to=air.get("reply_mail"))
+            booking.update(status="requested", via="email", request_mail=asked,
+                           portal_answer={"status": status, "body": body})
         else:
             booking.update(status="failed", via="portal", error={"status": status, "body": body})
         store.put(f"booking-{d['root']}", "booking", booking["status"], booking)
@@ -403,8 +404,12 @@ class Forwarder:
         if deal_id is None:
             return
         rec = store.get(deal_id)
-        if rec and rec["data"].get("booking") and is_confirmation(m):  # a confirmation sent in a bid thread
-            self.on_booking_mail(m)
+        booked = (rec or {}).get("data", {}).get("booking") or {}
+        if booked and (is_confirmation(m) or (m.get("in_reply_to") and m["in_reply_to"] == booked.get("request_mail"))):
+            # the airline answering our booking (its confirmation, or its reply to our booking mail) is booking news,
+            # not an offer: round 51's "thank you for your booking ... Price: 4466.52" became a 0-day option
+            self.on_booking_mail(m, store.get(f"booking-{rec['data']['root']}"))
+            return
         carrier = kit.world().carrier_by_email(m["sender"])
         told = re.search(r"\bwe fly\b([^\n]*)", m["body"], re.I)  # "We fly CGN-DEL, FRA-JFK, ..." in a decline
         if told and carrier:
@@ -491,12 +496,12 @@ class Forwarder:
                     **r["data"], "replied": r["data"].get("replied", []) + [RATEDESK],
                     "offers": r["data"].get("offers", []) + [o.as_dict() for o in offers]}))
 
-    def on_booking_mail(self, m: dict) -> None:
+    def on_booking_mail(self, m: dict, rec: dict | None = None) -> None:
         """An airline writes about one of our bookings: its confirmation, or news after it (a delay, a change, a
         cancellation). Its word goes on the booking, where crm and tracking read it; the deal's session hears it,
         unless it only confirms exactly what we booked."""
         text = f"{m['subject']}\n{m['body']}"
-        rec = booking_for(text)
+        rec = rec or booking_for(text)
         if rec is None:
             store.log("booking", "info", f"airline mail not matched to a booking: {m['subject']}")
             return
@@ -510,11 +515,15 @@ class Forwarder:
             b = {**b, "status": "confirmed", "confirmation_mail": m["id"], "confirmation_text": m["body"][:800]}
         else:  # the airline's latest word on this shipment: tracking answers start from it
             b = {**b, "carrier_status": {"text": m["body"][:1500], "at": m.get("received_at"), "mail": m["id"]}}
+        # what the airline's price means for the customer's total, by code: its mail prices the flight, our total
+        # includes the pickup (round 51 told a customer 4466.52 'rather than the quoted 4659.12': the same price)
+        b, facts, changed = price_in_airline_mail(b, m["body"], confirmation)
         store.put(rec["id"], "booking", b.get("status", rec["status"]), b)
         store.update(b["deal"], lambda r: (r["status"], {**r["data"], "booking": b}))
         store.log("booking", "info", (f"confirmed {b.get('booking_reference')}" if confirmation else
-                                      f"airline news on {b.get('booking_reference')}: {m['subject']}"), run_id=b["deal"])
-        if confirmation and confirmation_matches(b, text):  # same reference, same price: nothing new for the deal
+                                      f"airline news on {b.get('booking_reference')}: {m['subject']}")
+                  + (f" ({facts})" if changed else ""), run_id=b["deal"])
+        if confirmation and not changed and confirmation_matches(b, text):  # same reference, same price: no news
             store.log("booking", "info", f"{b.get('booking_reference')}: the airline's confirmation matches "
                       "the booking, the session is not woken", run_id=b["deal"])
             return
@@ -522,7 +531,7 @@ class Forwarder:
         what = "confirmed the booking" if confirmation else "wrote about the booking"
         agent.notify(f"session-{store.get(b['deal'])['data']['root']}",
                      f"The airline {what} (their mail {m['id']}): booking reference {b.get('booking_reference')}. "
-                     f"Mail:\n{m['body'][:1500]}")
+                     f"{facts}\nMail:\n{m['body'][:1500]}")
 
     def eur(self, amount: Decimal, currency: str, fx: Any) -> Decimal | None:
         total = pricing.to_eur(amount, currency, fx, self.fx)
@@ -708,16 +717,45 @@ def booking_for(text: str) -> dict | None:
     return None
 
 
+def booked_air(b: dict) -> tuple[Decimal, Decimal] | None:
+    """The flight price we booked and the pickup in the booking's all-in total (an airline's mail prices the
+    flight only)."""
+    try:
+        pickup = Decimal(str((b.get("pickup") or {}).get("total") or 0))
+        return Decimal(str(b.get("amount", "")).split()[0]) - pickup, pickup
+    except Exception:
+        return None
+
+
 def confirmation_matches(b: dict, text: str) -> bool:
     """The airline confirms what we booked: our booking reference and the air price we booked at are both in its
     mail. Anything else (another price, no reference, a booking we made by mail) is news the agent should read."""
-    try:
-        amount = Decimal(str(b.get("amount", "")).split()[0])
-        air = amount - Decimal(str((b.get("pickup") or {}).get("total") or 0))
-    except Exception:
-        return False
-    return bool(b.get("booking_reference")) and b["booking_reference"] in text and \
-        b.get("via") == "portal" and air in amounts_in(text)
+    booked = booked_air(b)
+    return booked is not None and bool(b.get("booking_reference")) and b["booking_reference"] in text and \
+        b.get("via") == "portal" and booked[0] in amounts_in(text)
+
+
+def price_in_airline_mail(b: dict, body: str, confirmation: bool) -> tuple[dict, str, bool]:
+    """What an airline's mail about our booking says about the price, worked out by code for the agent: the flight
+    price we booked, or another one (a confirmation is the airline's word on what it charges: the all-in total
+    follows it, as at booking). Returns the booking, the facts for the agent, and whether the price changed."""
+    booked = booked_air(b)
+    if booked is None:
+        return b, "", False
+    air, pickup = booked
+    with_pickup = f" (with the pickup, {pricing.fmt(pickup)})" if pickup else ""
+    if air in amounts_in(body):
+        return b, (f"Their price, {pricing.fmt(air)}, is the flight price we booked: the customer's all-in total "
+                   f"stays {b['amount']}{with_pickup}."), False
+    stated = {a for tok in re.findall(r"(\d[\d.,']*\d|\d)\s*(?:EUR|€)", body) for a in amounts_in(tok)}
+    if confirmation and len(stated) == 1:
+        new_air = stated.pop()
+        quoted = b.get("quoted_amount") or b["amount"]
+        now = pricing.fmt(new_air + pickup)
+        return ({**b, "amount": now, "quoted_amount": quoted, "price_changed": {"quoted": quoted, "booked": now}},
+                f"Their price for the flight is {pricing.fmt(new_air)}, not the {pricing.fmt(air)} we booked: the "
+                f"all-in total is now {now}{with_pickup}, against the {quoted} we quoted (price_changed).", True)
+    return b, f"What we booked: the flight at {pricing.fmt(air)}, all-in {b['amount']}{with_pickup}.", False
 
 
 LANES_FRESH = 2 * 3600  # what a carrier told us about its lanes holds this long; then it is asked again

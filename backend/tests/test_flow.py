@@ -494,3 +494,43 @@ def test_a_mailbox_poll_is_never_retried_sooner_than_5us_limit():
     assert api.poll(3) == ([], 3) and api.poll_gap == 5.5  # 429 'per 5 seconds': the gap stays 5.5 s
     api._last_poll = 0
     assert api.poll(3) == ([{"id": 7}], 8) and len(calls) == 3
+
+
+def _booked_by_mail(api):
+    """Round 51: door-to-port booked by mail with the airline (portal booking unavailable for that airline)."""
+    b = {"team_reference": "SM-81", "deal": "deal-81", "customer": "jonas@kessler.example", "airline": "Nova Atlas Cargo",
+         "route": "MUC-BKK", "transit_days": "2", "via": "email", "status": "requested", "rate_id": "R-vuCFXpwNvy1h_5sL",
+         "amount": "4659.12 EUR", "pickup": {"total": "192.60"}}
+    ask = api._deliver("start-milan@hackloop.mail", "nova-atlas-cargo@hackloop.mail", "Booking R-vuCFXpwNvy1h_5sL",
+                       "we would like to book your offer R-vuCFXpwNvy1h_5sL")
+    store.kv_set(f"bidreq:{ask['id']}", "deal-81")
+    b["request_mail"] = ask["id"]
+    store.put("booking-81", "booking", "requested", b)
+    store.put("deal-81", "deal", "booked", {"root": 81, "booking": b})
+    store.put("session-81", "session", "idle", {"root": 81, "task": "customer", "seen": [], "executions": 1, "items": []})
+    return ask
+
+
+def test_an_airline_confirmation_is_read_against_the_flight_price_we_booked():
+    """Round 51: the airline confirmed 4466.52 for the flight; the agent compared it with the 4659.12 all-in (pickup
+    192.60 included) and told the customer the price had changed. Code now says what the price means."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    ask = _booked_by_mail(api)
+    reply = api._deliver("nova-atlas-cargo@hackloop.mail", api.mailbox, "Re: Booking R-vuCFXpwNvy1h_5sL",
+                         "Hello,\n\nthank you for your booking.\n\nBooking reference: BK-44RD0LQJ\nRate reference: "
+                         "R-vuCFXpwNvy1h_5sL\nLane: MUC-BKK, 923 kg\nPrice: 4466.52 EUR\nStatus: booked\n", ask["id"])
+    run(f)
+    assert store.get("deal-81")["data"].get("offers", []) == []  # a booking reply is not an offer
+    told = json.dumps(store.get("session-81")["data"]["items"])
+    assert "is the flight price we booked" in told and "stays 4659.12 EUR" in told
+    api._deliver("nova-atlas-cargo@hackloop.mail", api.mailbox, "Booking BK-44RD0LQJ confirmed",
+                 "Hello,\n\nyour booking BK-44RD0LQJ is confirmed.\n\nBooking reference: BK-44RD0LQJ\nYour reference: "
+                 "SM-81\nPrice: 4913.17 EUR\nStatus: booked and ready to ship\n")
+    run(f)
+    b = store.get("booking-81")["data"]
+    assert b["status"] == "confirmed" and b["amount"] == "5105.77 EUR"  # 4913.17 for the flight + 192.60 pickup
+    assert b["price_changed"] == {"quoted": "4659.12 EUR", "booked": "5105.77 EUR"}
+    assert "all-in total is now 5105.77 EUR" in json.dumps(store.get("session-81")["data"]["items"])
+    assert reply["id"]
