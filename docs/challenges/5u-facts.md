@@ -172,3 +172,7 @@ on round 33 with the real texts: priced from 1.92 cbm, 320.64 kg.
 airline (its `R-...` reference), told the customer the request was in and the confirmation pending, and passed on
 the airline's reference when its confirmation came (20:30). At 20:26 `/v1/portal/ports` also answered 503 at a
 restart, which kept the forwarder from starting for 45 s; startup now carries on without the portal lanes.
+
+**Mailbox poll limit (Sat 20:30):** `GET /v1/mailbox/messages` answers `429 one poll per 5 seconds` (retry_after 1).
+The limit is per team key: anything else polling our mailbox with it takes from the same budget. The client keeps
+to the gap it learns from the 429; bids now arrive up to 5 s later, quotes still well inside 2 minutes.
