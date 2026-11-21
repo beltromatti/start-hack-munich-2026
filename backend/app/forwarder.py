@@ -378,7 +378,10 @@ class Forwarder:
 
     def ask_trucker(self, deal_id: str, c: kit.Carrier, req: dict) -> int:
         z = kit.world().zones.get(req["pickup_zone"], {})
-        postcode = req.get("pickup_postcode") or kit.ZONE_POSTCODE.get(req["pickup_zone"], "")  # a town: its postcode
+        # a town, or only the first digits of a postcode ("area 60"): a real postcode of that town, because the
+        # truckers answer only a request with five digits (probe Sat 18:14)
+        given = re.sub(r"\D", "", req.get("pickup_postcode") or "")
+        postcode = req["pickup_postcode"] if len(given) == 5 else kit.ZONE_POSTCODE.get(req["pickup_zone"], "")
         body = (f"Hello {c.name} team,\n\nplease quote a pickup from {postcode} "
                 f"{z.get('area', '')} (zone {req['pickup_zone']}) to {z.get('airport', req['origin'])} airport.\n"
                 f"Total weight: {kg_text(Decimal(req['weight_kg']))} kg\n"
@@ -835,9 +838,7 @@ def normalise(s: dict, w: kit.World) -> dict:
     if len(postcode) >= 2 and postcode[:2] in w.zones:
         zone = postcode[:2]
     if pickup and not zone and pickup.get("city"):  # "pickup in Darmstadt": that zone's area
-        city = pickup["city"].strip().lower()
-        zone = next((z for z, v in w.zones.items() if v["area"].lower() == city), None) or \
-            next((z for z, v in w.zones.items() if city in v["area"].lower() or v["area"].lower() in city), None)
+        zone = kit.zone_of_town(pickup["city"], w.zones)
     origin = (s.get("origin_airport") or "").upper() or None
     if zone:
         origin = w.zones[zone]["airport"]  # the truck goes to its zone's airport

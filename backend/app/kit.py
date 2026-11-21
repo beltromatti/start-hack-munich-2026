@@ -5,6 +5,7 @@ which win over the kit file); portal lanes come live from the API and are refres
 """
 import csv
 import json
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -13,32 +14,73 @@ from . import store
 from .config import KIT
 
 START = KIT / "start-kit"
-# Every destination in the start kit (carrier list, sheets, portal), with the names customers use for it.
+# Every destination in the start kit (carrier list, sheets, portal), with the names customers use for it, in the
+# languages they write in.
 DESTINATIONS = {
-    "ASU": "Asuncion", "ATL": "Atlanta", "BKK": "Bangkok", "BOG": "Bogota", "BOM": "Mumbai / Bombay", "CAI": "Cairo",
-    "DEL": "Delhi / New Delhi", "DFW": "Dallas", "DOH": "Doha", "DXB": "Dubai", "EZE": "Buenos Aires",
-    "GRU": "Sao Paulo", "HKG": "Hong Kong", "ICN": "Seoul", "JFK": "New York", "JNB": "Johannesburg",
-    "KTM": "Kathmandu", "KUL": "Kuala Lumpur", "LAX": "Los Angeles", "LIM": "Lima", "LOS": "Lagos",
-    "MEL": "Melbourne", "MEX": "Mexico City", "MIA": "Miami", "MNL": "Manila", "NBO": "Nairobi",
-    "NRT": "Tokyo", "ORD": "Chicago", "PEK": "Beijing / Peking", "PPT": "Papeete / Tahiti", "PVG": "Shanghai",
-    "RUH": "Riyadh", "SCL": "Santiago de Chile", "SGN": "Ho Chi Minh City / Saigon", "SIN": "Singapore",
-    "SYD": "Sydney", "TLV": "Tel Aviv", "TNR": "Antananarivo", "TPE": "Taipei", "ULN": "Ulaanbaatar",
-    "YYZ": "Toronto",
+    "ASU": "Asuncion", "ATL": "Atlanta", "BKK": "Bangkok", "BOG": "Bogota", "BOM": "Mumbai / Bombay",
+    "CAI": "Cairo / Kairo / Le Caire / El Cairo / Il Cairo",
+    "DEL": "Delhi / New Delhi / Neu-Delhi / Neu Delhi / Nueva Delhi / Nuova Delhi", "DFW": "Dallas", "DOH": "Doha",
+    "DXB": "Dubai", "EZE": "Buenos Aires", "GRU": "Sao Paulo / San Paolo", "HKG": "Hong Kong / Hongkong",
+    "ICN": "Seoul / Seul", "JFK": "New York / Nueva York / Nuova York", "JNB": "Johannesburg / Johannesbourg",
+    "KTM": "Kathmandu / Katmandu / Katmandou", "KUL": "Kuala Lumpur", "LAX": "Los Angeles", "LIM": "Lima",
+    "LOS": "Lagos", "MEL": "Melbourne",
+    "MEX": "Mexico City / Mexiko-Stadt / Mexiko Stadt / Ciudad de Mexico / Citta del Messico / Mexico DF",
+    "MIA": "Miami", "MNL": "Manila / Manille", "NBO": "Nairobi", "NRT": "Tokyo / Tokio", "ORD": "Chicago",
+    "PEK": "Beijing / Peking / Pekin / Pechino", "PPT": "Papeete / Tahiti", "PVG": "Shanghai / Schanghai",
+    "RUH": "Riyadh / Riad / Riyad", "SCL": "Santiago de Chile / Santiago",
+    "SGN": "Ho Chi Minh City / Saigon / Ho-Chi-Minh-Stadt / Ho Chi Minh", "SIN": "Singapore / Singapur / Singapour",
+    "SYD": "Sydney", "TLV": "Tel Aviv", "TNR": "Antananarivo / Tananarive", "TPE": "Taipei / Taipeh",
+    "ULN": "Ulaanbaatar / Ulan Bator / Ulan-Bator / Oulan-Bator", "YYZ": "Toronto",
 }
+# The pickup zones are named in English in the kit; the same towns as their own people write them.
+TOWNS = {"munchen": "munich", "monaco di baviera": "munich", "koln": "cologne", "colonia": "cologne",
+         "francoforte": "frankfurt", "francfort": "frankfurt", "amburgo": "hamburg", "hambourg": "hamburg",
+         "stoccarda": "stuttgart", "magonza": "mainz", "mayence": "mainz", "ratisbona": "regensburg",
+         "ratisbonne": "regensburg", "brema": "bremen", "breme": "bremen", "sud": "south", "sued": "south",
+         "nord": "north"}
+
+
+def fold(text: str | None) -> str:
+    """A place name as a key: lower case, accents dropped, the German spellings made one ("München", "Muenchen",
+    "Munchen"; "Gießen", "Giessen"; "São Paulo", "Sao Paulo"), punctuation as spaces."""
+    import unicodedata
+    t = (text or "").lower().replace("ß", "ss")
+    t = "".join(c for c in unicodedata.normalize("NFKD", t) if not unicodedata.combining(c))
+    t = re.sub(r"(?<=[aou])e(?=[a-z])", "", t) if re.search(r"[aou]e[a-z]", t) else t
+    return re.sub(r"[^a-z0-9]+", " ", t).strip()
 
 
 def destination_code(text: str | None) -> str | None:
-    """'LOS', 'Lagos', 'Lagos, Nigeria', 'Peking' -> the IATA code in our network; any other 3-letter code as is."""
+    """'LOS', 'Lagos', 'Lagos, Nigeria', 'Peking', 'São Paulo' -> the IATA code in our network; any other 3-letter
+    code as is. Of several cities in the text the one named first (the others are left to the agent)."""
     t = (text or "").strip()
     if not t:
         return None
     if t.upper() in DESTINATIONS:
         return t.upper()
-    low = t.lower()
+    low, found = f" {fold(t)} ", []
     for code, names in DESTINATIONS.items():
-        if any(n.strip().lower() in low for n in names.split("/")):
-            return code
+        at = [low.find(f" {fold(n)} ") for n in names.split("/")]
+        if any(i >= 0 for i in at):
+            found.append((min(i for i in at if i >= 0), code))
+    if found:
+        return min(found)[1]
     return t.upper() if len(t) == 3 and t.isalpha() else None
+
+
+def zone_of_town(text: str | None, zones: dict[str, dict]) -> str | None:
+    """The pickup zone a town belongs to, as the customer wrote the town: its own spelling ("München", "Köln",
+    "Düsseldorf"), and the longest name that fits ("Munich South depot" is Munich South, not Munich)."""
+    key = f" {fold(text)} "
+    for theirs, ours in TOWNS.items():
+        key = key.replace(f" {theirs} ", f" {ours} ")
+    key = key.strip()
+    if not key:
+        return None
+    areas = sorted(((fold(v["area"]), z) for z, v in zones.items()), key=lambda x: -len(x[0]))
+    return next((z for a, z in areas if a == key), None) \
+        or next((z for a, z in areas if f" {a} " in f" {key} "), None) \
+        or next((z for a, z in reversed(areas) if f" {key} " in f" {a} "), None)
 
 
 # A real postcode in the town of each pickup zone. Truckers price a collection by zone but only answer a request

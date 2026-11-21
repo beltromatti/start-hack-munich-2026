@@ -1168,3 +1168,32 @@ def test_a_tariffs_validity_without_a_year_is_the_nearest_such_day():
     ends = today + timedelta(days=9)
     assert _day(f"{ends.day} {ends.strftime('%B')}", nearest=True) == ends.isoformat()
     assert _day("2026-12-01", nearest=True) == "2026-12-01" and _day("whenever", nearest=True) is None
+
+
+def test_places_are_understood_as_their_people_write_them():
+    """A German customer writes München, Köln, Düsseldorf, Gießen; the kit names the zones Munich, Cologne, Duesseldorf,
+    Giessen. Passed on as written, the town was "not inside our pickup zones" and the customer got a question instead
+    of a price, which 5U scores as a decline. The same for São Paulo and Pékin as destinations."""
+    from app.forwarder import normalise
+    api = FakeFiveU()
+    w = kit.load(api)
+    zone = lambda town: kit.zone_of_town(town, w.zones)
+    assert [zone(t) for t in ("München", "Muenchen", "Munchen", "Munich")] == ["80"] * 4
+    assert [zone(t) for t in ("Köln", "Koeln", "Düsseldorf", "Gießen", "Mönchengladbach", "Tübingen")] == ["50", "50", "40", "35", "41", "72"]
+    assert zone("Munich South depot") == "81" and zone("München Süd") == "81" and zone("Hamburg North warehouse") == "22"
+    assert zone("Frankfurt") == "60" and zone("Hamburg") == "20" and zone("Berlin") is None and zone("Hessen") is None
+    code = kit.destination_code
+    assert [code(t) for t in ("São Paulo", "Pékin", "Neu-Delhi", "Nueva York", "Tokio", "Mexiko-Stadt")] == ["GRU", "PEK", "DEL", "JFK", "NRT", "MEX"]
+    assert code("Lagos, Nigeria") == "LOS" and code("LOS") == "LOS" and code("Limassol") is None and code("Chicago or New York") == "ORD"
+    lot = [{"pieces": 2, "weight": {"value": 300, "unit": "kg", "per_piece": False}, "volume": {"value": 1, "unit": "cbm", "per_piece": False}}]
+    req = normalise({"origin_airport": None, "destination_airport": "São Paulo", "lots": lot,
+                     "pickup": {"city": "München", "postcode": None}, "cargo": {}}, w)
+    assert req["missing"] == [] and (req["origin"], req["destination"], req["pickup_zone"]) == ("MUC", "GRU", "80")
+    # only the first digits of a postcode: the truckers still get five (they answer nothing else)
+    sent = []
+    f = Sync(api)
+    f.mail_carrier = lambda deal_id, to, subject, body, in_reply_to=None: sent.append(body) or 1
+    trucker = next(c for c in w.carriers if c.kind == "trucker")
+    f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
+    f.ask_trucker("deal-1", trucker, {**req, "pickup_postcode": "80469", "weight_kg": "300", "volume_cbm": "1.000", "pieces": 2})
+    assert "pickup from 80331 Munich" in sent[0] and "pickup from 80469 Munich" in sent[1]
