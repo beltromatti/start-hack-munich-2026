@@ -2,12 +2,14 @@
 
 Run: uv run uvicorn app.main:app --port 8000   (make api / make live)
 """
+import base64
+import hmac
 import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -33,6 +35,23 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="START Milan Forwarding", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+_PASSWORD = os.getenv("UI_PASSWORD", "")
+
+
+@app.middleware("http")
+async def team_only(request: Request, call_next):
+    """On a public address (the server), the UI and the API ask for the team password (browser login box).
+    /api/health stays open for health checks. No UI_PASSWORD set (a laptop): open, as before."""
+    if _PASSWORD and request.url.path != "/api/health":
+        auth = request.headers.get("authorization", "")
+        try:
+            given = base64.b64decode(auth.split(" ", 1)[1]).decode().split(":", 1)[1] if auth.startswith("Basic ") else ""
+        except Exception:
+            given = ""
+        if not hmac.compare_digest(given, _PASSWORD):
+            return Response("Team only", status_code=401, headers={"WWW-Authenticate": 'Basic realm="START Milan"'})
+    return await call_next(request)
 
 
 @app.get("/api/health")

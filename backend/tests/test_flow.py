@@ -274,3 +274,15 @@ def test_a_bid_quoted_per_kg_gets_its_total_from_code():
     m = {"id": 42, "in_reply_to": 41, "sender": "yellowtail-air-freight@hackloop.mail"}
     off = f.offer(o, m, kit.world().carrier_by_email(m["sender"]))
     assert str(off.total) == "982.00"  # 300 x 2.42 + 300 x 0.77 + 25
+
+
+def test_the_server_asks_for_the_team_password(monkeypatch):
+    import base64
+    from fastapi.testclient import TestClient
+    from app import main
+    monkeypatch.setattr(main, "_PASSWORD", "s3cret")
+    c = TestClient(main.app)
+    assert c.get("/api/health").status_code == 200
+    assert c.get("/api/deals").status_code == 401
+    ok = {"Authorization": "Basic " + base64.b64encode(b"team:s3cret").decode()}
+    assert c.get("/api/deals", headers=ok).status_code == 200
