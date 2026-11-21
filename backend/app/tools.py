@@ -1,0 +1,271 @@
+"""The forwarder's tools: few, distinct, powerful. Each is thin over the engine (forwarder.py) and the register.
+
+What a tool guarantees, the model never has to: prices and totals are computed here, mails go only where 5U allows
+and land in the right thread, the first quote of a thread is recorded as the quote, bookings use real references.
+What to do, when, and how to say it is the model's.
+"""
+import json
+import re
+import time
+from dataclasses import dataclass, field
+from typing import Any
+
+from . import kit, pricing, store
+from .config import settings
+from .kit import RATEDESK, TRACKING
+
+S, N, I = {"type": ["string", "null"]}, {"type": ["number", "null"]}, {"type": ["integer", "null"]}
+
+
+def obj(props: dict, desc: str | None = None) -> dict:
+    o = {"type": "object", "additionalProperties": False, "properties": props, "required": list(props)}
+    if desc:
+        o["description"] = desc
+    return o
+
+
+def nullable(o: dict) -> dict:
+    return {"anyOf": [o, {"type": "null"}]}
+
+
+QUANTITY = obj({"value": N, "unit": S, "per_piece": {"type": "boolean"}})
+SHIPMENT = obj({
+    "origin_airport": {**S, "description": "IATA code of the German departure airport, if the customer names one"},
+    "pickup": nullable(obj({"postcode": S, "city": S}, "door-to-port: where the truck collects the goods")),
+    "destination_airport": {**S, "description": "IATA code of the destination airport"},
+    "pieces": I,
+    "weight": {**QUANTITY, "description": "as written: value, unit (kg, lb, t), per piece or total"},
+    "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or total; null values if unknown"},
+    "dimensions": {"type": "array", "items": obj({"count": I, "length": N, "width": N, "height": N, "unit": S}),
+                   "description": "one entry per group of identical pieces, as written"},
+    "cargo": obj({"commodity": S, "ready_date": S, "notes": S}),
+})
+
+
+def fn(name: str, desc: str, props: dict) -> dict:
+    return {"type": "function", "function": {"name": name, "description": desc, "strict": True,
+                                             "parameters": obj(props)}}
+
+
+TOOLS = [
+    fn("get_offers",
+       "Price a shipment: asks every airline and trucker that can carry it (by mail, in parallel), reads the rate "
+       "portal and our rate sheets, waits for the answers and returns the priced options, all-in totals computed by "
+       "code (chargeable weight, cheaper weight breaks, minimums, surcharges, pickup leg), with the option that fits "
+       "each preference. Pass the shipment as the customer described it, units as written. With shipment null it "
+       "only waits for the replies still missing and returns the options again. Carriers answer in 15-50 s; "
+       "wait_seconds is how long to wait at most (it returns as soon as everyone answered).",
+       {"shipment": nullable(SHIPMENT),
+        "preference": {"type": "string", "enum": ["cheapest", "fastest", "unspecified"]},
+        "wait_seconds": {"type": "number"}}),
+    fn("send_mail",
+       "Send a mail. By default it answers the person who wrote the mail you are handling, in this thread. "
+       "kind says what it is; for a quote give option_id, so the CRM records exactly that option and total "
+       "(5U scores only the first quote of a thread). `to` only to write to someone else in this thread's deal.",
+       {"kind": {"type": "string", "enum": ["quote", "question", "reply", "booking_confirmation", "tracking_answer",
+                                            "decline", "other"]},
+        "body": {"type": "string", "description": "the whole mail body, plain text"},
+        "option_id": S, "to": S}),
+    fn("book",
+       "Book an option of this deal with the carrier: by its rate reference on the portal (a fresh rate if it "
+       "expired), otherwise by mail to the airline. Returns the booking with its reference and status.",
+       {"option_id": {"type": "string"}}),
+    fn("crm",
+       "Search our CRM: deals and bookings by booking or rate reference, our reference (SM-...), customer name or "
+       "address, company, route, airline, anything. Returns the matching deals with their shipment, quote, booking, "
+       "status and dates (estimated arrival computed). Empty query: the latest deals.",
+       {"query": {"type": "string"}}),
+    fn("deal",
+       "The whole record of a deal: the thread, the shipment, every offer and carrier message, the options, the "
+       "quote, the booking, notes. No id: the deal of this thread.",
+       {"deal_id": S}),
+    fn("mail_carrier",
+       "Write to a carrier or trucker from our carrier list, or to the rate desk: to answer a question they asked, "
+       "to ask for something, to book by mail. Their answer comes back into this deal (get_offers with shipment "
+       "null waits for it). in_reply_to: the id of their mail you answer, if any.",
+       {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}, "in_reply_to": I}),
+    fn("note",
+       "Write a note on the deal for the team (what you noticed, what you decided and why). flag: yellow when a "
+       "person should look at it, red when something is wrong or risky; none otherwise.",
+       {"text": {"type": "string"}, "flag": {"type": "string", "enum": ["none", "yellow", "red"]}}),
+    fn("no_reply",
+       "Nothing needs to be sent for the mail you are handling (for example a thank-you after the booking). Say why.",
+       {"reason": {"type": "string"}}),
+]
+
+
+@dataclass
+class Ctx:
+    fw: Any
+    session_id: str
+    deal_id: str
+    root: int
+    task: str
+    mail: dict | None                     # the mail this execution handles (None: a person wrote in the session)
+    outcome: list[str] = field(default_factory=list)
+
+
+def run(ctx: Ctx, name: str, args: dict) -> dict:
+    f = {"get_offers": get_offers, "send_mail": send_mail, "book": book, "crm": crm, "deal": deal,
+         "mail_carrier": mail_carrier, "note": note, "no_reply": no_reply}.get(name)
+    if f is None:
+        return {"error": f"unknown tool {name}"}
+    return f(ctx, **args)
+
+
+# ---- implementations ---------------------------------------------------------------------------------------
+
+def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: float) -> dict:
+    _ensure_deal(ctx)
+    store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" else r["status"],
+                                         {**r["data"], "preference": preference}))
+    out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds)
+    if out.get("missing"):
+        store.update(ctx.deal_id, lambda r: ("waiting_customer", r["data"]))
+    return out
+
+
+def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | None) -> dict:
+    m = ctx.mail or _last_inbound(ctx.root)
+    if m is None:
+        return {"error": "no mail in this thread to answer"}
+    to = (to or m["sender"]).strip().lower()
+    allowed = {x["sender"].lower() for x in store.thread(ctx.root) if x["direction"] == "in"} | {TRACKING, RATEDESK}
+    if to not in allowed and not kit.world().carrier_by_email(to):
+        return {"error": f"{to} is not part of this thread; 5U only delivers to customers who wrote to us, "
+                         f"carriers on our list, the rate desk and the tracking desk"}
+    parent = next((x for x in reversed(store.thread(ctx.root)) if x["direction"] == "in" and x["sender"].lower() == to),
+                  m)
+    subject = parent["subject"] or "Your shipment"
+    subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+    sent = ctx.fw.api.send(to, subject, body, in_reply_to=parent["id"])
+    store.save_mail(sent, "out", kind, handled=True)
+    ctx.outcome.append(kind)
+    store.log("forwarder", "mail_out", f"{kind} to {to}: {body[:140]}", {"mail": sent["id"], "body": body,
+                                                                           "option": option_id}, run_id=ctx.deal_id)
+    result: dict[str, Any] = {"sent": sent["id"], "to": to}
+    if kind == "question" and store.get(ctx.deal_id):
+        store.update(ctx.deal_id, lambda r: ("waiting_customer" if r["status"] in ("new", "pricing") else r["status"],
+                                             r["data"]))
+    if kind == "quote":
+        result.update(_record_quote(ctx, option_id, body, sent))
+    return result
+
+
+def _record_quote(ctx: Ctx, option_id: str | None, body: str, sent: dict) -> dict:
+    d = store.get(ctx.deal_id)["data"] if store.get(ctx.deal_id) else {}
+    opt = (d.get("options") or {}).get(option_id or "")
+    if not opt:
+        store.log("forwarder", "info", f"quote sent without a known option ({option_id})", run_id=ctx.deal_id)
+        return {"note": "no option recorded with this quote (option_id unknown): the CRM has no price for it"}
+    if opt["total_text"] not in body:  # diagnostics, not a rule: we measure, the prompt teaches
+        store.log("forwarder", "info", f"quote text does not contain {opt['total_text']}", run_id=ctx.deal_id)
+    first = not d.get("quote")
+    took = time.time() - _ts(d.get("received_at"))
+    q = {"option": option_id, "amount": opt["total_text"], "total": opt["total"], "air": opt["air"],
+         "pickup": opt["pickup"], "mail": sent["id"], "at": time.time(), "response_seconds": round(took, 1)}
+    store.update(ctx.deal_id, lambda r: ("quoted" if r["status"] in ("new", "pricing") else r["status"], {
+        **r["data"], "quote": r["data"].get("quote") or q, "quotes": r["data"].get("quotes", []) + [q]}))
+    store.log("forwarder", "decision", f"quoted {opt['total_text']} ({opt['air']['carrier']}) in {took:.0f}s",
+              q, run_id=ctx.deal_id)
+    return {"recorded_quote": opt["total_text"], "first_quote_in_thread": first}
+
+
+def book(ctx: Ctx, option_id: str) -> dict:
+    _ensure_deal(ctx)
+    return ctx.fw.book_option(ctx.deal_id, option_id)
+
+
+def crm(ctx: Ctx, query: str) -> dict:
+    words = re.findall(r"[a-z0-9][a-z0-9_\-]*[a-z0-9]", query.lower())
+    out = []
+    for rec in store.records("deal"):
+        b = store.get(f"booking-{rec['data'].get('root')}")
+        hay = json.dumps({"deal": rec, "booking": b}, default=str).lower()
+        score = sum(1 for w in words if w in hay) if words else 1
+        if score:
+            out.append((score, rec["updated_at"], _summary(rec, b)))
+    out.sort(key=lambda x: (-x[0], -x[1]))
+    return {"matches": [x[2] for x in out[:10]], "total_matches": len(out)}
+
+
+def deal(ctx: Ctx, deal_id: str | None) -> dict:
+    rec = store.get(deal_id or ctx.deal_id)
+    if not rec:
+        return {"error": "no such deal"}
+    d = rec["data"]
+    thread = [{"id": m["id"], "from": m["sender"], "to": m["recipient"], "at": m["received_at"],
+               "subject": m["subject"], "body": m["body"]} for m in store.thread(d["root"])]
+    return {"id": rec["id"], "status": rec["status"], "customer": d.get("customer"), "thread": thread,
+            "shipment": d.get("request"), "preference": d.get("preference"), "options": d.get("options"),
+            "carrier_messages": d.get("carrier_messages"), "quote": d.get("quote"), "booking": d.get("booking"),
+            "estimated_arrival": eta(d["booking"]) if d.get("booking") else None, "notes": d.get("notes")}
+
+
+def mail_carrier(ctx: Ctx, to: str, subject: str, body: str, in_reply_to: int | None) -> dict:
+    to = to.strip().lower()
+    if to != RATEDESK and not kit.world().carrier_by_email(to):
+        return {"error": f"{to} is not on our carrier list"}
+    _ensure_deal(ctx)
+    mid = ctx.fw.mail_carrier(ctx.deal_id, to, subject, body, in_reply_to=in_reply_to)
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"].get("asked", {}),
+                                                                              str(mid): to}}))
+    return {"sent": mid, "note": "their answer comes back into this deal"}
+
+
+def note(ctx: Ctx, text: str, flag: str) -> dict:
+    _ensure_deal(ctx)
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "notes": r["data"].get("notes", []) + [
+        {"at": time.time(), "text": text, "flag": flag}], "flag": flag if flag != "none" else r["data"].get("flag")}))
+    store.log("forwarder", "decision", f"note [{flag}] {text[:160]}", run_id=ctx.deal_id)
+    return {"ok": True}
+
+
+def no_reply(ctx: Ctx, reason: str) -> dict:
+    ctx.outcome.append("no_reply")
+    store.log("forwarder", "decision", f"no reply: {reason[:160]}", run_id=ctx.deal_id)
+    return {"ok": True}
+
+
+# ---- helpers -----------------------------------------------------------------------------------------------
+
+def _ensure_deal(ctx: Ctx) -> None:
+    if store.get(ctx.deal_id) is None:
+        first = store.thread(ctx.root)[0] if store.thread(ctx.root) else (ctx.mail or {})
+        store.put(ctx.deal_id, "deal", "new", {"root": ctx.root, "customer": first.get("sender"),
+                                               "subject": first.get("subject"), "received_at": first.get("received_at"),
+                                               "offers": [], "asked": {}, "replied": []})
+
+
+def _last_inbound(root: int) -> dict | None:
+    return next((x for x in reversed(store.thread(root)) if x["direction"] == "in"), None)
+
+
+def _summary(rec: dict, b: dict | None) -> dict:
+    d = rec["data"]
+    bd = (b or {}).get("data") or d.get("booking")
+    return {"deal_id": rec["id"], "status": rec["status"], "customer": d.get("customer"), "subject": d.get("subject"),
+            "shipment": d.get("request"), "quote": {k: (d.get("quote") or {}).get(k) for k in ("amount", "option")}
+            if d.get("quote") else None,
+            "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",
+                                                   "transit_days", "status", "via", "pickup", "amount")},
+                         "booked_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(bd["booked_at"])),
+                         "estimated_arrival": eta(bd)} if bd else None)}
+
+
+def eta(booking: dict) -> str | None:
+    """Estimated arrival: booking time plus transit days (an estimate, and the agent says so)."""
+    from datetime import datetime, timedelta, timezone
+    try:
+        booked = datetime.fromtimestamp(booking["booked_at"], timezone.utc)
+        return (booked + timedelta(days=float(booking["transit_days"]))).strftime("%a %d %b %Y")
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _ts(iso: str | None) -> float:
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(iso).timestamp() if iso else time.time()
+    except ValueError:
+        return time.time()

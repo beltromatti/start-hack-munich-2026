@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import store
+from . import agent, store
 from .config import settings
 
 forwarder = None
@@ -35,7 +35,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True, "worker": settings.worker, "llm": settings.llm_base_url or "openai",
-            "models": {"parse": settings.model_parse, "bid": settings.model_bid, "write": settings.model_write}}
+            "models": {"agent": settings.model_agent, "effort": settings.effort_agent, "bid": settings.model_bid,
+                       "parse": settings.model_agent}}
 
 
 @app.get("/api/events")
@@ -48,21 +49,80 @@ def usage() -> dict:
     return store.usage()
 
 
+@app.get("/api/deals")
+def deals() -> list[dict]:
+    """Every deal, newest first: the CRM list (status, customer, route, quote, booking, flag, cost)."""
+    out = []
+    for r in store.records("deal"):
+        d = r["data"]
+        req = d.get("request") or {}
+        out.append({"id": r["id"], "status": r["status"], "updated_at": r["updated_at"], "customer": d.get("customer"),
+                    "subject": d.get("subject"), "route": f"{req.get('origin')}-{req.get('destination')}" if req else None,
+                    "weight_kg": req.get("weight_kg"), "preference": d.get("preference"),
+                    "quote": (d.get("quote") or {}).get("amount"),
+                    "response_seconds": (d.get("quote") or {}).get("response_seconds"),
+                    "booking": (d.get("booking") or {}).get("booking_reference"), "flag": d.get("flag"),
+                    "cost_usd": store.usage(r["id"])["cost_usd"]})
+    return out
+
+
 @app.get("/api/rfqs")
 def rfqs() -> list[dict]:
-    return [{"id": r["id"], "status": r["status"], "updated_at": r["updated_at"], "customer": r["data"].get("customer"),
-             "subject": r["data"].get("subject"), "request": r["data"].get("request"), "amount": r["data"].get("amount"),
-             "response_seconds": r["data"].get("response_seconds"), "cost": store.usage(r["id"])["cost_usd"]}
-            for r in store.records("rfq")]
+    return deals()
 
 
-@app.get("/api/rfqs/{rid}")
-def rfq(rid: str) -> dict:
-    r = store.get(rid)
+@app.get("/api/deals/{deal_id}")
+def deal(deal_id: str) -> dict:
+    r = store.get(deal_id)
     if not r:
         raise HTTPException(404)
-    return {**r, "mails": store.thread(r["data"]["root"]), "events": store.events(run_id=rid),
-            "usage": store.usage(rid)}
+    root = r["data"]["root"]
+    s = store.get(f"session-{root}")
+    return {**r, "mails": store.thread(root), "events": store.events(run_id=deal_id), "usage": store.usage(deal_id),
+            "session": {"status": s["status"], "messages": s["data"]["messages"]} if s else None}
+
+
+@app.get("/api/sessions")
+def sessions() -> list[dict]:
+    return [{"id": s["id"], "status": s["status"], "task": s["data"]["task"], "root": s["data"]["root"],
+             "executions": s["data"]["executions"], "updated_at": s["updated_at"]} for s in store.records("session")]
+
+
+@app.get("/api/sessions/{session_id}")
+def session(session_id: str) -> dict:
+    s = store.get(session_id)
+    if not s:
+        raise HTTPException(404)
+    return s
+
+
+@app.post("/api/sessions/{session_id}/message")
+def message(session_id: str, payload: dict) -> dict:
+    """A person writes into a session: the forwarder resumes it and follows them (their word wins)."""
+    text = (payload.get("text") or "").strip()
+    if not text:
+        raise HTTPException(400, "empty message")
+    s = agent.operator_message(session_id, text, payload.get("who") or "operator")
+    if not s:
+        raise HTTPException(404)
+    store.log("human", "decision", f"message to {session_id}: {text[:200]}", run_id=f"deal-{s['data']['root']}")
+    return {"status": s["status"]}
+
+
+@app.post("/api/deals/{deal_id}/reply")
+def human_reply(deal_id: str, payload: dict) -> dict:
+    """A person answers the customer directly, in the thread."""
+    if forwarder is None:
+        raise HTTPException(409, "the forwarder is not running here (make live)")
+    r = store.get(deal_id)
+    body = (payload.get("body") or "").strip()
+    if not r or not body:
+        raise HTTPException(400, "unknown deal or empty body")
+    from . import tools
+    ctx = tools.Ctx(forwarder, f"session-{r['data']['root']}", deal_id, r["data"]["root"], "customer", None)
+    out = tools.send_mail(ctx, payload.get("kind") or "reply", body, payload.get("option_id"), None)
+    store.log("human", "mail_out", f"human reply in {deal_id}", {"body": body}, run_id=deal_id)
+    return out
 
 
 @app.get("/api/bookings")
@@ -78,47 +138,3 @@ def mails(limit: int = 200) -> list[dict]:
 @app.get("/api/board")
 def board() -> dict:
     return json.loads(store.kv_get("board_me") or "{}")
-
-
-# ---- a person steps in (the human's word wins: the loop never undoes it) -----------------------------------
-
-def _live():
-    if forwarder is None:
-        raise HTTPException(409, "the forwarder is not running here (WORKER=1 / make live)")
-    return forwarder
-
-
-@app.post("/api/rfqs/{rid}/hold")
-def hold(rid: str) -> dict:
-    """Stop the automatic quote for this request (while it is still being priced)."""
-    r = store.update(rid, lambda r: ("held", r["data"]) if r["status"] in ("pricing", "collecting") else None)
-    if not r:
-        raise HTTPException(404)
-    store.log("human", "decision", f"held {rid} (was it already quoted? status {r['status']})", run_id=rid)
-    return {"status": r["status"]}
-
-
-@app.post("/api/rfqs/{rid}/release")
-def release(rid: str) -> dict:
-    """Hand a held request back to the forwarder: it quotes now with the offers it has."""
-    r = store.update(rid, lambda r: ("collecting", {**r["data"], "deadline": 0}) if r["status"] == "held" else None)
-    if not r:
-        raise HTTPException(404)
-    store.log("human", "decision", f"released {rid}", run_id=rid)
-    return {"status": r["status"]}
-
-
-@app.post("/api/rfqs/{rid}/reply")
-def human_reply(rid: str, payload: dict) -> dict:
-    """Send a reply written by a person in the customer's thread. If nothing was quoted yet, this is the quote."""
-    f = _live()
-    r = store.get(rid)
-    body = (payload.get("body") or "").strip()
-    if not r or not body:
-        raise HTTPException(400, "unknown request or empty body")
-    m = store.mail(r["data"]["last_customer_mail"])
-    sent = f.reply_customer(rid, m, body)
-    store.update(rid, lambda x: ("quoted" if x["status"] in ("pricing", "collecting", "held", "waiting_customer")
-                                 else x["status"], {**x["data"], "human_reply": sent["id"]}))
-    store.log("human", "mail_out", f"human reply in {rid}", {"body": body}, run_id=rid)
-    return {"sent": sent["id"]}

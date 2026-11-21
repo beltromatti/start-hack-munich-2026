@@ -24,17 +24,27 @@ class Settings:
     mailbox: str = os.getenv("FIVEU_MAILBOX", "start-milan@hackloop.mail")
     llm_base_url: str | None = _target()[0]
     llm_api_key: str = _target()[1]
-    # One model per step. Parsing what a person wrote and writing to a person get the better small model.
-    model_parse: str = os.getenv("LLM_MODEL_PARSE", "gpt-6-luna")
+    # The forwarder agent, and the small model that reads carrier replies and tariffs for the tools.
+    model_agent: str = os.getenv("LLM_MODEL_AGENT", "gpt-6-luna")
+    effort_agent: str = os.getenv("LLM_EFFORT_AGENT", "none")
     model_bid: str = os.getenv("LLM_MODEL_BID", "gpt-5-nano")
-    model_write: str = os.getenv("LLM_MODEL_WRITE", "gpt-6-luna")
+    model_tariff: str = os.getenv("LLM_MODEL_TARIFF", "gpt-6-luna")
     db_path: str = os.getenv("DB_PATH", str(ROOT / "backend" / "data" / "forwarder.db"))
     worker: bool = os.getenv("WORKER", "0") == "1"
     poll_seconds: float = float(os.getenv("POLL_SECONDS", "1.5"))
-    # How long we wait for carrier and trucker replies before quoting with what we have.
+    # How long get_offers waits for carrier and trucker replies by default (the agent may ask for less or more).
     bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "85"))
     persona: str = os.getenv("PERSONA_NAME", "Giulia")
     company: str = os.getenv("COMPANY_NAME", "START Milan Forwarding")
+
+    @staticmethod
+    def effort_for(model: str) -> str | None:
+        """Extraction calls: as little thinking as the model allows (they read, they do not decide)."""
+        if model.startswith(("gpt-6", "gpt-5.6")):
+            return "none"
+        if model.startswith("gpt-5"):
+            return "minimal"
+        return None
 
 
 settings = Settings()

@@ -13,6 +13,8 @@ from . import store
 from .config import KIT
 
 START = KIT / "start-kit"
+TRACKING = "tracking@hackloop.mail"
+RATEDESK = "ratedesk@hackloop.mail"
 
 
 @dataclass
