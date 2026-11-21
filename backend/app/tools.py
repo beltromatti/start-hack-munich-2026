@@ -35,7 +35,8 @@ SHIPMENT = obj({
     "origin_airport": {**S, "description": "IATA code of the German departure airport, if the customer names one"},
     "pickup": nullable(obj({"postcode": S, "city": S},
                            "door-to-port, only when the customer asks us to collect the goods (pickup, trucking, "
-                           "from our site, ab Werk): where the truck collects them. An address in a signature or "
+                           "from our site, ab Werk, EXW, FCA at their premises): where the truck collects them. "
+                           "FCA at an airport is no pickup. An address in a signature or "
                            "letterhead is not a pickup request: null")),
     "destination_airport": {**S, "description": "IATA code of the destination airport. A city is its airport in "
                                                 "our network: " + ", ".join(

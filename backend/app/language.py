@@ -150,13 +150,30 @@ def _digits(text: str) -> str:
 
 EN = set("the and please could you your our is are for with we to of a an this that would be will".split())
 DE = set("der die das und bitte wir ist sind für mit sie ihr ihre zu von ein eine den dem uns unser können".split())
+# Other languages' small words, so that a French, Italian, Spanish, Dutch or Turkish mail full of English trade terms
+# ("all in rate", "pick-up", "for 300 kg") is not counted as English: the trade writes its jargon in English.
+OTHER = set("le la les des et pour nous vous est une du avec merci bonjour il lo gli per che sono della grazie "
+            "buongiorno el los las para por gracias hola nuestro het een voor wij ons graag bedankt ve bir için bu "
+            "ile lütfen merhaba teşekkürler rica ederim olarak".split())
+# Where the quoted older mail starts in a reply or a forward: their own words are what stands above it.
+_QUOTE = re.compile(r"^\s*(>|-{2,}\s*(original|forwarded|ursprüngliche|weitergeleitete)|on .{3,80} wrote:|"
+                    r"am .{3,80} schrieb|(from|von|de|da|kimden):\s)", re.I | re.M)
+
+
+def own_words(text: str) -> str:
+    """The newest text of a mail, without the quoted mail or forward under it (all of it when nothing is above)."""
+    m = _QUOTE.search(text or "")
+    return (text[:m.start()] if m and text[:m.start()].strip() else text) or ""
 
 
 def language_of(text: str) -> str | None:
     """The language a mail's own words are in, when it is clear (English or German), counted by code: a German
-    company writing in English writes English (rounds 29, 49, 69 were answered in German). None when unclear."""
-    words = re.findall(r"[a-zäöüß]+", (text or "").lower())
-    en, de = sum(w in EN for w in words), sum(w in DE for w in words)
+    company writing in English writes English (rounds 29, 49, 69 were answered in German). None when unclear: a
+    third language in the words, or English trade terms in a German or foreign sentence, is the model's to read."""
+    words = re.findall(r"[^\W\d_]+", own_words(text).lower())
+    en, de, other = (sum(w in s for w in words) for s in (EN, DE, OTHER))
+    if other >= 2:
+        return None
     if en >= 4 and en >= 3 * de:
         return "English"
     if de >= 4 and de >= 3 * en:

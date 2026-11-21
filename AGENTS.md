@@ -20,7 +20,7 @@ Read it instead of the raw pdf/xlsx/jpg files. Pricing: also price the next weig
 (299 kg cost more than 300 kg on the portal, see `5u-facts.md`).
 The team key never goes into the repo. It lives only in each person's `.env`.
 Feed a mail into the local 5U with `FakeFiveU.customer(m["frm"], m["subject"], m["body"])` and compare the quote with
-the key. Forwarder vocabulary for the parse prompt: `backend/app/prompts/glossary.md`.
+the key. Trade language (Incoterms, English jargon in other languages, abbreviations): `prompts/forwarder.md`.
 
 ## Architecture (keep it this simple)
 

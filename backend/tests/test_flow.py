@@ -653,6 +653,15 @@ def test_the_language_of_a_mail_and_times_said_in_words():
     de = "Guten Tag, bitte senden Sie uns ein Angebot für die Sendung. Wir sind ab dem 24. bereit und die Ware ist verpackt."
     assert language.language_of(en) == "English" and language.language_of(de) == "German"
     assert language.language_of("Thanks!\\nViele Gruesse / Many greetings") is None
+    # English trade terms in a Turkish or French mail do not make it English: the model reads that language
+    tr = "Merhaba, please quote all in rate for 300 kg FRA-IST, pick-up from our warehouse. Teşekkürler, rica ederim"
+    fr = "Bonjour, merci de nous envoyer votre rate all-in for the pick-up and the airport, pour 2 pallets with 300 kg"
+    assert language.language_of(tr) is None and language.language_of(fr) is None
+    # a German reply above a quoted English mail is German: their own words are on top
+    reply = ("Guten Tag, bitte buchen Sie das für uns, wir sind ab Montag bereit und die Ware ist verpackt.\n\n"
+             "On Mon, 23 Nov 2026 Desk wrote:\n> Hello, the cheapest way is with the airline for your goods, and "
+             "we can book it for you this week if that works")
+    assert language.language_of(reply) == "German"
     assert language.time_in("We need seven hours from your order to the collection.") == Decimal("0.292")
     assert language.time_in("Lead time twenty-four hours from order to collection") == Decimal("1")
 

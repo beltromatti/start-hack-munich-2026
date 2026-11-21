@@ -23,6 +23,15 @@ MAILS = [
      "Please quote MUC to JFK, 1 pallet 120x80x150 cm, 410 kg, general cargo, ready Monday.\nRegards, Tom"),
     ("lea@kleinhandel.example", "Quote please", "Hi, can you send me a price for 80 kg to Kathmandu? Lea"),
     ("mike@freightbuyer.example", "price", "how much for a shipment to Sydney? thanks"),
+    # trade language: an Incoterm decides the pickup, English jargon inside another language, a DAP buyer
+    ("export@ferrari-valvole.example", "Richiesta quotazione EXW Köln - Toronto",
+     "Buongiorno,\n\nvorremmo una quotazione all-in per 4 colli, GW 520 kg, 2,4 cbm, resa EXW Köln 50672, "
+     "destinazione YYZ. Merce pronta lunedì.\n\nGrazie e cordiali saluti\nGiulia Rossi"),
+    ("lojistik@anadolu-tekstil.example", "Fiyat teklifi FRA-DXB / all in rate",
+     "Merhaba,\n\nFCA Frankfurt Airport, 6 koli, toplam 280 kg, 1,1 cbm, destinasyon Dubai (DXB). En uygun all in "
+     "rate rica ederim, TT önemli değil.\n\nTeşekkürler\nMehmet Yılmaz"),
+    ("buying@prairie-tools.example", "RFQ DAP Chicago",
+     "Hello, need your rate DAP Chicago for 2 plts, 380 kg GW, 120x80x110 cm each, ex HAM. Ready Wed. BR Kevin"),
 ]
 
 
