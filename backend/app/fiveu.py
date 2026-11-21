@@ -5,6 +5,7 @@ Rules the code enforces, whatever a model or a mail says:
 - outbound mail is capped per recipient and per minute, so nobody gets spammed.
 """
 import threading
+import re
 import time
 from collections import defaultdict, deque
 from typing import Any
@@ -43,8 +44,25 @@ class FiveU:
 
     # ---- mailbox -------------------------------------------------------------------------------------------
 
+    poll_gap = 0.0      # seconds between mailbox polls, learned from 5U's 429 ("one poll per 5 seconds", Sat 20:30)
+    _last_poll = 0.0
+
     def poll(self, since_id: int) -> tuple[list[dict], int]:
+        """New mail since since_id. Keeps to 5U's poll limit: never polls sooner than it allows, and a 429 is a
+        'not yet' (it sets the gap from 5U's own words and waits), not an error."""
+        if time.time() - self._last_poll < self.poll_gap:
+            return [], since_id
+        self._last_poll = time.time()
         r = self._req("GET", "/v1/mailbox/messages", params={"since_id": since_id, "limit": 200})
+        if r.status_code == 429:
+            try:
+                d = r.json()
+            except Exception:
+                d = {}
+            m = re.search(r"per\s+(\d+(?:\.\d+)?)\s*second", str(d.get("detail", "")))
+            self.poll_gap = max(self.poll_gap, float(m.group(1)) if m else 5.0)
+            self._last_poll = time.time()  # the next poll waits a full gap from now
+            return [], since_id
         r.raise_for_status()
         d = r.json()
         return d["messages"], d["next_since_id"]
