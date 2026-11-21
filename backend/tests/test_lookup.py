@@ -81,8 +81,24 @@ def test_no_fields_gives_the_latest_deals():
 def test_a_returning_customer_brings_their_last_shipments_into_the_quote():
     world()
     lines = lookup.history("Rheintal-Praezision@hackloop.mail", exclude="deal-123")
-    assert len(lines) == 1 and "CGN-EZE 410 kg, booked Meridian, arrives " in lines[0]
+    assert len(lines) == 1 and "CGN-EZE (Buenos Aires) 410 kg, booked Meridian, " in lines[0]
     assert lookup.history("new-customer@hackloop.mail") == []
+
+
+def test_history_says_where_the_shipment_stands_and_leaves_out_what_we_did_not_book():
+    """Offline, Sat 21 Nov: with "arrives <date>" alone the model wrote "hope it arrived well" for goods that were
+    not collected yet, and a request we never quoted came back as "after your Riyadh request"."""
+    deal(1, "weidner@hackloop.mail", "CGN", "DFW", 85, "2026-10-01", "BK-OLD00001", "SM-1")
+    old = store.get("deal-1")["data"]
+    old["booking"]["booked_at"] = FIRST - 60 * 86400                                           # flown weeks ago
+    store.put("deal-1", "deal", "booked", old)
+    deal(2, "weidner@hackloop.mail", "DUS", "ATL", 1754, "2999-01-01", "BK-NEW00002", "SM-2")  # not ready yet
+    store.put("deal-3", "deal", "quoted", {"root": 3, "customer": "weidner@hackloop.mail", "quote": {"amount": "1.00"},
+                                           "request": {"origin": "FRA", "destination": "RUH", "weight_kg": "50"}})
+    lines = lookup.history("weidner@hackloop.mail")
+    assert len(lines) == 2 and not any("RUH" in x for x in lines)
+    assert "DUS-ATL (Atlanta)" in lines[0] and "not flown yet, arrives " in lines[0]
+    assert "CGN-DFW (Dallas)" in lines[1] and ", arrived " in lines[1]
 
 
 def test_history_is_cheap_on_a_full_night():

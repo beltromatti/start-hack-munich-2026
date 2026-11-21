@@ -116,8 +116,12 @@ def find(reference=None, customer=None, origin=None, destination=None, weight_kg
 
 
 def history(customer: str | None, exclude: str | None = None, n: int = 3) -> list[str]:
-    """This sender's earlier deals, newest first, one short line each, so the agent can remember them for about 60
-    tokens instead of a search: "2026-11-21 CGN-SGN 410 kg, booked Meridian, arrives 2026-11-24"."""
+    """What we booked for this sender before, newest first, one short line each, so the agent can remember them for
+    about 60 tokens instead of a search: "Sat 21 Nov 2026 CGN-SGN (Ho Chi Minh City) 410 kg, booked Meridian, not
+    flown yet, arrives Tue 24 Nov 2026". Only booked work: a request we lost is nothing to remind them of. Each line
+    says where the shipment stands, from the dates tracking uses, so the agent can only say what is true (offline
+    test, Sat 21 Nov: "hope it arrived well" came out for shipments that had not been collected)."""
+    from . import kit
     from .tools import _ts, timeline  # the dates the quote and the tracking answer use (tools imports this module)
     if not customer:
         return []
@@ -128,23 +132,20 @@ def history(customer: str | None, exclude: str | None = None, n: int = 3) -> lis
         if rec["id"] == exclude or (d.get("customer") or "").strip().lower() != who:
             continue
         req, bd = d.get("request") or {}, d.get("booking") or {}
-        if not req.get("destination"):
-            continue  # a mail that never became a shipment is nothing to remember
+        if not req.get("destination") or not bd or bd.get("status") == "failed":
+            continue
         when = time.strftime("%a %d %b %Y", time.gmtime((_ts(d.get("received_at")) if d.get("received_at") else 0)
                                                      or rec["updated_at"]))
         kg = f" {req['weight_kg']} kg" if req.get("weight_kg") else ""
-        if bd:
-            what = f"booked {bd.get('airline') or ''}".strip()
-            t = timeline(bd)
-            if t.get("expected_stage_now") == "arrived":
-                what += f", arrived {t['estimated_arrival']}"
-            elif t:
-                what += f", arrives {t['estimated_arrival']}"
-        elif d.get("quote"):
-            what = f"quoted {d['quote'].get('amount')} EUR, not booked"
-        else:
-            what = "not quoted"
-        out.append(f"{when} {req.get('origin') or '?'}-{req['destination']}{kg}, {what}")
+        place = kit.DESTINATIONS.get(req["destination"], "").split(" / ")[0]
+        what = f"booked {bd.get('airline') or ''}".strip()
+        t = timeline(bd)
+        stage = t.get("expected_stage_now")
+        if stage == "arrived":
+            what += f", arrived {t['estimated_arrival']}"
+        elif t:
+            what += f", {'in the air' if stage == 'in transit' else 'not flown yet'}, arrives {t['estimated_arrival']}"
+        out.append(f"{when} {req.get('origin') or '?'}-{req['destination']}{f' ({place})' if place else ''}{kg}, {what}")
         if len(out) == n:
             break
     return out
