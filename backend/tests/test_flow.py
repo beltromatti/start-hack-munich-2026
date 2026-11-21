@@ -83,3 +83,39 @@ def test_tariff_mail_replaces_the_airlines_sheet():
     assert len(yl) == 1 and yl[0]["minimum_eur"] == "99.00" and yl[0]["fuel_eur_per_kg"] == "1.00"
     assert [l for l in kit.world().sheet_lanes if l["airline"] == "Yellowtail Air Freight"] == yl
     assert store.get("tariff-yellowtail-air-freight")["status"] == "active"
+
+
+def test_sheetless_airline_is_also_asked_at_the_next_break():
+    # Zephyr, Himalaya and Pampero fly to KTM, have no sheet and are not on the portal: their breaks are unknown.
+    api = FakeFiveU(reply_now=False)
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("carl@gamma.example", "Quote FRA to KTM", "Please quote 280 kg, FRA to KTM, cheapest.")
+    run(f, 2)
+    to_zephyr = [m["subject"] for m in api.outbox if m["to"] == "zephyr-steppe-cargo@hackloop.mail"]
+    assert to_zephyr == ["Rate request FRA-KTM 280 kg", "Rate request FRA-KTM 300 kg"]
+    seen, later = set(), []
+    for p in api.pending:  # one answer per carrier arrives first
+        if p["sender"] in seen:
+            later.append(p)
+        else:
+            seen.add(p["sender"])
+            api._deliver(**p)
+    api.pending = later
+    run(f, 2)
+    assert store.get(f"rfq-{rfq['id']}")["status"] == "collecting", "the 300 kg price may be the cheaper one"
+    api.flush()
+    run(f, 3)
+    rec = store.get(f"rfq-{rfq['id']}")
+    assert rec["status"] == "quoted" and rec["data"]["amount"] == "1534.40 EUR"  # the cheaper of 280 and 300 kg
+
+
+def test_a_sheet_airline_is_asked_once():
+    api = FakeFiveU(reply_now=False)
+    kit.load(api)
+    f = Sync(api)
+    api.customer("anna@acme.example", "Quote FRA to ORD", "Please quote 240 kg, FRA to ORD, cheapest.")
+    run(f, 2)
+    to_yellowtail = [m["subject"] for m in api.outbox if m["to"] == "yellowtail-air-freight@hackloop.mail"]
+    assert to_yellowtail == ["Rate request FRA-ORD 250 kg"]  # its sheet says 250 kg is the cheaper billing
+

@@ -47,6 +47,16 @@ def sheet_price(lane: dict, weight_kg: Decimal, volume_cbm: Decimal | None) -> t
     return best
 
 
+COMMON_BREAKS = (45, 100, 250, 300, 500, 1000, 2000)  # every break on the 10 sheets and the 15 portal airlines
+
+
+def breaks_to_try(cw: Decimal, factor: Decimal = Decimal("1.35")) -> list[Decimal]:
+    """For a carrier whose breaks we do not know (no sheet, not on the portal): the breaks above the chargeable
+    weight at which billing can still be cheaper. Rate plus surcharges never falls by more than 1.33x between
+    two breaks on any sheet, so a break further away than `factor` cannot win."""
+    return [Decimal(b) for b in COMMON_BREAKS if cw < b < cw * factor]
+
+
 def next_break(breaks: list[int], cw: Decimal) -> Decimal | None:
     above = [Decimal(b) for b in breaks if Decimal(b) > cw]
     return min(above) if above else None

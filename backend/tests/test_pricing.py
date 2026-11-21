@@ -123,3 +123,10 @@ def test_request_without_preference_follows_the_switch():
     assert q() == "Fast"                                   # default so far: ratio balance, speed dominates
     assert q(unspecified="cheapest") == "Slow"
     assert q(balance="minmax") == "Mid"                    # 0.05 + 0.33 beats 0 + 1 and 1 + 0
+
+
+def test_breaks_to_try_for_a_carrier_without_known_breaks():
+    assert pricing.breaks_to_try(D(280)) == [D(300)]
+    assert pricing.breaks_to_try(D(230)) == [D(250), D(300)]   # third break is 250 or 300, depending on the airline
+    assert pricing.breaks_to_try(D(120)) == []                 # 250 is more than 1.35x away: cannot be cheaper
+    assert pricing.breaks_to_try(D(2500)) == []

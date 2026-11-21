@@ -13,6 +13,7 @@ import re
 import threading
 import time
 import traceback
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -167,9 +168,13 @@ class Forwarder:
             total, billed = pricing.sheet_price(lane, kg, cbm)
             offers.append(Offer("air", lane["airline"], total, Decimal(lane["transit_days"]), "sheet", None, billed))
         asked: dict[str, str] = {}
+        with_sheet = {l["airline"] for l in w.sheet_lanes}
         for c in w.email_airlines(o, d):  # carriers that quote by mail
-            billed = next((x.billed_kg for x in offers if x.carrier == c.name), cw)
-            asked[str(self.ask_airline(rid, c, o, d, billed, cbm, req))] = c.email
+            weights = [next((x.billed_kg for x in offers if x.carrier == c.name), cw)]
+            if c.name not in with_sheet:  # breaks unknown: billing at the next break up may be the cheaper price
+                weights += pricing.breaks_to_try(cw)
+            for wt in weights:
+                asked[str(self.ask_airline(rid, c, o, d, wt, cbm, req))] = c.email
         if req["pickup_zone"]:
             for c in w.truckers(req["pickup_zone"]):
                 asked[str(self.ask_trucker(rid, c, req))] = c.email
@@ -245,7 +250,9 @@ class Forwarder:
         d = rec["data"]
         if time.time() >= d.get("deadline", 0):
             return True
-        return set(d["asked"].values()) <= set(d["replied"])
+        # every request mail answered: a carrier asked at two weights answers twice
+        asked, replied = Counter(d["asked"].values()), Counter(d["replied"])
+        return all(replied[email] >= n for email, n in asked.items())
 
     def send_quote(self, rid: str) -> None:
         claimed = store.update(rid, lambda r: ("quoting", r["data"]) if r["status"] == "collecting" else None)
