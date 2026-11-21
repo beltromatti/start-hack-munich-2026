@@ -11,8 +11,8 @@ guess is marked as a guess.
 | 1 | `pricing.py` matches Jan's answer key in **18 of 18** priced cases, to the cent | none | checked |
 | 2 | **Which trucker goes into the all-in total is undocumented, and the candidates differ by up to 88.80 EUR** (zone 60). On a 1000 EUR shipment that is 9 %: the quote is rejected | every door-to-port request under about 1600 to 1800 EUR | switch ready, rule open until the board shows it |
 | 3 | The 50/50 "balanced" formula in `pick()` almost always returns the fastest offer | requests without a stated preference | switch ready |
-| 4 | The 4 airlines without a sheet (Zephyr, Himalaya, Lagoon, Pampero) are asked at one weight only. On the sheets the next break is cheaper for 14.0 % of weights, by more than 5 % for 8.4 % | about 1 round in 100 (5 of 41 destinations) | patch below |
-| 5 | Currency: a non-EUR price is only converted when it is USD and a portal call brought a rate before | 0 today (all 34 portal rates and 35 mails are EUR), a likely hourly change | patch below |
+| 4 | The 4 airlines without a sheet (Zephyr, Himalaya, Lagoon, Pampero) are asked at one weight only. On the sheets the next break is cheaper for 14.0 % of weights, by more than 5 % for 8.4 % | about 1 round in 100 (5 of 41 destinations) | patch 7daaaf6 |
+| 5 | Currency: a non-EUR price is only converted when it is USD and a portal call brought a rate before | 0 today (all 34 portal rates and 35 mails are EUR), a likely hourly change | patch 86205fb |
 
 ## 1. Mechanics: answer key against `pricing.py`
 
@@ -124,24 +124,43 @@ of weights, by more than 5 % for 8.4 %, worst case 30.8 %. If these airlines pri
 verified: the mailbox has one Zephyr price, 120 kg FRA-KTM 657.60 EUR), a request to one of the 5
 destinations just under a break is quoted too high.
 
-Proposed change in `start_rfq`: for an email airline with no sheet lane, also ask at the next break of both
-shapes (250 and 300) when it is under 1.35 times the chargeable weight. `best_by_carrier` already keeps the
-cheaper of two live prices. `ready()` must then count replies per request mail, not per sender. Not built yet.
+### Patch (commit 7daaaf6)
+
+- `pricing.breaks_to_try(cw)`: the breaks above the chargeable weight that can still be cheaper (under 1.35x;
+  the largest drop on any sheet is 1.32x). 280 kg gives 300, 230 kg gives 250 and 300, 120 kg gives none.
+- `start_rfq`: an email airline with no sheet at all is asked at the chargeable weight and at those breaks.
+  Sheet airlines are still asked once, at their sheet's cheapest billed weight. `best_by_carrier` already keeps
+  the cheaper of two live prices.
+- `ready()`: a request waits until every request mail is answered, not every sender (else the quote could go
+  out between the two answers of one airline).
+
+Cost: 1 or 2 more mails and bid reads per sheetless airline, only on the 5 destinations, only near a break.
+Tests: `test_sheetless_airline_is_also_asked_at_the_next_break`, `test_a_sheet_airline_is_asked_once`,
+`test_breaks_to_try_for_a_carrier_without_known_breaks`.
 
 ## 5. Currency
 
 `forwarder.eur()` converts only USD, and only with the last `fx_eur_per_usd` a portal call returned. The API
 says the field is "EUR per 1 unit of `currency`", so a GBP price would carry its rate in the same field and
 overwrite the USD rate. A USD bid by mail before any USD portal rate is dropped (logged as an error), and the
-bid form has no field for a rate stated in the mail. Today nothing is in another currency. Proposed: keep the
-rate per currency, and read a stated rate from the bid mail. Not built yet.
+bid form has no field for a rate stated in the mail. Today nothing is in another currency. 
+
+### Patch (commit 86205fb)
+
+- `forwarder.eur()`: the rate is kept per currency (`self.fx["USD"]`, `self.fx["GBP"]`). A rate stated with a
+  price applies to that price's currency. A price in a currency with no rate seen is still dropped, never guessed.
+- Bid form and `prompts/bid.md`: new field `fx_eur_per_unit`, filled only when a non-EUR mail states a rate.
+  This changes the bid prompt for every bid read. Leave this commit out if you do not want to touch the prompt
+  before the first currency change shows up.
+
+Test: `test_prices_in_other_currencies_convert_with_their_own_rate`.
 
 We always quote in EUR. If a customer asks for a total in USD we do not convert. No such mail seen yet.
 
 ## How to re-run
 
 ```
-cd backend && uv run pytest -q                                   # 17 passed
+cd backend && uv run pytest -q                                   # 21 passed
 cd backend && uv run python -m research.check_key <synthetic>     # 0 mismatches
 cd backend && FIVEU_BASE_URL=... FIVEU_API_KEY=... uv run python -m research.rounds   # read-only round log
 ```
