@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Milan Forwarding · Sam Slides</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Sam Slides. One look with the desk, the website and the thumbnail: paper ground, spheres of colour with grain,
+   frosted white cards, Inter, the mark. Green, amber and red are the desk's three states and nothing else.
+   Ground, orb, typing field and the "one request" stage are the website's own code (personal/desk-demo/site/company). */
+:root { --ink: #141414; --ink2: #3b3b3b; --muted: #747474; --line: rgba(0,0,0,.07); --ease: cubic-bezier(.22, 1, .36, 1); --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #eef2e8; color: var(--ink); font-family: Inter, ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p, ol, ul { margin: 0; padding: 0; list-style: none; }
+
+/* ground: the website's */
+.ground { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.ground i { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+.ground i::before, .ground i::after { content: ""; position: absolute; border-radius: 50%; filter: blur(50px); }
+.ground i::before { width: 74vmax; height: 74vmax; right: -22vmax; bottom: -34vmax; background: radial-gradient(circle at 34% 30%, var(--a), var(--b) 46%, var(--c) 74%, transparent 76%); animation: drift 26s ease-in-out infinite alternate; }
+.ground i::after { width: 40vmax; height: 40vmax; right: 12vmax; top: -26vmax; background: radial-gradient(circle at 34% 30%, var(--a), var(--b) 50%, transparent 74%); animation: drift 32s ease-in-out infinite alternate-reverse; }
+.ground .calm { --a: #c9f0cf; --b: #3fae6c; --c: #1d7d4b; } .ground .watch { --a: #fbe7b2; --b: #e7a83a; --c: #c27d14; } .ground .alert { --a: #fbcdbd; --b: #e8573c; --c: #b9341f; }
+body[data-mood="calm"] .ground .calm, body[data-mood="watch"] .ground .watch, body[data-mood="alert"] .ground .alert { opacity: 1; }
+.ground::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .55; mix-blend-mode: overlay; }
+body.quiet .ground i::before { right: -34vmax; bottom: -46vmax; } body.quiet .ground i::after { top: -34vmax; }
+@keyframes drift { to { transform: translate(-4vmax, -3vmax) scale(1.08); } }
+
+/* orb: the website's */
+.orb { width: 72px; height: 72px; position: relative; overflow: hidden; flex: none; border-radius: 58% 42% 52% 48% / 46% 54% 46% 54%; background: radial-gradient(circle at 70% 80%, var(--o3), transparent 62%), var(--o2); box-shadow: 0 18px 40px -12px var(--o2), inset 0 -8px 16px -8px var(--o3); animation: morph 11s ease-in-out infinite, turn 30s linear infinite; }
+.orb::before { content: ""; position: absolute; inset: -25%; background: radial-gradient(circle at 42% 38%, var(--o1), transparent 44%); filter: blur(6px); animation: swim 6.5s ease-in-out infinite alternate; }
+.orb::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); background-size: 120px; opacity: .6; mix-blend-mode: overlay; }
+.orb, .g { --o1: #c9f0cf; --o2: #3fae6c; --o3: #1d7d4b; } .am { --o1: #fbe7b2; --o2: #e7a83a; --o3: #c27d14; } .rd { --o1: #fbcdbd; --o2: #e8573c; --o3: #b9341f; }
+@keyframes morph { 0%, 100% { border-radius: 58% 42% 52% 48% / 46% 54% 46% 54%; } 33% { border-radius: 43% 57% 45% 55% / 57% 43% 58% 42%; } 66% { border-radius: 52% 48% 61% 39% / 41% 59% 44% 56%; } }
+@keyframes turn { to { rotate: 360deg; } } @keyframes swim { from { transform: translate(-14%, -10%) scale(.9); } to { transform: translate(16%, 12%) scale(1.2); } }
+
+/* stage: 1920 x 1080, scaled into any window. The ground runs to the window edge, so there are no bars. */
+.deck { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; z-index: 1; }
+.sl { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s .35s; }
+.sl.on { opacity: 1; visibility: visible; transition: opacity .6s ease; }
+.sl.on .rv { animation: arrive .8s var(--ease) both; animation-delay: calc(var(--d, 0) * 1ms); }
+@keyframes arrive { from { opacity: 0; transform: translateY(24px); } }
+.sl > * { position: absolute; }
+.logo { left: 110px; top: 84px; display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 30px; letter-spacing: -.015em; } .logo svg { width: 54px; height: 54px; }
+h1, h2 { font-weight: 600; letter-spacing: -.045em; line-height: 1.03; left: 104px; }
+h1 { top: 330px; font-size: 138px; } h2 { top: 200px; font-size: 88px; } h2.s { font-size: 72px; }
+h1 span, h2 span { display: block; } .a { color: rgba(20,20,20,.42); }
+.cap { left: 110px; bottom: 62px; font-size: 22px; color: var(--muted); }
+.card { background: rgba(255,255,255,.8); backdrop-filter: blur(34px) saturate(1.2); -webkit-backdrop-filter: blur(34px) saturate(1.2); border-radius: 32px; box-shadow: 0 30px 80px rgba(30,40,30,.14), 0 0 0 1px rgba(255,255,255,.55); padding: 40px 44px; }
+.row3 { left: 104px; right: 104px; top: 500px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.row3 small { display: block; font-size: 24px; font-weight: 500; color: var(--muted); margin-bottom: 18px; }
+.row3 b { display: block; font-size: 46px; font-weight: 600; letter-spacing: -.03em; line-height: 1.08; }
+.row3 p { margin-top: 16px; font-size: 28px; line-height: 1.4; color: var(--ink2); }
+
+/* 1 the typing field: the website's */
+.ask { left: 104px; top: 690px; height: 96px; border-radius: 999px; background: #fff; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 24px 60px -22px rgba(30,40,30,.34); display: flex; align-items: center; gap: 22px; padding: 0 16px 0 40px; font-size: 34px; letter-spacing: -.01em; min-width: 1040px; }
+.ask span { flex: 1; white-space: nowrap; } .ask span i { display: inline-block; width: 3px; height: 1.1em; margin-left: 3px; vertical-align: -.18em; background: #3fae6c; border-radius: 2px; animation: caret 1.05s steps(1) infinite; } @keyframes caret { 50% { opacity: 0; } }
+.ask b { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(180deg, #2c2c2c, #111); display: grid; place-items: center; color: #fff; } .ask b svg { width: 26px; height: 26px; }
+
+/* 2 problem */
+.nums { left: 104px; top: 500px; height: 348px; display: grid; grid-template-columns: 500px 500px; gap: 32px; }
+.nums b { display: block; font-size: 128px; font-weight: 600; letter-spacing: -.05em; line-height: 1; } .nums span { display: block; margin-top: 14px; font-size: 28px; color: var(--ink2); }
+.news { right: 104px; top: 500px; width: 640px; display: grid; gap: 20px; }
+.news li { padding: 26px 32px; height: 164px; } .news small { display: flex; justify-content: space-between; font-size: 22px; color: var(--muted); } .news small b { color: var(--ink); font-weight: 600; } .news p { margin-top: 10px; font-size: 30px; font-weight: 500; letter-spacing: -.02em; line-height: 1.2; }
+
+/* 3 many agents become one */
+.sw { left: 0; top: 0; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #f2f3ef, #b3b9af 60%, #8f968b); box-shadow: 0 10px 22px -10px rgba(40,50,40,.5); transition: transform 1.1s var(--ease), opacity .5s ease .6s; animation: bob 5s ease-in-out infinite alternate; }
+.sw em { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); font-style: normal; font-size: 20px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: opacity .3s; }
+@keyframes bob { to { translate: 0 -10px; } }
+.one { left: 1400px; top: 640px; width: 0; height: 0; } .one .orb { position: absolute; width: 280px; height: 280px; left: -140px; top: -140px; scale: 0; transition: scale 1.2s var(--ease) .5s; }
+.one b { position: absolute; top: 172px; left: -200px; width: 400px; text-align: center; font-size: 40px; font-weight: 600; letter-spacing: -.03em; opacity: 0; transition: opacity .6s ease 1.1s; }
+.late { opacity: 0; transition: opacity .7s ease .4s; }
+[data-step="1"] .sw { transform: translate(var(--tx), var(--ty)) scale(.1); opacity: 0; } [data-step="1"] .sw em { opacity: 0; }
+[data-step="1"] .one .orb { scale: 1; } [data-step="1"] .one b, [data-step="1"] .late { opacity: 1; }
+
+/* 5 one request: the website's stage, larger */
+.how-stage { background: var(--w); border-radius: 22px; box-shadow: 0 1px 2px rgba(30,40,30,.04), 0 0 0 1px var(--line), 0 40px 80px -50px rgba(30,40,30,.5); padding: 22px 24px 24px; display: grid; grid-template-rows: auto 1fr; gap: 16px; min-height: 420px; }
+.how-top { display: flex; align-items: baseline; justify-content: space-between; color: var(--muted); font-size: 13.5px; font-weight: 500; }
+.how-clock { font: 600 34px/1 "Inter", sans-serif; letter-spacing: -.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.how-arts { position: relative; display: grid; align-items: center; } .how-art { grid-area: 1 / 1; opacity: 0; transform: translateY(14px) scale(.985); transition: opacity .5s var(--ease), transform .6s var(--ease); pointer-events: none; } .how-art.on { opacity: 1; transform: none; pointer-events: auto; } .how-art.past { transform: translateY(-14px) scale(.985); }
+.a-mail { background: #f6f6f4; border-radius: 16px; padding: 18px 20px; display: grid; gap: 8px; font-size: 15.5px; line-height: 1.55; } .a-mail.out { background: #eef5f0; } .a-mail p { margin: 0; }
+.a-h { display: flex; gap: 10px; align-items: baseline; font-size: 14px; } .a-h span { color: var(--muted); } .a-h time { margin-left: auto; color: var(--muted); font-size: 13px; } .a-s { font-weight: 600; }
+.a-file { justify-self: start; background: #fff; border-radius: 999px; padding: 5px 13px; font-size: 13px; font-weight: 500; box-shadow: 0 0 0 1px var(--line); } .a-total { font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.a-rows { display: grid; } .a-rows > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 12px 4px; border-top: 1px solid var(--line); font-size: 15px; } .a-rows > div:first-child { border-top: 0; } .a-rows span { color: var(--muted); } .a-rows b { font-weight: 500; }
+.a-rows .warn, .a-rows .ok { border-radius: 12px; border-top-color: transparent; padding: 12px 14px; margin: 4px -10px; } .a-rows .warn { background: #fff4de; } .a-rows .warn + div, .a-rows .ok + div { border-top-color: transparent; } .a-rows .ok { background: #e6f5ec; }
+.a-src { display: grid; gap: 10px; } .a-src > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 14px; align-items: center; background: #f6f6f4; border-radius: 14px; padding: 14px 18px; } .a-src b { font-weight: 600; font-size: 15.5px; } .a-src span { grid-column: 1; color: var(--ink2); font-size: 14.5px; } .a-src em { grid-row: 1 / span 2; grid-column: 2; font-style: normal; font-weight: 600; font-size: 14px; background: #fff; border-radius: 999px; padding: 5px 12px; box-shadow: 0 0 0 1px var(--line); font-variant-numeric: tabular-nums; }
+.a-tbl { display: grid; gap: 6px; } .a-tbl > div { display: grid; grid-template-columns: minmax(0, 1fr) 70px 130px; gap: 12px; align-items: center; padding: 13px 16px; border-radius: 14px; background: #f6f6f4; font-size: 15px; } .a-tbl span { color: var(--muted); } .a-tbl em { font-style: normal; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; } .a-tbl .pick { background: #141414; color: #fff; } .a-tbl .pick span { color: #cfcfcf; } .a-tbl p { margin: 8px 4px 0; color: var(--ink2); font-size: 14.5px; }
+
+.how-wrap { left: 488px; top: 96px; width: 620px; zoom: 1.64; } /* left and top are zoomed too: 800 and 158 on the stage */
+.how-cap { left: 104px; top: 470px; width: 600px; } .how-cap small { font-size: 24px; color: var(--muted); font-variant-numeric: tabular-nums; } .how-cap h3 { margin: 8px 0 14px; font-size: 46px; font-weight: 600; letter-spacing: -.03em; line-height: 1.1; } .how-cap p { font-size: 28px; line-height: 1.4; color: var(--ink2); }
+.dash { left: 104px; top: 880px; display: flex; gap: 8px; } .dash i { width: 44px; height: 5px; border-radius: 5px; background: rgba(0,0,0,.14); transition: background-color .3s; } .dash i.on { background: #141414; }
+
+/* 6 the desk and its three states */
+.states { left: 104px; top: 460px; width: 660px; display: grid; gap: 14px; }
+.states li { display: grid; grid-template-columns: 64px 1fr; gap: 22px; align-items: center; padding: 20px 24px; border-radius: 26px; transition: background-color .5s, box-shadow .5s; }
+.states .orb { width: 64px; height: 64px; } .states b { display: block; font-size: 32px; font-weight: 600; letter-spacing: -.02em; } .states span { display: block; margin-top: 4px; font-size: 24px; line-height: 1.35; color: var(--ink2); }
+[data-step="0"] .states li:nth-child(1), [data-step="1"] .states li:nth-child(2), [data-step="2"] .states li:nth-child(3) { background: rgba(255,255,255,.86); box-shadow: 0 24px 60px -30px rgba(30,40,30,.4); }
+.win { right: 84px; top: 190px; width: 1040px; border-radius: 26px; overflow: hidden; background: #fff; box-shadow: 0 50px 110px -40px rgba(20,30,20,.5), 0 0 0 1px rgba(0,0,0,.06); } .win img { display: block; width: 100%; }
+
+/* 8 Auer: real mails */
+.mails { left: 104px; right: 104px; top: 500px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; align-items: start; }
+.mails li { padding: 32px 36px; } .mails .me { background: #fff; }
+.mails .hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 26px; } .mails .hd b { font-weight: 600; white-space: nowrap; } .mails .hd span { order: 3; flex-basis: 100%; color: var(--muted); font-size: 22px; } .mails time { margin-left: auto; color: var(--muted); font-size: 22px; font-variant-numeric: tabular-nums; }
+.mails p { margin-top: 18px; font-size: 32px; line-height: 1.35; letter-spacing: -.01em; } .mails mark { background: #fdebc4; color: inherit; border-radius: 8px; padding: 1px 8px; -webkit-box-decoration-break: clone; box-decoration-break: clone; } .mails mark.ok { background: #d9f2df; }
+.mails u { display: inline-block; margin-top: 18px; text-decoration: none; background: #fff; border-radius: 999px; padding: 8px 18px; font-size: 22px; font-weight: 500; box-shadow: 0 0 0 1px var(--line); }
+
+/* 9 the loop */
+.loop { left: 1370px; top: 610px; width: 0; height: 0; }
+.loop svg { position: absolute; left: -320px; top: -320px; width: 640px; height: 640px; overflow: visible; } .loop circle { fill: none; } .loop .r { stroke: rgba(20,20,20,.14); stroke-width: 2; } .loop .t { stroke: #1d7d4b; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 9 91; animation: spin 7s linear infinite; } @keyframes spin { to { stroke-dashoffset: -100; } }
+.loop .orb { position: absolute; width: 170px; height: 170px; left: -85px; top: -85px; }
+.loop b { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; background: #fff; border-radius: 999px; padding: 16px 28px; font-size: 28px; font-weight: 600; letter-spacing: -.015em; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 18px 40px -18px rgba(30,40,30,.4); }
+
+/* 10 close: the submission thumbnail, live */
+.res { left: 110px; top: 664px; font-size: 38px; font-weight: 500; letter-spacing: -.015em; color: var(--ink2); }
+.team { left: 104px; bottom: 76px; display: flex; align-items: center; gap: 30px; } .faces { display: flex; padding-left: 18px; }
+.face { width: 132px; height: 132px; border-radius: 50%; border: 6px solid #fff; background-repeat: no-repeat; box-shadow: 0 14px 30px -12px rgba(20,30,20,.4); margin-left: -18px; }
+.names { font-size: 36px; font-weight: 500; color: var(--ink2); letter-spacing: -.01em; } .names i { font-style: normal; color: rgba(20,20,20,.3); margin: 0 14px; }
+
+.pg { position: fixed; right: 22px; bottom: 16px; z-index: 3; font-size: 13px; color: rgba(20,20,20,.45); font-variant-numeric: tabular-nums; }
+.note { display: none; } body.notes .sl.on .note { display: block; left: 104px; right: 104px; bottom: 20px; top: auto; z-index: 5; background: #141414; color: #fff; border-radius: 22px; padding: 22px 28px; font-size: 26px; line-height: 1.4; }
+@media (prefers-reduced-motion: reduce) { .sl.on .rv, .sw, .orb, .orb::before { animation: none; } }
+</style></head>
+<body data-mood="calm">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="3.4"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -12"/></filter>
+  <symbol id="mk" viewBox="0 0 64 64"><g filter="url(#goo)" fill="currentColor" stroke="currentColor"><circle cx="21" cy="42" r="15" stroke="none"/><circle cx="42" cy="23" r="9.5" stroke="none"/><path d="M28 36 39 26" stroke-width="6.5" stroke-linecap="round"/></g><circle cx="56" cy="10" r="4.4" fill="currentColor"/></symbol>
+</defs></svg>
+<div class="ground"><i class="calm"></i><i class="watch"></i><i class="alert"></i></div>
+
+<main class="deck">
+
+<!-- 1 The question. It is 5U's own brief title. The request below is real: scored run, Sunday 02:08. -->
+<section class="sl" data-type="1">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h1><span class="a rv">Who answers</span><span class="rv" style="--d:120">at 2 a.m.?</span></h1>
+  <div class="ask rv" style="--d:400"><span id="typed"></span><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></b></div>
+  <p class="cap">A real request from our scored night.</p>
+  <p class="note">"Who answers your customers at 2 a.m.?" At 02:08 a customer in Düsseldorf needed a price to Riyadh. Their forwarder was asleep.</p>
+</section>
+
+<!-- 2 The problem. Numbers: Freightos studies 2015 and 2017. Headlines: pitch/sources/headlines.md on jan-pitch-deck. -->
+<section class="sl quiet">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2><span class="a rv">The request is in the inbox.</span><span class="rv" style="--d:120">The answer takes days.</span></h2>
+  <ul class="nums"><li class="card rv" style="--d:300"><b>101 h</b><span>until the average quote arrives</span></li><li class="card rv" style="--d:400"><b>45%</b><span>of requests get an answer at all</span></li></ul>
+  <ul class="news">
+    <li class="card rv" style="--d:520"><small><b>Reuters</b>13 March 2026</small><p>Air freight rates soar as Middle East conflict blocks trade routes</p></li>
+    <li class="card rv" style="--d:620"><small><b>The Loadstar</b>9 March 2026</small><p>Air cargo turns to trucks as Middle East disruption sends rates soaring</p></li>
+  </ul>
+  <p class="cap">Freightos studies, 2015 and 2017. Headlines as published.</p>
+  <p class="note">A quote takes 101 hours on average and fewer than half of all requests get one. Meanwhile prices move by the hour. Say the years of the studies if asked.</p>
+</section>
+
+<!-- 3 The usual answer is more agents. One key press and they become one. -->
+<section class="sl" data-steps="1" id="swarm">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2><span class="a rv">Everyone builds agents.</span><span class="late">We made it simple.</span></h2>
+  <div class="one"><div class="orb"></div><b>Giulia</b></div>
+  <p class="note">The usual answer is a swarm: a router, a parser, a pricing agent, a reviewer. Press once. We built one agent and called it Giulia.</p>
+</section>
+
+<!-- 4 Three principles, as on jan-pitch-deck and in vision.md. -->
+<section class="sl quiet">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2><span class="rv">Three rules keep it simple.</span></h2>
+  <ol class="row3">
+    <li class="card rv" style="--d:200"><small>1</small><b>One agent per deal.</b><p>Giulia holds the whole thread, from the first mail to the booking.</p></li>
+    <li class="card rv" style="--d:300"><small>2</small><b>Prices come from code.</b><p>The model writes the mail. Every total and date is computed.</p></li>
+    <li class="card rv" style="--d:400"><small>3</small><b>Your word wins.</b><p>Write Giulia one sentence. Giulia follows it from then on.</p></li>
+  </ol>
+  <p class="note">One agent with one session per mail thread. Every price, date and recipient is computed or checked by code. A person can write into any session and Giulia follows.</p>
+</section>
+
+<!-- 5 What happens to one request. The stage and its six moments are the website's. It plays by itself. -->
+<section class="sl quiet" id="how">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2 class="s"><span class="a rv">What happens</span><span class="rv" style="--d:120">to one request</span></h2>
+  <div class="how-cap"></div><div class="dash"></div>
+  <div class="how-wrap rv" style="--d:200"></div>
+  <p class="cap">An example request. The steps are what the system does.</p>
+  <p class="note">It plays by itself, about 15 seconds. Giulia reads mail and attachment, asks three places at once, compares like a forwarder, sends one price, and books after the yes.</p>
+</section>
+
+<!-- 6 The product. The three states and their sentences are the desk's own. The ground changes with them. -->
+<section class="sl quiet" id="desk" data-step="0">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2 class="s"><span class="a rv">The colour says</span><span class="rv" style="--d:120">if you are needed.</span></h2>
+  <ul class="states">
+    <li class="rv" style="--d:250"><span class="orb"></span><div><b>Green: nothing to do</b><span>Giulia answered everything alone.</span></div></li>
+    <li class="rv" style="--d:330"><span class="orb am"></span><div><b>Amber: read when you have a minute</b><span>Giulia decided something and left you a note.</span></div></li>
+    <li class="rv" style="--d:410"><span class="orb rd"></span><div><b>Red: look now</b><span>Something looks wrong. You take over that shipment.</span></div></li>
+  </ul>
+  <div class="win rv" style="--d:200"><img src="img/desk-home.jpg" alt="The desk in its green state"></div>
+  <p class="cap">Real screen from the product, example data.</p>
+  <p class="note">This is the running product. Giulia runs the desk and you look at one colour. The numbers on screen are example data, say so.</p>
+</section>
+
+<!-- 7 What is different. 02:08 is deal-29659 (Lindqvist Medtech, DUS to RUH, 990 kg) from the scored run. -->
+<section class="sl quiet">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2><span class="a rv">Time zones, people and knowledge</span><span class="rv" style="--d:120">on one desk.</span></h2>
+  <ul class="row3">
+    <li class="card rv" style="--d:250"><small>Any hour</small><b>02:08, Düsseldorf to Riyadh</b><p>Quote sent after 43 seconds. Booked at 02:09.</p></li>
+    <li class="card rv" style="--d:350"><small>Every customer</small><b>Giulia keeps notes</b><p>What a customer asks for and books is there for the next quote.</p></li>
+    <li class="card rv" style="--d:450"><small>Your team</small><b>Step in with one sentence</b><p>Typed or spoken. No rules to configure.</p></li>
+  </ul>
+  <p class="cap">02:08 is a real request from the scored night.</p>
+  <p class="note">Other tools hold each step until a person approves. Giulia acts and flags only what needs a person. Name no competitor. The scored night ran with no human in the loop, that was the organisers' rule.</p>
+</section>
+
+<!-- 8 Auer. Real mails from the scored run, word for word (ids 38215, 38231, 38270), times CET. -->
+<section class="sl quiet" data-mood="watch">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2><span class="a rv">The mail says non-dangerous.</span><span class="rv" style="--d:120">The attachment says Class 8.</span></h2>
+  <ul class="mails">
+    <li class="card rv" style="--d:500"><div class="hd"><b>Tobias Auer</b><span>Auer Maschinenbau</span><time>04:52:25</time></div><p>The goods are general cargo, <mark>non-dangerous</mark></p><u>packing_list_34372.pdf</u></li>
+    <li class="card me rv" style="--d:1300"><div class="hd"><b>Giulia</b><time>04:52:30</time></div><p>The attached instruction lists the cleaning agent as <mark>UN1760, Class 8 corrosive liquid</mark>.</p></li>
+    <li class="card rv" style="--d:2100"><div class="hd"><b>Tobias Auer</b><span>Auer Maschinenbau</span><time>04:52:39</time></div><p><mark class="ok">Thank you, good point.</mark></p></li>
+  </ul>
+  <p class="cap">Real mails from the scored night, Sunday 04:52 CET, word for word.</p>
+  <p class="note">Auer writes "non-dangerous". The attached paper says UN 1760, Class 8, corrosive. Giulia reads the attachment and says so before pricing. 14 seconds after his request Auer writes "Thank you, good point".</p>
+</section>
+
+<!-- 9 Vision. Built today: notes per customer. The loop is the plan. -->
+<section class="sl quiet">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h2><span class="a rv">Giulia gets better</span><span class="rv" style="--d:120">with every customer.</span></h2>
+  <div class="loop rv" style="--d:250">
+    <svg viewBox="0 0 640 640"><circle class="r" cx="320" cy="320" r="300"/><circle class="t" cx="320" cy="320" r="300" pathLength="100" transform="rotate(-90 320 320)"/></svg>
+    <div class="orb"></div>
+    <b style="left:0;top:-300px">Giulia quotes</b><b style="left:300px;top:0">Customer says yes or no</b><b style="left:0;top:300px">Giulia keeps the outcome</b><b style="left:-300px;top:0">Next quote starts from it</b>
+  </div>
+  <p class="cap">Built today: notes per customer. The loop is what we build next.</p>
+  <p class="note">Today Giulia keeps notes per customer. Next, every yes and no goes back into the next quote. Say "we are building this", never "it runs".</p>
+</section>
+
+<!-- 10 Close: the submission thumbnail, live. Numbers: 5U board, Sunday 10:53. Refresh from the final board. -->
+<section class="sl">
+  <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#mk"/></svg>Milan Forwarding</div>
+  <h1><span class="a rv">Everyone builds agents.</span><span class="rv" style="--d:120">We made it simple.</span></h1>
+  <p class="res rv" style="--d:350">166 of 187 quotes accepted. 1st of 15 teams, with no person in the loop.</p>
+  <div class="team rv" style="--d:500">
+    <div class="faces">
+      <div class="face" style="background-image:url(img/jan.jpg);background-size:180%;background-position:40% 21%"></div>
+      <div class="face" style="background-image:url(img/mattia.jpg);background-size:116%;background-position:50% 0%"></div>
+      <div class="face" style="background-image:url(img/sam.jpg);background-size:150%;background-position:50% 26%"></div>
+    </div>
+    <div class="names">Jan Köberle<i>·</i>Mattia Beltrami<i>·</i>Sam Sonntag</div>
+  </div>
+  <p class="note">"Any hour, any time zone: Giulia answers." That is the answer to slide 1. Board: 5U, Sunday 10:53.</p>
+</section>
+
+</main>
+<div class="pg" id="pg"></div>
+<script>
+// Arrow keys, space, enter or a click: next. n: speaker notes. f: full screen. #s4 opens slide 4, #s3.1 its second state.
+(function () {
+  var deck = document.querySelector('.deck'), S = [].slice.call(document.querySelectorAll('.sl')), pg = document.getElementById('pg');
+  var i = 0, step = 0, timers = [];
+  function fit() { var s = Math.min(innerWidth / 1920, innerHeight / 1080); deck.style.transform = 'scale(' + s + ')'; deck.style.left = (innerWidth - 1920 * s) / 2 + 'px'; deck.style.top = (innerHeight - 1080 * s) / 2 + 'px'; }
+  addEventListener('resize', fit); fit();
+  function later(f, ms) { timers.push(setTimeout(f, ms)); }
+  function mood(m) { document.body.dataset.mood = m; }
+
+  // 3: the swarm. Grey spheres with the usual names, spread over the right half, each knows its way to the middle.
+  var names = ['Router agent', 'Parser agent', 'Pricing agent', 'Review agent', 'Booking agent', 'Supervisor', 'Memory agent', 'Planner'];
+  var P = [[1010,470,44],[1130,380,30],[1250,470,56],[1370,360,34],[1500,440,48],[1640,370,30],[1760,470,52],[1060,640,34],[1215,690,26],[1330,560,40],[1480,610,28],[1620,570,44],[1770,640,30],[1000,810,52],[1140,770,30],[1270,850,46],[1400,780,32],[1530,860,54],[1660,770,34],[1780,840,42],[1090,930,28],[1350,950,30],[1600,950,28]];
+  var sw = document.getElementById('swarm');
+  P.forEach(function (p, k) { p[2] = Math.round(p[2] * 1.5); var d = document.createElement('div'); d.className = 'sw'; d.style.cssText = 'left:' + (p[0] - p[2] / 2) + 'px;top:' + (p[1] - p[2] / 2) + 'px;width:' + p[2] + 'px;height:' + p[2] + 'px;--tx:' + (1400 - p[0]) + 'px;--ty:' + (640 - p[1]) + 'px;animation-delay:' + (-k * 0.37) + 's;transition-delay:' + (k * 18) + 'ms,' + (500 + k * 18) + 'ms';
+    if (p[2] >= 60 && names.length) d.innerHTML = '<em>' + names.shift() + '</em>'; sw.appendChild(d); });
+
+  // 5: one request, the website's six moments. "Giulia" instead of "she", as on every slide.
+  var mail = '<div class="a-mail"><div class="a-h"><b>Lumiere Cosmetics</b><span>to Giulia</span><time>06:23</time></div><p class="a-s">Request: 14 cartons to Dubai</p><p>Hi, we have 14 cartons of cosmetics for Dubai, about 2.78 cbm, ready Thursday. Cheapest option please.<br>Thanks, Anna</p><span class="a-file">packing-list.pdf</span></div>';
+  var facts = '<div class="a-rows"><div><span>Goods</span><b>14 cartons of cosmetics, not dangerous</b></div><div><span>Weight</span><b>212 kg gross</b></div><div class="warn"><span>Volume</span><b>1.92 cbm on the packing list, 2.78 cbm in the mail</b></div><div><span>Wants</span><b>the cheapest option</b></div><div><span>Writes</span><b>English, first name, short</b></div></div>';
+  var src = '<div class="a-src"><div><b>Rate sheets</b><span>3 airlines fly Munich to Dubai</span><em>at once</em></div><div><b>Rate portal</b><span>1 price read from the page</span><em>6 s</em></div><div><b>Airlines by mail</b><span>2 answers, one as a PDF</span><em>25 s</em></div></div>';
+  var offers = '<div class="a-tbl"><div class="pick"><b>Elbflug Air Freight</b><span>4 days</span><em>1186.20 EUR</em></div><div><b>Helix Air Freight</b><span>3 days</span><em>1292.96 EUR</em></div><div><b>Wayzata Air Cargo</b><span>2 days</span><em>1340.41 EUR</em></div><p>Billed at 320 kg, because the volume weight is higher than the gross weight. The next weight break was priced too and came out dearer.</p></div>';
+  var quote = '<div class="a-mail out"><div class="a-h"><b>Giulia</b><span>to Lumiere Cosmetics</span><time>47 s later</time></div><p>Hi Anna,<br>cheapest is Elbflug Air Freight, 4 days airport to airport. I priced from your packing list, 1.92 cbm.</p><p class="a-total">Total: 1186.20 EUR all-in</p><p>A short yes and I book it.<br>Regards, Giulia</p></div>';
+  var booked = '<div class="a-rows"><div><span>Customer</span><b>Yes, please book it.</b></div><div class="ok"><span>Booked</span><b>Elbflug Air Freight, reference BK-16903</b></div><div><span>Confirmed</span><b>to the customer, in the same thread</b></div><div class="warn"><span>Note for the desk</span><b>The packing list and the mail disagreed. I priced from the packing list and said so.</b></div></div>';
+  
+  var H = [
+    { t: '00:00', h: 'A request arrives', p: 'A few lines and a packing list attached.', a: mail },
+    { t: '00:04', h: 'Giulia reads all of it', p: 'Mail and attachment disagree on the volume. Giulia notices.', a: facts },
+    { t: '00:06', h: 'Giulia asks three places at once', p: 'Rate sheets, the rate portal and the airlines by mail.', a: src },
+    { t: '00:31', h: 'Giulia compares like a forwarder', p: 'Every total is computed by code, never written by the model.', a: offers },
+    { t: '00:47', h: 'One price goes back', p: 'In the customer\'s language and tone, in the same thread.', a: quote },
+    { t: '20:52', h: 'A yes comes, and Giulia books', p: 'A note stays on the desk. It turns amber until you have read it.', a: booked }
+  ];
+  var how = document.getElementById('how'), wrap = how.querySelector('.how-wrap'), cap = how.querySelector('.how-cap'), dash = how.querySelector('.dash');
+  wrap.innerHTML = '<div class="how-stage"><div class="how-top"><span>An example request</span><b class="how-clock">00:00</b></div><div class="how-arts">' + H.map(function (x) { return '<div class="how-art">' + x.a + '</div>'; }).join('') + '</div></div>';
+  dash.innerHTML = H.map(function () { return '<i></i>'; }).join('');
+  var A = [].slice.call(wrap.querySelectorAll('.how-art')), D = [].slice.call(dash.children);
+  function show(k) { A.forEach(function (e, j) { e.classList.toggle('on', j === k); e.classList.toggle('past', j < k); }); D.forEach(function (e, j) { e.classList.toggle('on', j <= k); });
+    wrap.querySelector('.how-clock').textContent = H[k].t; cap.innerHTML = '<small>' + H[k].t + '</small><h3>' + H[k].h + '</h3><p>' + H[k].p + '</p>'; mood(k === 5 ? 'watch' : 'calm'); }
+
+  // 1: the line types itself, as the question field on the website does
+  var line = '02:08, Düsseldorf. A customer needs a price to Riyadh.', typed = document.getElementById('typed');
+  function type() { typed.innerHTML = '<i></i>'; var k = 0; (function tick() { typed.innerHTML = line.slice(0, k).replace(/</g, '') + '<i></i>'; if (k++ < line.length) later(tick, 34); })(); }
+
+  function setStep(k) { step = k; S[i].dataset.step = k; if (S[i].id === 'desk') mood(['calm', 'watch', 'alert'][k] || 'calm'); }
+  function enter() {
+    timers.forEach(clearTimeout); timers = [];
+    var s = S[i]; mood(s.dataset.mood || 'calm'); document.body.classList.toggle('quiet', s.classList.contains('quiet'));
+    if (s.dataset.type) { typed.innerHTML = '<i></i>'; later(type, 900); }
+    if (s.id === 'how') { show(0); for (var k = 1; k < H.length; k++) later(show.bind(null, k), k * 2600); }
+    if (s.id === 'desk') { later(function () { setStep(1); }, 2600); later(function () { setStep(2); }, 5200); later(function () { setStep(0); }, 7800); }
+  }
+  function go(k, st) { i = Math.max(0, Math.min(S.length - 1, k)); S.forEach(function (s, j) { s.classList.toggle('on', j === i); });
+    pg.textContent = (i + 1) + ' / ' + S.length; try { history.replaceState(null, '', '#s' + (i + 1)); } catch (e) {}
+    enter(); setStep(st || 0); if (S[i].id === 'how' && st) { timers.forEach(clearTimeout); show(st); } }
+  function next() { if (step < (S[i].dataset.steps | 0)) setStep(step + 1); else if (i < S.length - 1) go(i + 1); }
+  function prev() { if (step > 0 && S[i].dataset.steps) setStep(step - 1); else go(i - 1); }
+  addEventListener('keydown', function (e) {
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].indexOf(e.key) >= 0) { e.preventDefault(); next(); }
+    if (['ArrowLeft', 'PageUp'].indexOf(e.key) >= 0) { e.preventDefault(); prev(); }
+    if (e.key === 'n') document.body.classList.toggle('notes');
+    if (e.key === 'f' && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
+  });
+  addEventListener('click', function (e) { if (e.clientX < innerWidth * 0.25) prev(); else next(); });
+  var m = location.hash.match(/s(\d+)(?:\.(\d+))?/); go(m ? m[1] - 1 : 0, m && m[2] ? +m[2] : 0);
+})();
+</script>
+</body></html>
