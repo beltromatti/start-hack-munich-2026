@@ -105,7 +105,7 @@ the world (a mail, an airline's news) and a person start work, never the agent's
 | `crm`, `deal` | find shipments and deals | a customer's thread sees only that customer's deals; tracking sees all |
 | `mail_carrier`, `carrier_status` | ask a carrier something | only carriers on the list, at most two mails to one carrier per deal in ten minutes; the answer comes back to this deal |
 | `browser` | open, read, fill and press on a page the team sees live (today 5U's portal page) | 5U's sites only (https); a key is marked `{team_key}` and typed by the person; a rate on the page is read by code |
-| `ask_person` | interrupt the team for what only a person can do: a check on the page, or an answer in words | only while someone is at the desk (operator mode); an alarm opens the deal; a page rate becomes a price by code; inside the 2-minute clock |
+| `ask_person` | interrupt the team for what only a person can do: a check on the page, or an answer in words | only while someone is at the desk (operator mode); an alarm opens the deal; a page rate becomes a price by code; on the page, before the quote, the person gets the round's time |
 | `note` | leave a flag or a fact for the team (and for later threads) | it stays on the deal |
 | `no_reply` | decide nothing needs sending, with the reason | the required outcome is met; `done` ends the turn |
 
@@ -122,11 +122,11 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
   truckers of the pickup zone. An airline that told us its lanes in the last two hours ("We fly ...") is not asked
   for a lane outside them; the agent sees who was skipped (`not_asked`) and can still ask. Unknown is always asked.
   5U moves airlines between portal and mail, so a portal airline off the portal for this lane (or a 404) is asked
-  by mail too; when the rate API turns an airline away (503), it is retried every 20 s for about 4 minutes and
-  awaited (`portal_retrying`: in rounds 93-100 it was always the airline the answer needed, and the teams that
-  waited 83-358 s for it won those rounds), the rate desk is asked, and a portal rate we saw tonight on that lane
-  and break prices the airline (`portal_memory`). Asks that may never be answered (mails to portal airlines, the
-  rate desk) are sent but not awaited: the quote does not wait for them (round 94 waited 499 s).
+  by mail too; when the rate API turns an airline away (503), it is retried for 20 s, the rate desk is asked, a
+  portal rate we saw tonight on that lane and break prices the airline (`portal_memory`), and with a person at the
+  desk `get_offers` says so at once, so the person starts on 5U's portal page while the carriers answer. Asks that
+  may never be answered (mails to portal airlines, the rate desk) are sent but not awaited: the quote does not wait
+  for them (round 94 waited 499 s).
 - **Pricing:** chargeable weight = max(kg, cbm x 167); also price the break above when it can be cheaper (299 kg
   cost more than 300 kg); minimum on freight; surcharges per billed kg; exact weights in every request (116.9, not
   117). A bid quoted per kg or itemised gets its total from code. A live bid beats the sheet; a carrier that
@@ -183,8 +183,9 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **No caps on steps, tokens or output.** The model decides how much a deal needs. A cheap model (`gpt-6-luna`, low
   effort) for the agent, `gpt-5-nano` for reading bids. One stop only, for spinning: 10 turns without progress.
 - **What stays are the limits the model cannot keep itself,** each with its reason: the 2-minute clock (the agent
-  sees `seconds_since_request`; a person is awaited at most 95 s after the mail, the portal about 230 s, inside the
-  6-minute close: a right quote at four minutes beats a fast wrong one); not spamming a
+  sees `seconds_since_request`; a person on 5U's portal page up to 290 s after the mail, because people took 83-358 s
+  there and a right quote at four minutes beats a fast wrong one, with time left to write it before the 6-minute
+  close; the portal API 20 s); not spamming a
   counterpart (two mails to one carrier per deal in ten minutes: round 88 sent six and lost 20 points); a hung
   gateway costs 45 s a try before OpenAI direct.
 - **The one system constraint is the required outcome:** the mail being handled gets an answer or a reasoned
@@ -248,6 +249,9 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   an alarm opens the deal, and the person does only what is theirs (the check, the key on their click, send). The
   tool turns the result into a price by code. With nobody at the desk (operator mode off) the agent quotes with what
   it has. `ask_person` serves any other thing only a person can settle (kind answer), like SIEVER's `avvisa`.
+  In rounds 93-100 the turned-away airline was always the one the answer needed, and the teams that won booked it
+  83-358 s after the request: people on the page (5U's brief: "a browser page behind a bot challenge"; slide 2:
+  "judgement calls go to people"). So the agent hears of it at once and the person gets minutes, not seconds.
 - **Suspicion is the model's, protection is the tool's.** Impostors write from lookalike addresses seconds after a
   real request ("my mailbox is down, send it here", rounds 105-107). What protects is a guarantee: a conversation
   sees only its own sender's deals, so nothing of a customer reaches anyone else, whatever the agent answers. A code
@@ -339,8 +343,12 @@ Then:
     Someone new inside a customer's thread (their broker) is helped like the customer; a mail may go to several
     people of the thread, one mail each, never outside it.
 21. The limits that stay are those the model cannot keep: the 2-minute clock and not spamming a counterpart.
-22. A source that turned us away is waited for as long as it can still change the answer: the 6-minute close, not
-    the 2-minute best, bounds it (rounds 93-100). A yes with an open question is answered before booking (round 108).
+22. Where a source turns us away, the answer is where 5U still keeps it (the portal page, with a person): the
+    person is called at once and given minutes, bounded by the 6-minute close, not the 2-minute best (rounds 93-100).
+    A yes with an open question is answered before booking (round 108).
+23. A cause is read in 5U's own words and our data before it is built on. "They waited, the API came back" (a
+    teammate's reading of rounds 93-100) ran for twenty minutes as a 4-minute API wait; the brief named the page,
+    and our own retries had failed up to 89 s.
 
 ## 13. Open, and known limits
 

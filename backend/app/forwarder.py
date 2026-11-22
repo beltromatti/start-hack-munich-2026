@@ -164,6 +164,13 @@ class Forwarder:
                 d = store.get(deal_id)["data"]
                 return {"carrier_messages": d.get("carrier_messages", []), "still_waiting_for": waiting_for(d)}
             return {"error": "no shipment yet: call get_offers with the shipment"}
+        pm = deal["data"].get("portal_missing") or {}
+        if pm.get("airlines") and not pm.get("shown") and store.kv_get("operator_on") == "1":
+            # the portal turned airlines away and a person is at the desk: the agent hears it now, not after the
+            # carriers' wait, so the person gets the minutes they need while the carriers answer (rounds 93-100)
+            store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_missing": {
+                **(r["data"].get("portal_missing") or {}), "shown": True}}))
+            wait = 0
         self._wait(deal_id, wait)
         return self.options(deal_id, preference)
 
@@ -173,12 +180,7 @@ class Forwarder:
             self._retry_portal(deal_id)
             self.wait_step()
 
-    # Seconds between tries of one airline, and how long after the ask an airline the rate API turned away (503, 429)
-    # is retried and waited for. Rounds 93-100 (Sun 00:19-01:03): one airline per lane answered 503, always the one
-    # 5U's answer needed; the teams that won those rounds (x3 to x10) booked it 83-358 s after the request, Mythos
-    # at 83-114 s every time. We stopped after 20 s and lost all eight. A request closes at 6 minutes (round 94
-    # answered at 499 s: out of time), so the wait ends with time left to write.
-    PORTAL_RETRY = (20, 230)
+    PORTAL_RETRY = (10, 20)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for (round 94: it stayed down for minutes; the quote must still go out inside 2 minutes)
 
     def _retry_portal(self, deal_id: str) -> None:
         """The portal answered 5xx or 429 for some airlines of this request: try them again while we wait for the
@@ -191,9 +193,8 @@ class Forwarder:
         if time.time() - pr["since"] > self.PORTAL_RETRY[1]:
             store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {**pr, "names": []}}))
             return
-        gap = max(self.PORTAL_RETRY[0], 6.5 * len(pr["names"]))  # under the team's 10 rates a minute
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {
-            **pr, "next": time.time() + gap}}))
+            **pr, "next": time.time() + self.PORTAL_RETRY[0]}}))
         cbm = Decimal(pr["cbm"]) if pr.get("cbm") else None
         got, failed = self.portal_offers(deal_id, pr["o"], pr["d"], Decimal(pr["kg"]), cbm, Decimal(pr["cw"]),
                                          only=set(pr["names"]))
@@ -380,20 +381,14 @@ class Forwarder:
             result["insurance"] = ({"premium": pricing.fmt(premium), "included_in_every_total": True} if premium
                                    is not None else {"included_in_every_total": False, "why": "the goods value is "
                                    "not in EUR or a term is missing: ask, never compute it yourself"})
-        pr = d.get("portal_retry") or {}
-        left = Forwarder.PORTAL_RETRY[1] - (time.time() - pr.get("since", 0))
-        if pr.get("names") and left > 0:  # the rate API turned them away a moment ago: tried again every 20 s
-            result["portal_retrying"] = {"airlines": pr["names"], "seconds_left": int(left),
-                                         "why": "the rate API answers 503 for them right now; in the night outage it "
-                                                "came back within 80-360 s, and the teams that waited won those rounds"}
         pm = d.get("portal_missing") or {}
         if pm.get("airlines"):  # their rates are on 5U's portal page, for people who pass its check
             result["portal_page"] = {
                 "airlines": [f"{a['name']} ({a.get('code')})" for a in pm["airlines"]],
                 "person_at_desk": store.kv_get("operator_on") == "1",
-                "how": "with a person at the desk: browser open (5U's portal page), fill the form for the airline "
-                       "that matters most for this request, ask_person kind page; its price then joins these "
-                       "options. Without one: wait while portal_retrying lists it, then quote with what you have"}
+                "how": "with a person at the desk: now, while the carriers answer, browser open (5U's portal "
+                       "page), fill the form for the airline that matters most for this request, ask_person kind "
+                       "page; its price then joins these options. Without one: quote with what you have"}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]
@@ -938,7 +933,11 @@ def remembered_offer(a: dict, o: str, d: str, billed: Decimal, breaks: list | No
                                               f"fresh rate when the portal answers"})
 
 
-OPERATOR_WAIT = 95  # seconds after the customer's mail a person may take to read 5U's portal page (quote < 120 s)
+# Seconds after the customer's mail a person on 5U's portal page may take: the teams that won the outage rounds
+# (93-100) booked the turned-away airline 83-358 s after the request, people on the page. A right quote late beats
+# a fast wrong one (accuracy 45, and x3 to x10 when few teams get it; time 15, zero at 6 minutes); what is left
+# after it is for the agent to write the quote before the request closes at 360 s (round 94, 499 s: out of time).
+OPERATOR_WAIT = 290
 
 
 def read_portal_page(text: str) -> dict:

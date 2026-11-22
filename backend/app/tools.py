@@ -96,8 +96,7 @@ TOOLS = [
        "each preference. Pass the shipment as the customer described it, units as written. With shipment null it "
        "only waits for the replies still missing and returns the options again (or, when there is nothing to "
        "price, what the carriers answered). Carriers answer in 15-60 s (live, "
-       "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. An "
-       "airline the rate API turned away (portal_retrying) is tried again for about 4 minutes and is worth waiting for. "
+       "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. "
        "wait_seconds is how long to wait at most: it returns as soon as everyone answered.",
        {"shipment": nullable(SHIPMENT),
         "preference": {"type": "string", "enum": ["cheapest", "fastest", "unspecified"]},
@@ -141,8 +140,9 @@ TOOLS = [
        "Interrupt the team for what only a person can do, when one is at the desk (operator mode): an alarm rings and "
        "this deal opens in front of them. kind page: they act on this deal's browser page (pass a check, type the "
        "key, send); it waits for the page to show a rate and adds it to this deal's prices for `airline`. kind "
-       "answer: they answer `note` in words (a decision, a fact you cannot get), and you get their answer. Waits up to "
-       "wait_seconds (the quote is due within 2 minutes of the request). Nobody is asked when operator mode is off.",
+       "answer: they answer `note` in words (a decision, a fact you cannot get), and you get their answer. Returns as "
+       "soon as they are done; waits up to wait_seconds, and on the page, before the quote, as long as the round "
+       "still allows (a person needs minutes there). Nobody is asked when operator mode is off.",
        {"kind": {"type": "string", "enum": ["page", "answer"]}, "note": {"type": "string"}, "airline": S,
         "wait_seconds": {"type": "number"}}),
     fn("crm",
@@ -404,8 +404,9 @@ def ask_person(ctx: Ctx, kind: str, note: str, airline: str | None = None, wait_
         return {"error": "nobody is at the desk (operator mode off): go on without a person"}
     d = store.get(deal)["data"]
     left = float(wait_seconds or 60)
-    if ctx.task == "customer" and not d.get("quote"):  # a quote not yet sent is due within 2 minutes
-        left = min(left, OPERATOR_WAIT - (_since(d.get("received_at")) or 0))
+    if ctx.task == "customer" and not d.get("quote"):  # before the quote, the person gets the round's time
+        remaining = OPERATOR_WAIT - (_since(d.get("received_at")) or 0)  # on the page they need minutes, not seconds
+        left = remaining if kind == "page" else min(left, remaining)  # (rounds 93-100); it returns when they are done
     if left <= 5:
         return {"error": "no time left for a person: go on with what you have"}
     since = time.time()

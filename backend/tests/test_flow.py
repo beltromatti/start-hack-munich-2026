@@ -1005,19 +1005,6 @@ def test_a_portal_outage_is_retried_while_the_carriers_are_awaited(monkeypatch):
     assert not store.get(ctx.deal_id)["data"]["portal_retry"]["names"]
 
 
-def test_an_airline_the_rate_api_turned_away_is_waited_for_minutes_not_seconds():
-    """Rounds 93-100: one airline per lane answered 503, always the one the answer needed; the winning teams booked it
-    83-358 s after the request, we stopped trying after 20 s. It is now awaited until about 230 s after the ask,
-    and dropped after, so the quote still goes out before the request closes at 6 minutes."""
-    import time
-    from app.forwarder import Forwarder, waiting_for
-    pr = lambda age: {"portal_retry": {"names": ["Borealis Freight Airways"], "since": time.time() - age}}
-    assert "portal: Borealis Freight Airways" in waiting_for(pr(100))
-    assert "portal: Borealis Freight Airways" in waiting_for(pr(200))
-    assert not waiting_for(pr(Forwarder.PORTAL_RETRY[1] + 5))
-    assert Forwarder.PORTAL_RETRY[1] + 30 < 360
-
-
 def test_a_mail_goes_to_several_people_of_the_thread_and_never_outside_it():
     """A customs broker joins a customer's thread (5U's CEO: 'a customs broker joining a thread halfway'): a revised
     offer goes to the customer and the broker, one mail each (5U's mail has one recipient); nobody outside the
@@ -1372,7 +1359,8 @@ def test_a_change_in_how_5u_scores_is_logged_once():
 
 def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     """Rounds 93-98: the rate API answered 503 for some airlines; 5U's portal page still shows them, to people who
-    pass its check. With operator mode on, the agent waits for a person's price (up to 80 s after the mail); the
+    pass its check. With operator mode on, the agent hears it at once and the person gets minutes (people took
+    83-358 s in those rounds); the
     price joins the offers like a portal price, and every total is still computed by code."""
     from decimal import Decimal
     from app import tools
@@ -1391,10 +1379,14 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
             "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
             "lots": [{"pieces": 1, "weight": q(320, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}],
             "insurance": None, "extra_charges": []}
-    first = tools.get_offers(ctx, ship, "fastest", 0)
+    import time
+    t0 = time.time()
+    first = tools.get_offers(ctx, ship, "fastest", 60)  # with a person at the desk it does not wait for carriers:
+    assert time.time() - t0 < 10  # the agent brings the person in at once (rounds 93-100: people took 83-358 s)
     d = store.get(ctx.deal_id)["data"]
     missing = [a["name"] for a in d["portal_missing"]["airlines"]]
     assert missing and first["portal_page"]["person_at_desk"]  # the agent is told, and drives the page itself
+    assert d["portal_missing"]["shown"]  # only once: the next get_offers waits for the carriers as usual
     assert not any(x.startswith("person:") for x in waiting_for(d))  # get_offers does not block on a person
     code = d["portal_missing"]["airlines"][0]["code"]
     out = add_portal_page_rate(ctx.deal_id, f"{missing[0]} ({code})", "1696,00", 1, "R-page1")  # as the agent says it
@@ -1403,6 +1395,8 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     opts = tools.get_offers(ctx, None, "fastest", 0)["options"]
     page = next(o for o in opts if o["airline"] == missing[0])
     assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
+    from app.forwarder import OPERATOR_WAIT
+    assert 200 <= OPERATOR_WAIT <= 300  # minutes for the person, and the quote still inside the 6-minute close
     store.kv_set("operator_on", "0")
     assert "operator mode off" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
 
