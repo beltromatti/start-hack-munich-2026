@@ -217,6 +217,10 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   offer accepted in a new mail is booked on the deal that holds it (`book` with its `deal_id`, the customer's own
   deals only). A shipment that starts outside Germany (an import) is named out of our service by `get_offers`,
   so the agent says so instead of asking for a German airport (Sam's probe, Sun 00:30).
+- **What the customer adds to the price is priced by code too.** Cargo insurance on their terms (round 91: value,
+  share insured, premium rate) is a field of the shipment, and get_offers adds the premium to every total; several
+  shipments in one mail are several quotes, each option carrying its own shipment, each booking its own reference
+  (rounds 89-90).
 - **Time:** every accepted quote inside 2 minutes took the full 15; speed beyond that is not worth accuracy.
 - **Not every mail is a customer.** 5U sends traps: a "CEO" asking for the API keys (refused: the agent holds no
   secret to give), a sales pitch (no reply). Judging them is the agent's job; what a mail can make us do is bounded

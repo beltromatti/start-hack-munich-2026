@@ -250,3 +250,7 @@ to whole days by 5U.
   minutes (each automatic answer woke the session, which wrote again). Since 00:04 `mail_carrier` sends at most
   two mails to one carrier per deal in ten minutes. Round 90 (RUH and GRU in one mail, book RUH now) booked with
   the right route and weight under SM-26221.
+- Cargo insurance in the all-in price (round 91, Sun 00:07): "goods value 22000 EUR, insured at 110 % of that value,
+  premium rate 0.40 %" (96.80 EUR). We had no way to price it: quoted 927.95 without it, saying so. Since 00:08
+  the shipment carries `insurance` and get_offers adds the premium to every total by code (checked with the real
+  model on the fake 5U: "858.52 EUR all-in, including cargo insurance").
