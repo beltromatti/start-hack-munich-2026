@@ -28,7 +28,8 @@ export function Voice({ deals }: { deals: DealRow[] }) {
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState("");
-  const [eleven, setEleven] = useState(false);
+  const [eleven, setEleven] = useState(false); // the desk speaks with ElevenLabs
+  const [ears, setEars] = useState(false);     // the backend transcribes (llm.transcribe), else the browser listens
   const { seen } = useKnowledge(deals);
   const orb = useRef<HTMLSpanElement>(null);
   const level = useRef(0);            // 0..1, what the orb breathes with
@@ -49,7 +50,7 @@ export function Voice({ deals }: { deals: DealRow[] }) {
       add("meta", { name: "theme-color", content: "#eef2e8" })];
     const vp = document.querySelector("meta[name=viewport]"), was = vp?.getAttribute("content") ?? "";
     vp?.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover");
-    fetch("/api/voice").then((r) => r.json()).then((j: { voice: boolean }) => setEleven(!!j.voice)).catch(() => setEleven(false));
+    fetch("/api/voice").then((r) => r.json()).then((j: { voice: boolean; hear?: boolean }) => { setEleven(!!j.voice); setEars(!!j.hear); }).catch(() => setEleven(false));
     return () => { els.forEach((e) => e.remove()); vp?.setAttribute("content", was); };
   }, []);
 
@@ -104,7 +105,7 @@ export function Voice({ deals }: { deals: DealRow[] }) {
   const listen = async () => {
     stopAll(); setHeard(""); setNote(""); setTyping(false); setStep("listening");
     const back = () => setStep(ansRef.current?.act ? "confirm" : "idle");
-    if (eleven && navigator.mediaDevices?.getUserMedia && "MediaRecorder" in window) {
+    if (ears && navigator.mediaDevices?.getUserMedia && "MediaRecorder" in window) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         listenTo(ctx().createMediaStreamSource(stream));

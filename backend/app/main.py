@@ -289,7 +289,7 @@ def ask(payload: dict) -> dict:
 
 @app.get("/api/voice")
 def voice_status() -> dict:
-    """Whether the voice desk speaks and hears with ElevenLabs here (else the page uses the browser's own voice)."""
+    """Whether the voice desk speaks (ElevenLabs) and hears (llm.transcribe) here; else the browser's own voice."""
     from . import voice
     return voice.status()
 
@@ -309,13 +309,14 @@ def voice_speak(payload: dict):
 
 @app.post("/api/voice/hear")
 async def voice_hear(request: Request) -> dict:
-    """A recording (the raw body, its type in Content-Type) as words. 503 without a key: the browser listens."""
+    """A recording (the raw body, its type in Content-Type) as words (llm.transcribe). 503 without a key: the
+    browser listens."""
     from . import voice
     audio = await request.body()
     kind = request.headers.get("content-type", "audio/webm").split(";")[0]
     ext = {"audio/mp4": "m4a", "audio/aac": "aac", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/ogg": "ogg"}.get(kind, "webm")
     try:
-        return voice.hear(audio, "speech." + ext, kind)
+        return voice.hear(audio, "speech." + ext)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:

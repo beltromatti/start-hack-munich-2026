@@ -1,5 +1,4 @@
 """The voice desk: without a key the page falls back to the browser, with one the calls go to ElevenLabs as asked."""
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -13,25 +12,32 @@ def fresh(monkeypatch):
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
 
 
-def test_no_key_means_the_browser_speaks():
+def test_no_key_means_the_browser_speaks(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     c = TestClient(app)
-    assert c.get("/api/voice").json() == {"voice": False}
+    assert c.get("/api/voice").json() == {"voice": False, "hear": False}
     assert c.post("/api/voice/speak", json={"text": "Hello"}).status_code == 503
-    assert c.post("/api/voice/hear", content=b"abc", headers={"content-type": "audio/webm"}).status_code == 503
     assert c.post("/api/voice/speak", json={"text": "  "}).status_code == 400
 
 
-def test_hear_sends_the_recording_with_the_key(monkeypatch):
-    monkeypatch.setenv("ELEVENLABS_API_KEY", "k")
+def test_hear_uses_the_one_transcriber(monkeypatch):
+    """Speech to text has one implementation, llm.transcribe (OpenAI direct, never the scored gateway)."""
     seen = {}
 
-    def post(url, headers, timeout, data, files):
-        seen.update(url=url, key=headers["xi-api-key"], model=data["model_id"], file=files["file"])
-        return httpx.Response(200, json={"text": " The Hartmann flight is  late ", "language_code": "eng"})
-    monkeypatch.setattr(voice.httpx, "post", post)
+    def transcribe(raw, filename, run_id=None):
+        seen.update(raw=raw, filename=filename)
+        return " The Hartmann flight is  late "
+    monkeypatch.setattr(voice.llm, "transcribe", transcribe)
     out = TestClient(app).post("/api/voice/hear", content=b"audio", headers={"content-type": "audio/mp4"}).json()
-    assert out == {"text": "The Hartmann flight is late", "language": "eng"}
-    assert seen["url"].endswith("/speech-to-text") and seen["key"] == "k" and seen["file"][0] == "speech.m4a"
+    assert out == {"text": "The Hartmann flight is late"}
+    assert seen == {"raw": b"audio", "filename": "speech.m4a"}
+
+
+def test_hear_without_a_transcriber_lets_the_browser_listen(monkeypatch):
+    def transcribe(raw, filename, run_id=None):
+        raise RuntimeError("no OpenAI key for transcription")
+    monkeypatch.setattr(voice.llm, "transcribe", transcribe)
+    assert TestClient(app).post("/api/voice/hear", content=b"x", headers={"content-type": "audio/webm"}).status_code == 503
 
 
 def test_the_brake_stops_a_runaway_page(monkeypatch):

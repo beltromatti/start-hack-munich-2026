@@ -1,14 +1,17 @@
 """The voice desk: a person speaks to the desk on a phone and hears its answer.
 
-Thin over ElevenLabs with our own key (`ELEVENLABS_API_KEY`), never the 5U gateway: it is our tool, not part of a
-quote. Hearing turns a recording into words (Scribe). Speaking turns the desk's checked answer into audio (Flash, the
-low latency model). What the words mean is decided where it always is: `/api/ask` answers and proposes, and a
-person's yes passes it to Giulia's session. No key: the page uses the browser's own voice.
+Never the 5U gateway: it is our tool, not part of a quote. Speaking turns the desk's checked answer into audio with
+ElevenLabs (Flash, the low latency model, our own `ELEVENLABS_API_KEY`). Hearing uses the one transcriber we already
+have, `llm.transcribe` (OpenAI direct, the same call that reads customers' voice messages), so there is one
+implementation of speech to text. What the words mean is decided where it always is: `/api/ask` answers and
+proposes, and a person's yes passes it to Giulia's session. A missing key: the page uses the browser's own voice.
 """
 import os
 import time
 
 import httpx
+
+from . import llm
 
 API = "https://api.elevenlabs.io/v1"
 # Alice: a clear, calm British voice. Any other voice from the ElevenLabs library through ELEVENLABS_VOICE_ID.
@@ -29,7 +32,7 @@ def _brake() -> None:
 
 
 def status() -> dict:
-    return {"voice": bool(key())}
+    return {"voice": bool(key()), "hear": bool(os.getenv("OPENAI_API_KEY", "").strip())}
 
 
 def speak(text: str):
@@ -63,19 +66,11 @@ def speak(text: str):
     return chunks()
 
 
-def hear(audio: bytes, filename: str = "speech.webm", content_type: str = "audio/webm") -> dict:
-    """A recording as words, with the language ElevenLabs heard."""
+def hear(audio: bytes, filename: str = "speech.webm") -> dict:
+    """A recording as words, through the project's one transcriber (`llm.transcribe`, never the gateway)."""
     if not audio:
         raise ValueError("no audio")
     if len(audio) > 8_000_000:
         raise ValueError("recording too long")
-    if not key():
-        raise RuntimeError("no ElevenLabs key")
     _brake()
-    r = httpx.post(f"{API}/speech-to-text", headers={"xi-api-key": key()}, timeout=40,
-                   data={"model_id": os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1"), "tag_audio_events": "false"},
-                   files={"file": (filename, audio, content_type or "application/octet-stream")})
-    if r.status_code >= 400:
-        raise RuntimeError(f"ElevenLabs {r.status_code}: {r.text[:200]}")
-    j = r.json()
-    return {"text": " ".join(str(j.get("text") or "").split())[:600], "language": j.get("language_code")}
+    return {"text": " ".join(llm.transcribe(audio, filename).split())[:600]}
