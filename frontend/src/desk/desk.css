@@ -252,6 +252,19 @@ button.dk-aiw { width: 100%; text-align: left; border-radius: var(--r-ctl); padd
 .dk-nd { background: rgba(255,255,255,.7) radial-gradient(rgba(0,0,0,.09) 1px, transparent 1.2px) 0 0 / 18px 18px; border-color: rgba(0,0,0,.06); }
 .dk-np { animation: none; } .dk-np > * { animation: dk-arrive .4s var(--ease) both; }
 @media (prefers-reduced-motion: reduce) { .dk-lk { animation: none; stroke-dashoffset: 0; } }
+/* one customer at a glance: the map, and beside it what is open and what stands out */
+.dk-cm { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: stretch; } .dk-cside { display: grid; gap: 16px; align-content: start; }
+.dk-cmbox { padding: 6px; display: grid; align-items: center; background: #fff radial-gradient(rgba(0,0,0,.055) 1px, transparent 1.2px) 0 0 / 20px 20px; } .dk-cmfacts { display: none; }
+.dk-cmap { display: block; width: 100%; height: auto; } .dk-cmap .orbit { fill: none; stroke: rgba(0,0,0,.09); stroke-dasharray: 2 7; stroke-linecap: round; }
+.dk-cmap .l { fill: none; stroke: rgba(0,0,0,.2); stroke-width: 1.4; stroke-dasharray: 1; stroke-dashoffset: 1; animation: dk-draw 1.1s var(--ease) .2s forwards; } .dk-cmap .l.thin { stroke: rgba(0,0,0,.14); stroke-width: 1.1; animation-delay: .55s; }
+.dk-cmap .hub { fill: #fff; stroke: rgba(0,0,0,.05); } .dk-cmap .face { fill: #efe9dc; } .dk-cmap .ini { font-size: 38px; font-weight: 600; fill: var(--d-ink); }
+.dk-cmap .ht { font-size: 14px; font-weight: 600; fill: var(--d-ink); } .dk-cmap .hs { font-size: 11.5px; fill: var(--d-muted); } .dk-cmap .dk-ic { color: var(--d-ink2); }
+.dk-cmap .leaf { fill: #fff; stroke: rgba(0,0,0,.08); } .dk-cmap .lt { font-size: 12.5px; fill: var(--d-ink2); }
+.dk-cmap .h { animation: dk-fade .7s ease both; transition: opacity .35s; } .dk-cmap:has(.h:hover) .h:not(:hover) { opacity: .32; } .dk-cmap .h:hover .hub { stroke: var(--d-ink); } .dk-cmap .h:hover .l { stroke: var(--d-ink); }
+.dk-insight { padding-bottom: 16px; } .dk-insight h2 { display: flex; gap: 8px; align-items: center; } .dk-insight p { margin: 0; padding: 0 18px 10px; font-size: 14.5px; line-height: 1.5; } .dk-insight small { display: block; padding: 0 18px 12px; color: var(--d-muted); font-size: 12.5px; } .dk-insight .dk-btn { margin-left: 18px; }
+@media (max-width: 1100px) { .dk-cm { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .dk-cmap { display: none; } .dk-cmfacts { display: grid; } .dk-cmbox { background: #fff; padding: 0; } }
+@media (prefers-reduced-motion: reduce) { .dk-cmap .l { animation: none; stroke-dashoffset: 0; } .dk-cmap .h { animation: none; } }
 /* the assistant's analysis: a correlation matrix */
 .dk-mx { margin: 14px 0 6px; background: #fff; border-radius: var(--r-card); box-shadow: 0 0 0 1px var(--d-line), 0 20px 40px -30px rgba(30,40,30,.35); padding: 20px; max-width: 780px; animation: dk-arrive .6s var(--ease) both; }
 .dk-mx-grid { display: grid; gap: 3px; } .dk-mx-grid .rl { font-size: 13px; color: var(--d-ink2); display: flex; align-items: center; padding-right: 10px; line-height: 1.2; } .dk-mx-grid .cl { font-size: 11.5px; color: var(--d-muted); text-align: center; padding-top: 7px; line-height: 1.25; }

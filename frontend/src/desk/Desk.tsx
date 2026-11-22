@@ -10,6 +10,7 @@ import { CarrierFacts, Seen, carrierFacts, context, customerExtra, expect, useKn
 import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
+import { CustomerMap, insights, open as openWith } from "./CustomerMap";
 import { Jobs, Job } from "./Jobs";
 import { MatrixChart } from "./Matrix";
 import { Numbers } from "./Numbers";
@@ -335,11 +336,12 @@ function Customers({ deals, pick }: { deals: DealRow[]; pick: (email: string) =>
   );
 }
 
-function CustomerPage({ c, seen, open, back, teach }: { c: Cust; seen: Seen[]; open: (id: string) => void; back: () => void; teach: (deal: string, text: string) => Promise<string> }) {
+function CustomerPage({ c, seen, open, back, teach, ask }: { c: Cust; seen: Seen[]; open: (id: string) => void; back: () => void; teach: (deal: string, text: string) => Promise<string>; ask: (q: string) => void }) {
   const [told, setTold] = useState("");
   const add = (text: string) => { if (c.deals[0]) teach(c.deals[0].id, "About this customer, to remember: " + text).then(setTold); };
   const latest = c.deals[0], facts = [...known(c), ...customerExtra(c, seen)];
   const notes = [...new Set(seen.filter((x) => x.customer === c.email).flatMap((x) => x.notes))];
+  const stands = insights(c, seen), waiting = openWith(c);
   return (
     <>
       <div className="dk-prof">
@@ -347,7 +349,28 @@ function CustomerPage({ c, seen, open, back, teach }: { c: Cust; seen: Seen[]; o
         <div><h2>{c.name}</h2><small>{c.email} · {c.deals.length} {c.deals.length === 1 ? "request" : "requests"}, the last one {ago(c.last)}</small></div>
         <div className="dk-rt"><button className="dk-btn" onClick={back}>All customers</button>{latest ? <button className="dk-btn k" onClick={() => open(latest.id)}>{c.needs ? "Read the flagged shipment" : "Open latest shipment"}</button> : null}</div>
       </div>
-      <div className="dk-three">
+      <div className="dk-cm">
+        <section className="dk-box dk-cmbox"><CustomerMap c={c} seen={seen} /><dl className="dk-kv pad dk-cmfacts">{facts.map((f) => <div key={f[0]}><dt>{f[0]}</dt><dd>{f[1]}</dd></div>)}</dl></section>
+        <aside className="dk-cside">
+          <section className="dk-box"><div className="dk-bh"><h2>Open with them</h2></div>
+            {waiting.map((d) => { const g = groupOf(d); return (
+              <button key={d.id} className="dk-it" onClick={() => open(d.id)}>
+                <span className={"dk-sq " + (g === "needs" ? "a" : g === "working" ? "a" : "b")}><Icon n={g === "needs" ? "flag" : g === "working" ? "loader" : "send"} size={15} /></span>
+                <span style={{ minWidth: 0 }}><b>{lane(d) || LABEL[g]}</b><small>{g === "needs" ? "Flagged by Giulia" : g === "working" ? "In progress" : "Quote out, " + (d.quote ? money(d.quote) : "")}</small></span>
+                <Icon n="chevronRight" size={15} />
+              </button>
+            ); })}
+            {!waiting.length ? <p className="dk-bs">Nothing is open. Every request has an answer.</p> : null}
+          </section>
+          <section className="dk-box dk-insight"><div className="dk-bh"><h2><Icon n="brain" size={16} />Insight</h2></div>
+            {stands.map((s) => <p key={s}>{s}</p>)}
+            {!stands.length ? <p>Too few requests to say what stands out yet.</p> : null}
+            <small>Counted from their {c.deals.length === 1 ? "one request" : c.deals.length + " requests"}.</small>
+            <button className="dk-btn" onClick={() => ask("What should I know about " + c.name + " before I talk to them?")}>Ask the desk about them</button>
+          </section>
+        </aside>
+      </div>
+      <div className="dk-two even">
         <section className="dk-box"><div className="dk-bh"><h2>History</h2></div>
           <ol className="dk-tl pad">
             {c.deals.slice(0, 6).map((d) => {
@@ -365,7 +388,6 @@ function CustomerPage({ c, seen, open, back, teach }: { c: Cust; seen: Seen[]; o
             })}
           </ol>
         </section>
-        <section className="dk-box"><div className="dk-bh"><h2>What we know</h2></div><dl className="dk-kv pad">{facts.map((f) => <div key={f[0]}><dt>{f[0]}</dt><dd>{f[1]}</dd></div>)}</dl></section>
         <section className="dk-box"><div className="dk-bh"><h2>Remembered</h2></div>
           {notes.length ? <ul className="dk-notes">{notes.map((n) => <li key={n}><Icon n="brain" size={14} />{n}</li>)}</ul> : <p className="dk-bs">Nothing yet. Tell her what to keep in mind for this customer.</p>}
           {CAN.tell ? <div className="dk-tell in"><Composer line hint="Teach her something" send={add} /></div> : null}
@@ -657,7 +679,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "Giulia", eff: "Efficiency", jobs: "Jobs" };
   const hour = new Date().getHours(), greet = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
   const nv = (p: Page, icon: string, label: string, count?: number) => (
-    <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => go(p)}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
+    <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => { go(p); setCust(null); }}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
   );
   const tell = (a: Act): Promise<string> => post("/api/sessions/" + a.deal.replace(/^deal-/, "session-") + "/message", { text: a.text, who: ME }).then(() => { reload(); return "Passed on to Giulia."; });
   const send = (q: string) => {
@@ -738,7 +760,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
             <div className={"dk-cont" + (page === "ask" ? " ask" : "")} data-soft key={page + (cust ?? "") + who}>
               {page === "home" ? <Home role={me.role} deals={deals} list={list} seen={seen} open={show} pick={(email) => { setPage("cust"); setCust(email); }} seenIds={seenIds} send={send} /> : null}
               {page === "ship" ? <Shipments deals={deals} open={show} /> : null}
-              {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} /> : <Customers deals={deals} pick={setCust} />) : null}
+              {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} ask={send} /> : <Customers deals={deals} pick={setCust} />) : null}
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} /></> : null}
               {page === "help" ? <Help /> : null}
               {page === "eff" ? <Numbers deals={deals} board={board} /> : null}
