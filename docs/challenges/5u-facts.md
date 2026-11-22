@@ -289,3 +289,15 @@ Regensburg". We priced from Regensburg; the tracking question named 86168 (Augsb
 best: accuracy 24.84 of 45. The customer's sites change every round (none in Augsburg before), so it was missing
 information: ask (round 15 taught the same). Price match again in round 132 ("9 percent less"): answered, booked on
 the go-ahead.
+
+**The deadline scored two ways (round 179, Sun 09:02, factor 1.5, 3 of 14 accepted):** "ready for pickup on
+2026-11-27 ... need to be at ORD by 2026-11-29 at the latest. As long as the shipment arrives by then, price is what
+will decide". Portal CGN-ORD: Xenon 3 days (arrives 30 Nov), Aurelia and Ibisair 2, Meridian 1. We quoted Aurelia,
+the cheapest arriving 29 Nov (1074.69 EUR with the 50/50 trucker), and said Xenon is cheaper but a day late:
+rejected `too_high`. The three accepted teams all booked Xenon (public bookings 09:03:55-09:04:37). The same rule
+scored the other way twice: round 170 (08:07, ready 25 Nov, deadline 29 Nov, Wayzata 5 days excluded, Borealis
+quoted at 15 % more, accuracy 45, 13 of 14 accepted) and round 118 (Nova Atlas 7 days and Aurelia 6 days excluded,
+Fjordline quoted, accuracy 45). Arrival = ready date + transit days excludes Xenon in round 179 exactly as it
+excluded Wayzata in round 170; no other reading fits both. Nothing changed in the agent: raised with 5U as a scoring
+anomaly. The trucker is not the cause: in 60+ pickup rounds the 50/50 trucker scored 45 with gaps to the cheapest
+trucker up to 12 %, deadline round 84 included.
