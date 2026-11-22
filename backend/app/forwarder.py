@@ -789,11 +789,14 @@ class Forwarder:
         # is the first one to read. On the board (read Sun 00:52): rules.few_winners = {"factors": ["5", "3", "2"],
         # "from_round": 84} and a `factor` on each public round, null when the round pays no multiple.
         mine = {str(r.get("round_no")): r for r in reqs}
+        # settled: the public round says `status: closed` (our requests carry no such field, 5u-facts: round_no,
+        # sent_at, answered_at, verdict, reason, booked, points)
+        closed = {str(r.get("round_no")) for r in rounds if str(r.get("status") or "").lower() == "closed"}
         multiplied = []
         for r in rounds + reqs:
             n = str(r.get("round_no"))
-            if not mine.get(n, {}).get("closed"):  # said once, when the round is settled: its multiple and our
-                continue                             # verdict are final then, not while teams are still answering
+            if n not in mine or not (n in closed or mine[n].get("closed")):  # said once, when the round is settled:
+                continue                  # its multiple and our verdict are final then, not while teams still answer
             for k, v in r.items():
                 if (k.lower() == "factor" or "multipl" in k.lower()) and v not in (None, 1, 1.0, "1", "1.0", "x1") \
                         and n not in now["multipliers"]:

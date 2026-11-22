@@ -1346,5 +1346,12 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     before = len(said())
     f.watch_scoring({"requests": [r90, r89]}, real)
     assert [s for s in said()][before:] == ["scoring: round 90 pays a multiple (3), 2 teams accepted; ours: rejected no_pdf_offer"]
+    # our requests as the board really gives them carry no `closed`: the public round's status settles it
+    store.kv_set("board_scoring", "null")
+    real["rounds"].append({"round_no": 91, "status": "open", "answered": 3, "accepted": 1, "factor": "5"})
+    r90, r91 = {k: v for k, v in r90.items() if k != "closed"}, {"round_no": 91, "verdict": "pending", "points": {}}
+    before = len(said())
+    f.watch_scoring({"requests": [r91, r90, r89]}, real)
+    assert [s for s in said()][before:] == ["scoring: round 90 pays a multiple (3), 2 teams accepted; ours: rejected no_pdf_offer"]
     # a board in a shape nobody foresaw is compared as far as it goes and never raises into the watcher
     f.watch_scoring({"requests": ["row", r84], "frozen_at": None}, {"rules": "changed", "rounds": {"84": {}}, "ranking": None})
