@@ -209,3 +209,21 @@ def insurance_premium(ins: dict | None) -> Decimal | None:
     if ins.get("minimum_premium") not in (None, ""):
         premium = max(premium, Decimal(str(ins["minimum_premium"])))
     return money(premium)
+
+
+def extra_charges(charges: list | None, freight: Decimal, chargeable_kg: Decimal) -> tuple[Decimal, list[str]]:
+    """Charges the customer told us to include, on the amounts or rates they gave (the same kind as round 91's
+    insurance): a fixed amount, an amount per chargeable kg, or a percent of the freight total. In EUR only: a charge
+    in another currency is not converted (named back as not added), never guessed."""
+    total, skipped = Decimal(0), []
+    for c in charges or []:
+        if c.get("amount") in (None, ""):
+            skipped.append(f"{c.get('label')}: no amount")
+            continue
+        amount, basis = Decimal(str(c["amount"])), c.get("basis")
+        if basis != "percent_of_freight" and (c.get("currency") or "EUR").upper() not in ("EUR", "€", "EURO", "EUROS"):
+            skipped.append(f"{c.get('label')}: in {c.get('currency')}, not converted")
+            continue
+        total += (amount if basis == "per_shipment" else amount * chargeable_kg if basis == "per_kg"
+                  else freight * amount / 100)
+    return money(total), skipped

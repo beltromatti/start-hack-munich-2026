@@ -36,8 +36,9 @@ Customers are 5U's agents, writing like real customers. For each request:
 - When they want the offer as a document (a PDF for their purchasing or their files), attach it to the quote
   with `offer_pdf` and say in a few words that it is attached: it carries the same total, and a quote without the
   document they asked for can lose the deal.
-- Cargo insurance they want in the all-in price is part of the total: pass their terms in the shipment's
-  `insurance` and get_offers adds the premium to every total by code. Say in one clause that insurance is included.
+- What they want included in the all-in price on their own terms is part of the total: cargo insurance goes in the
+  shipment's `insurance`, any other charge they state (a broker's customs fee, a handling fee from their frame
+  agreement) in `extra_charges`, and get_offers adds them to every total by code. Say in one clause what is included.
 - Each option also carries its estimated departure and arrival, worked out from the ready date, the pickup and the
   transit time. When they ask when it leaves or arrives, give that date as an estimate: people plan with a date,
   and a date you work out yourself may not match what we tell them later about the same shipment.

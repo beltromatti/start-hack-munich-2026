@@ -920,3 +920,33 @@ def test_cargo_insurance_on_the_customers_terms_is_in_every_total():
     by = {o["airline"]: Decimal(o["total"].split()[0]) for o in plain["options"]}
     for o in insured["options"]:
         assert Decimal(o["total"].split()[0]) - by[o["airline"]] == Decimal("96.80")
+
+
+def test_charges_the_customer_states_are_added_by_code():
+    """The kind of round 91, generalised: a charge the customer tells us to include on their own amount or rate
+    (a broker's fee, a handling fee per kg or in percent) is added by code to every total, never by the model."""
+    from decimal import Decimal
+    from app import pricing, tools
+    fee = lambda a, b, cur="EUR": {"label": "x", "amount": a, "currency": cur, "basis": b}
+    assert pricing.extra_charges([fee(85, "per_shipment"), fee(0.10, "per_kg"), fee(2, "percent_of_freight", None)],
+                                 Decimal("1000"), Decimal("200")) == (Decimal("125.00"), [])
+    total, skipped = pricing.extra_charges([fee(50, "per_shipment", "USD")], Decimal("1000"), Decimal("200"))
+    assert total == 0 and skipped
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("sara@lind.example", "Quote", "176 kg FRA to ORD, with our broker's fee")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-29", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(176, "kg"), "volume": q(0.5, "cbm"), "dimensions": None}],
+            "insurance": None, "extra_charges": []}
+    plain = tools.get_offers(ctx, ship, "fastest", 5)
+    with_fee = tools.get_offers(ctx, {**ship, "extra_charges": [fee(85, "per_shipment")]}, "fastest", 0)
+    by = {o["airline"]: Decimal(o["total"].split()[0]) for o in plain["options"]}
+    assert with_fee["extra_charges"]["included_in_every_total"] == ["x"]
+    for o in with_fee["options"]:
+        assert Decimal(o["total"].split()[0]) - by[o["airline"]] == Decimal("85.00")

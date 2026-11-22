@@ -62,6 +62,16 @@ SHIPMENT = obj({
         "minimum_premium": {**N, "description": "a minimum premium if they name one, else null"}},
         "cargo insurance the customer wants in the all-in price, on the terms they give: our code adds the premium "
         "to every option's total. null when they do not ask for insurance")),
+    "extra_charges": {"type": "array", "description": (
+        "other charges the customer tells us to include in the all-in price, with the amount or rate they give "
+        "(their broker's customs fee, a handling fee in their frame agreement): our code adds each to every option's "
+        "total. Empty when they name none; never a charge they did not state"),
+        "items": obj({"label": {"type": "string"},
+                      "amount": {**N, "description": "the amount or rate as written"},
+                      "currency": {**S, "description": "as written (EUR if they say nothing); null for a percent"},
+                      "basis": {"type": "string", "enum": ["per_shipment", "per_kg", "percent_of_freight"],
+                                "description": "per_kg: per chargeable kg; percent_of_freight: percent of the "
+                                               "all-in freight total before these charges"}})},
 })
 
 
