@@ -950,3 +950,16 @@ def test_charges_the_customer_states_are_added_by_code():
     assert with_fee["extra_charges"]["included_in_every_total"] == ["x"]
     for o in with_fee["options"]:
         assert Decimal(o["total"].split()[0]) - by[o["airline"]] == Decimal("85.00")
+
+
+def test_an_airline_confirming_the_flight_price_of_an_insured_booking_changes_nothing():
+    """Round 92: the all-in total had the pickup and the insurance; the airline confirmed the flight price we booked,
+    and the code took the rest for the pickup alone, called it a lower price and the customer heard 3301.88 instead
+    of 3569.18. The rest of the all-in is everything besides the flight."""
+    from app.forwarder import price_in_airline_mail, confirmation_matches
+    b = {"amount": "3569.18 EUR", "others": "519.68", "pickup": {"total": "252.38"}, "booking_reference": "BK-PSPNO8HE",
+         "via": "portal"}
+    mail = "your booking BK-PSPNO8HE is confirmed.\nPrice: 3049.50 EUR\nStatus: booked and ready to ship"
+    out, facts, changed = price_in_airline_mail(b, mail, True)
+    assert not changed and out["amount"] == "3569.18 EUR" and "3569.18 EUR" in facts
+    assert confirmation_matches(b, mail)

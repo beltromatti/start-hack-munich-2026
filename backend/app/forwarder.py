@@ -401,7 +401,9 @@ class Forwarder:
                    "route": f"{req['origin']}-{req['destination']}", "transit_days": air["days"],
                    "amount": opt["total_text"], "option": option_id, "booked_at": time.time(),
                    "ready_date": req.get("ready_date"), "pickup": opt.get("pickup"), "weight_kg": req["weight_kg"],
-                   "pieces": req.get("pieces"), "rate_id": air.get("rate_id")}
+                   "pieces": req.get("pieces"), "rate_id": air.get("rate_id"),
+                   # everything in the all-in total besides the flight: pickup, insurance, charges they asked for
+                   "others": str(pricing.money(Decimal(str(opt["total"])) - Decimal(str(air["total"]))))}
         if status in (200, 201):
             booking.update(booking_reference=body.get("booking_reference"), status="booked", via="portal",
                            price=body.get("price"), currency=body.get("currency"), note=body.get("note"))
@@ -412,7 +414,7 @@ class Forwarder:
             except Exception:
                 booked_air = None
             if booked_air is not None and pricing.money(booked_air) != pricing.money(Decimal(str(air["total"]))):
-                now = booked_air + Decimal(str((opt.get("pickup") or {}).get("total") or 0))
+                now = booked_air + Decimal(booking["others"])
                 booking.update(amount=pricing.fmt(now), quoted_amount=opt["total_text"],
                                price_changed={"quoted": opt["total_text"], "booked": pricing.fmt(now)})
         elif air.get("email") or kit.world().carrier_by_name(air["carrier"]):  # by mail with the airline
@@ -834,11 +836,15 @@ def clean_reference(ref: str | None) -> str | None:
 
 
 def booked_air(b: dict) -> tuple[Decimal, Decimal] | None:
-    """The flight price we booked and the pickup in the booking's all-in total (an airline's mail prices the
-    flight only)."""
+    """The flight price we booked and the rest of the booking's all-in total (an airline's mail prices the flight
+    only; the rest is the pickup, and insurance or charges the customer asked to include: round 92 told a customer
+    3301.88 instead of 3569.18 because the rest was taken as the pickup alone)."""
     try:
-        pickup = Decimal(str((b.get("pickup") or {}).get("total") or 0))
-        return Decimal(str(b.get("amount", "")).split()[0]) - pickup, pickup
+        if b.get("others") is not None:
+            others = Decimal(str(b["others"]))
+        else:
+            others = Decimal(str((b.get("pickup") or {}).get("total") or 0))
+        return Decimal(str(b.get("amount", "")).split()[0]) - others, others
     except Exception:
         return None
 
@@ -859,7 +865,7 @@ def price_in_airline_mail(b: dict, body: str, confirmation: bool) -> tuple[dict,
     if booked is None:
         return b, "", False
     air, pickup = booked
-    with_pickup = f" (with the pickup, {pricing.fmt(pickup)})" if pickup else ""
+    with_pickup = f" (with the rest of the all-in: pickup, insurance, charges, {pricing.fmt(pickup)})" if pickup else ""
     if air in amounts_in(body):
         return b, (f"Their price, {pricing.fmt(air)}, is the flight price we booked: the customer's all-in total "
                    f"stays {b['amount']}{with_pickup}."), False
