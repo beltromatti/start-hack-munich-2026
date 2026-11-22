@@ -1356,7 +1356,9 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     missing = [a["name"] for a in d["portal_missing"]["airlines"]]
     assert missing and first["portal_page"]["person_at_desk"]  # the agent is told, and drives the page itself
     assert not any(x.startswith("person:") for x in waiting_for(d))  # get_offers does not block on a person
-    out = add_portal_page_rate(ctx.deal_id, missing[0], "1696,00", 1, "R-page1")
+    code = d["portal_missing"]["airlines"][0]["code"]
+    out = add_portal_page_rate(ctx.deal_id, f"{missing[0]} ({code})", "1696,00", 1, "R-page1")  # as the agent says it
+    assert out["offer"]["carrier"] == missing[0]
     assert out["ok"] and out["offer"]["source"] == "portal_page"
     opts = tools.get_offers(ctx, None, "fastest", 0)["options"]
     page = next(o for o in opts if o["airline"] == missing[0])

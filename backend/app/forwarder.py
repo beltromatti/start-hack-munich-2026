@@ -950,9 +950,11 @@ def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate
         return {"error": "no such deal"}
     d = rec["data"]
     pm = d.get("portal_missing") or {}
-    a = next((x for x in pm.get("airlines", []) if x["name"].lower() == airline.strip().lower()
-              or (x.get("code") or "").lower() == airline.strip().lower()), None)
-    name = a["name"] if a else airline.strip()
+    said = airline.strip().lower()  # a name, a code, or both ("Borealis Freight Airways (BX)")
+    a = next((x for x in pm.get("airlines", []) if x["name"].lower() in said
+              or (x.get("code") and re.search(rf"\b{x['code'].lower()}\b", said))), None)
+    known = kit.world().carrier_by_name(re.sub(r"\s*\([A-Z0-9]{2}\)\s*$", "", airline.strip()))
+    name = a["name"] if a else (known.name if known else airline.strip())
     try:
         amount, transit = pricing.money(Decimal(str(total).replace(",", "."))), Decimal(str(days))
         billed = Decimal(str(weight_kg)) if weight_kg not in (None, "") else Decimal(pm.get("weight_kg") or
