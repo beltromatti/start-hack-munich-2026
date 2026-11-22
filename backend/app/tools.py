@@ -126,25 +126,22 @@ TOOLS = [
        "The airline needs no mail. deal_id: null for this thread's deal, else the booking's own deal (crm finds it).",
        {"booking_reference": {"type": "string"}, "deal_id": S}),
     fn("browser",
-       "A browser page for this deal, shared with the team (they see it live in the deal's conversation), on 5U's "
-       "sites only: today 5U's portal page, where the rates of airlines whose rate API answers 503 still are, for "
-       "people who pass its check. action: open (url, or null for the portal page: the visible form by index and "
-       "label, and the text); read (the page now, and a rate if it shows one); fill (fields: [{i, value}] by the "
-       "index the form shows; for the team key pass the value {team_key}: the person types it with a click); press "
-       "(i: a visible button, e.g. a cookie banner's privacy-friendly choice, a popup's close). Pages change their "
-       "fields at every load: read the labels, never assume.",
-       {"action": {"type": "string", "enum": ["open", "read", "fill", "press"]}, "url": S,
-        "fields": {"type": ["array", "null"], "items": obj({"i": {"type": "integer"}, "value": {"type": "string"}})},
-        "i": I}),
-    fn("ask_person",
-       "Interrupt the team for what only a person can do, when one is at the desk (operator mode): an alarm rings and "
-       "this deal opens in front of them. kind page: they act on this deal's browser page (pass a check, type the "
-       "key, send); it waits for the page to show a rate and adds it to this deal's prices for `airline`. kind "
-       "answer: they answer `note` in words (a decision, a fact you cannot get), and you get their answer. Returns as "
-       "soon as they are done; waits up to wait_seconds, and on the page, before the quote, as long as the round "
-       "still allows (a person needs minutes there). Nobody is asked when operator mode is off.",
-       {"kind": {"type": "string", "enum": ["page", "answer"]}, "note": {"type": "string"}, "airline": S,
-        "wait_seconds": {"type": "number"}}),
+       "Your browser on 5U's sites, visible live to the team; no person is needed. open: navigate (url null = portal). "
+       "read: current text, fields with stable i references, and any rate (drawn checks/iframes include a screenshot "
+       "automatically). look: the same plus a screenshot you can "
+       "see (canvas, image checks, iframe controls). act: execute actions in order and return the resulting page. "
+       "Actions: fill (i, value; select option by value/label; {team_key} securely inserts our key); click (i for a "
+       "field/button or x,y in screenshot CSS pixels); press (value is a key e.g. Enter, ControlOrMeta+A); type "
+       "(value, into the focused field); scroll (x,y deltas); wait (ms, at most 3000); reload (fresh page/check). "
+       "Unused action fields are null. Batch the known fields, check answer and submit together: page checks expire "
+       "quickly. Read current labels, options and page errors; pages change. save_rate: read the displayed result "
+       "by code and add it to this deal for airline (name/code), returning fresh priced_options with all-in totals "
+       "and option IDs ready to quote (no extra get_offers wait just to refresh them). close: finish using "
+       "the page. A failed action stops the batch and shows what happened; re-observe before retrying.",
+       {"action": {"type": "string", "enum": ["open", "read", "look", "act", "save_rate", "close"]}, "url": S,
+        "actions": {"type": ["array", "null"], "items": obj({
+            "kind": {"type": "string", "enum": ["fill", "click", "press", "type", "scroll", "wait", "reload"]},
+            "i": I, "value": S, "x": N, "y": N, "ms": I})}, "airline": S}),
     fn("crm",
        "Search our CRM: deals and bookings by booking or rate reference, our reference (SM-...), customer name or "
        "address, company, route, airline, anything. Returns the matching deals with their shipment, quote, booking, "
@@ -375,84 +372,86 @@ def _booking_view(b: dict) -> dict:
 
 
 PORTAL_PAGE = "https://start-hack.5u.ai/portal/ui"
-BROWSER = "http://127.0.0.1:8010"
+BROWSER = settings.browser_base_url
 
 
 def _browser(method: str, path: str, body: dict | None = None) -> dict:
     import httpx
     try:
-        r = httpx.request(method, BROWSER + path, json=body, timeout=30)
+        r = httpx.request(method, BROWSER + path, json=body, timeout=30, trust_env=False)
         return r.json() if r.status_code < 400 else {"error": f"browser {r.status_code}: {r.text[:200]}"}
+    except httpx.TimeoutException:
+        return {"error": "browser request timed out: its outcome is unknown; read the page before repeating any submit"}
     except Exception as e:
         return {"error": f"the shared browser is not running ({e!r})"[:200]}
 
 
-def browser(ctx: Ctx, action: str, url: str | None = None, fields: list | None = None, i: int | None = None) -> dict:
-    """The agent's hands on a page the team sees live. Only 5U's sites (the guarantee); keys stay with the person;
-    a rate the page shows is read by code (read_portal_page), never by the model's arithmetic."""
+def browser(ctx: Ctx, action: str, url: str | None = None, actions: list | None = None,
+            airline: str | None = None, fields: list | None = None, i: int | None = None) -> dict:
+    """One browser tool, one agent. The notification observes work; it never waits for a person."""
     from urllib.parse import urlparse
-    from .forwarder import read_portal_page
+    from .forwarder import read_portal_page, add_portal_page_rate, _since
     _ensure_deal(ctx)
     deal = ctx.deal_id
+    rec = store.get(deal)
+    request = rec["data"].get("request")
     if action == "open":
         target = url or PORTAL_PAGE
         host = urlparse(target).hostname or ""
         if urlparse(target).scheme != "https" or not (host == "5u.ai" or host.endswith(".5u.ai")):
             return {"error": "the browser opens 5U's sites only (https, *.5u.ai)"}
-        return _browser("POST", f"/pages/{deal}", {"url": target})
-    if action == "fill":
-        return _browser("POST", f"/pages/{deal}/fill", {"fields": {str(f["i"]): f["value"] for f in fields or []}})
-    if action == "press":
-        return _browser("POST", f"/pages/{deal}/press", {"i": i})
-    if action == "read":
-        out = _browser("GET", f"/pages/{deal}")
-        return {**out, "rate": read_portal_page(out.get("text", ""))} if "text" in out else out
-    return {"error": f"unknown action {action}"}
+    activity = rec["data"].get("browser_activity") or {}
+    since = activity.get("since") if activity.get("active") else time.time()
+    store.update(deal, lambda r: (r["status"], {**r["data"], "browser_activity": {
+        "since": since, "updated_at": time.time(), "active": action != "close", "action": action,
+        "airline": airline or activity.get("airline"), "note": "Agent working on 5U's portal"}, "person_needed": None}))
+    if action == "open":
+        out = _browser("POST", f"/pages/{deal}", {"url": target, "reload": True})
+        store.update(deal, lambda r: (r["status"], {**r["data"], "browser_request": request}))
+    elif action == "act":
+        out = _browser("POST", f"/pages/{deal}/act", {"actions": actions or []})
+    elif action in ("fill", "press"):  # sessions created before the autonomous tool catalogue
+        body = {"fields": {str(f["i"]): f["value"] for f in fields or []}} if action == "fill" else {"i": i}
+        out = _browser("POST", f"/pages/{deal}/{action}", body)
+    elif action in ("read", "look", "save_rate"):
+        out = _browser("GET", f"/pages/{deal}" + ("/look" if action == "look" else ""))
+    elif action == "close":
+        return _browser("DELETE", f"/pages/{deal}")
+    else:
+        return {"error": f"unknown action {action}"}
+    if "text" in out:
+        out["rate"] = read_portal_page(out["text"])
+    if action == "save_rate" and not out.get("error"):
+        current = store.get(deal)["data"]
+        if not request:
+            return {**out, "error": "price the shipment with get_offers before importing a page rate"}
+        if not airline:
+            return {"error": "name the airline whose result is on this page", **out}
+        if current.get("browser_request") != current.get("request"):
+            return {"error": "the shipment changed since this page opened: reopen and price the current goods", **out}
+        rate = out.get("rate") or {}
+        if not all(rate.get(k) for k in ("total", "days", "rate_id")):
+            return {**out, "error": "no complete, unambiguous rate on the page yet; inspect the form or error"}
+        lane = f"{request['origin']}-{request['destination']}"
+        if rate.get("lane") and rate["lane"].replace(" ", "").upper() != lane:
+            return {**out, "error": "the displayed rate is for a different lane; query this shipment"}
+        if rate.get("valid_until") and (_since(rate["valid_until"]) or 0) > 0:
+            return {**out, "error": "the displayed rate has expired; obtain a fresh rate"}
+        added = add_portal_page_rate(deal, rate.get("airline") or airline, rate["total"], rate["days"],
+                                     rate["rate_id"], rate.get("weight_kg"), who="agent")
+        out.update(added)
+        if added.get("ok"):
+            out["priced_options"] = ctx.fw.options(deal, current.get("preference") or "cheapest")
+            store.update(deal, lambda r: (r["status"], {**r["data"], "browser_activity": {
+                **r["data"]["browser_activity"], "active": False, "note": "Rate saved by the agent"}}))
+    out["seconds_since_request"] = _since(rec["data"].get("received_at"))
+    return out
 
 
 def ask_person(ctx: Ctx, kind: str, note: str, airline: str | None = None, wait_seconds: float = 60) -> dict:
-    """An interruption to the team (like SIEVER's `avvisa`): the agent decides it, the system guarantees it (alarm,
-    the deal opened in front of them, their answer back here). Only while someone is at the desk."""
-    from .forwarder import OPERATOR_WAIT, _since, add_portal_page_rate, read_portal_page
-    _ensure_deal(ctx)
-    deal = ctx.deal_id
-    if store.kv_get("operator_on") != "1":
-        return {"error": "nobody is at the desk (operator mode off): go on without a person"}
-    d = store.get(deal)["data"]
-    left = float(wait_seconds or 60)
-    if ctx.task == "customer" and not d.get("quote"):  # before the quote, the person gets the round's time
-        remaining = OPERATOR_WAIT - (_since(d.get("received_at")) or 0)  # on the page they need minutes, not seconds
-        left = remaining if kind == "page" else min(left, remaining)  # (rounds 93-100); it returns when they are done
-    if left <= 5:
-        return {"error": "no time left for a person: go on with what you have"}
-    since = time.time()
-    store.update(deal, lambda r: (r["status"], {**r["data"], "person_needed": {
-        "since": since, "kind": kind, "note": note, "airline": airline, "answer": None}}))
-    store.log("forwarder", "decision", f"asks a person ({kind}): {note}"[:200], run_id=deal)
-    end, out = time.time() + left, {}
-    try:
-        while time.time() < end:
-            if kind == "page":
-                live = next((o for o in store.get(deal)["data"].get("offers", []) if airline and o["source"] in
-                             ("portal", "ratedesk", "portal_page") and o["carrier"].lower() in airline.lower()), None)
-                if live:  # another of 5U's channels priced it meanwhile (the rate desk, the API back): the person
-                    return {"priced_meanwhile": live["source"], "airline": live["carrier"],  # is free again
-                            "note": "the price is in this deal's options: get_offers with shipment null shows them"}
-                out = _browser("GET", f"/pages/{deal}")
-                rate = read_portal_page(out.get("text", ""))
-                if rate["rate_id"] and rate["total"] and rate["days"]:
-                    added = add_portal_page_rate(deal, airline or "", rate["total"], rate["days"], rate["rate_id"],
-                                                 None, "person on the page")
-                    return {"rate": rate, "added": added.get("offer"),
-                            "note": "the price is in this deal's options: get_offers with shipment null shows them"}
-            else:
-                ans = ((store.get(deal)["data"].get("person_needed") or {}).get("answer"))
-                if ans:
-                    return {"answer": ans}
-            time.sleep(1)
-    finally:
-        store.update(deal, lambda r: (r["status"], {**r["data"], "person_needed": None}))
-    return {"error": "no answer in time: go on with what you have", **({"page": out.get("text", "")[:800]} if out else {})}
+    """Compatibility for old session calls: the 04:03 organiser clarification rules out human assistance."""
+    return {"error": "This challenge is fully autonomous: use browser to complete the portal and its checks yourself. "
+            "The team is notified for observation only. For business facts, use records or ask the customer/carrier."}
 
 
 def cancel_booking(ctx: Ctx, booking_reference: str, deal_id: str | None = None) -> dict:

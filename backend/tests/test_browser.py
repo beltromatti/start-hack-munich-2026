@@ -7,6 +7,10 @@ import pytest
 from fastapi import HTTPException
 
 from app import browser, main
+from app import tools, store, kit, llm, agent
+from app.fake5u import FakeFiveU
+from app.forwarder import Forwarder, read_portal_page
+from dataclasses import replace
 
 
 @pytest.mark.parametrize("url", ["http://start-hack.5u.ai/portal/ui", "https://5u.ai.evil.example/", "file:///etc/passwd"])
@@ -70,3 +74,86 @@ def test_input_proxy_propagates_missing_page_and_does_not_forward_arbitrary_url(
     send.return_value = httpx.Response(200, json={"url": browser.PORTAL, "text": "private page"})
     assert main.portal_input("deal-1", "open", {"url": "https://evil.example"}) == {"ok": True}
     assert send.call_args.kwargs["json"] == {"reload": False}
+
+
+def test_key_alias_is_filled_by_backend_and_never_on_an_unapproved_origin(monkeypatch):
+    field = Mock(fill=AsyncMock())
+    p = Mock(url=browser.PORTAL)
+    p.is_closed.return_value = False
+    p.locator.return_value = field
+    p.evaluate = AsyncMock(return_value=[{"i": 3, "tag": "input", "type": "password", "label": "Team key"}])
+    monkeypatch.setitem(browser.state, "pages", {"key-test": p})
+    monkeypatch.setattr(browser, "settings", replace(browser.settings, fiveu_api_key="test-private-key"))
+    result = asyncio.run(browser.fill_fields("key-test", {"3": "{team_key}"}))
+    field.fill.assert_awaited_once_with("test-private-key", timeout=2000)
+    assert "test-private-key" not in str(result)
+    p.url = "https://outside.example/login"
+    with pytest.raises(HTTPException):
+        asyncio.run(browser.fill_fields("key-test", {"3": "{team_key}"}))
+    assert field.fill.await_count == 1
+
+
+def test_failed_fill_stops_batch_before_submit(monkeypatch):
+    p = Mock(url=browser.PORTAL)
+    p.is_closed.return_value = False
+    p.bring_to_front = AsyncMock()
+    p.mouse.click = AsyncMock()
+    monkeypatch.setitem(browser.state, "pages", {"batch-test": p})
+    monkeypatch.setattr(browser, "fill_fields", AsyncMock(return_value={"error": "field changed"}))
+    monkeypatch.setattr(browser, "view", AsyncMock(return_value={"text": "new form"}))
+    out = asyncio.run(browser.act("batch-test", {"actions": [
+        {"kind": "fill", "i": 3, "value": "7"}, {"kind": "click", "x": 10, "y": 20}]}))
+    assert out["error"] == "field changed" and not out["completed"]
+    p.mouse.click.assert_not_awaited()
+
+
+def test_autonomous_rate_import_is_idempotent_and_refuses_a_changed_shipment(monkeypatch):
+    api = FakeFiveU()
+    kit.load(api)
+    airline = kit.world().portal[("FRA", "ORD")][0]
+    request = {"origin": "FRA", "destination": "ORD", "chargeable_kg": "320", "weight_kg": "320",
+               "volume_cbm": "1", "pieces": 1, "pickup_zone": None, "pickup_postcode": None}
+    store.put("deal-77", "deal", "pricing", {"root": 77, "request": request, "browser_request": request,
+              "offers": [], "portal_missing": {"airlines": [airline], "weight_kg": "320"}})
+    ctx = tools.Ctx(Forwarder(api), "session-77", "deal-77", 77, "customer", None)
+    monkeypatch.setattr(tools, "_browser", lambda *a, **k: {"text": "1696.00 EUR · 1 day · R-autonomous77"})
+    first = tools.browser(ctx, "save_rate", airline=airline["name"])
+    second = tools.browser(ctx, "save_rate", airline=airline["name"])
+    assert first["ok"] and second["already_saved"]
+    assert first["priced_options"]["options"][0]["total"] == "1696.00 EUR"
+    assert len(store.get("deal-77")["data"]["offers"]) == 1
+    assert not store.get("deal-77")["data"].get("person_needed")
+    store.update("deal-77", lambda r: (r["status"], {**r["data"], "request": {**request, "chargeable_kg": "500"}}))
+    assert "shipment changed" in tools.browser(ctx, "save_rate", airline=airline["name"])["error"]
+    store.update("deal-77", lambda r: (r["status"], {**r["data"], "request": request}))
+    result = "Total\t1696.00\nCurrency\tEUR\nTransit days\t1\nrate_id\tR-lanecheck77\nLane\tFRA-JFK"
+    monkeypatch.setattr(tools, "_browser", lambda *a, **k: {"text": result})
+    assert "different lane" in tools.browser(ctx, "save_rate", airline=airline["name"])["error"]
+    result = result.replace("FRA-JFK", "FRA-ORD") + "\nValid until\t2020-01-01T00:00:00+00:00"
+    assert "expired" in tools.browser(ctx, "save_rate", airline=airline["name"])["error"]
+    assert len(store.get("deal-77")["data"]["offers"]) == 1
+
+
+def test_browser_image_reaches_the_same_agent_without_base64_in_event_logs(monkeypatch):
+    image = "data:image/jpeg;base64,dGVzdA=="
+    def turn(items, _):
+        if items[-1].get("type") == "function_call_output":
+            assert items[-1]["output"][1] == {"type": "input_image", "image_url": image, "detail": "high"}
+            return []
+        return [{"type": "function_call", "call_id": "see", "name": "browser", "arguments": '{"action":"look"}'}]
+    llm.use_fake_turn(turn)
+    monkeypatch.setattr(tools, "run", lambda *a, **k: {"text": "a visual check", "_image": image})
+    agent.execute(Forwarder(FakeFiveU()), 88, "customer", mail=None, event="Inspect the page")
+    assert image not in str(store.events())
+    assert store.get("session-88")["status"] == "idle"
+
+
+def test_portal_table_keeps_currency_days_and_weight_with_their_labels():
+    text = "Your rate\nrate_id\tR-tGUQ2mU-DWkPimU0\nAirline\tBorealis Freight Airways (BX)\nLane\tFRA-ORD\nChargeable weight (kg)\t320\nTotal\t1171.20\nCurrency\tEUR\nTransit days\t1\nValid until\t2026-11-22T04:11:37+00:00"
+    out = read_portal_page(text)
+    assert out["total"] == "1171.20" and out["days"] == "1" and out["weight_kg"] == "320"
+    assert out["lane"] == "FRA-ORD" and out["rate_id"] == "R-tGUQ2mU-DWkPimU0"
+    assert read_portal_page(text.replace("1171.20", "1.171,20"))["total"] == "1171.20"
+    assert read_portal_page(text.replace("EUR", "USD"))["total"] is None
+    assert read_portal_page(text + "\nAnother rate R-different123")["rate_id"] is None
+    assert read_portal_page("1171.20 EUR, 1 day, R-example1")["total"] == "1171.20"

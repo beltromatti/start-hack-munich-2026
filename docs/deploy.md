@@ -19,16 +19,18 @@ UI: `http://<server>:8000`. Behind a firewall: `ssh -L 8000:localhost:8000 <serv
 ## Shared portal browser on the desk's Mac
 
 Run `cd backend && uv run python -m app.browser` alongside the existing server. It listens only on
-`127.0.0.1:8010`; it never polls or sends mail. The operator's card opens the installed desktop Chrome and
+`127.0.0.1:8010`; it never polls or sends mail. The agent opens the installed desktop Chrome and the observer card
 shares its page, keyboard, paste and scroll controls in the conversation. "Show on desktop" brings the same
-tab forward for direct interaction. The check and team key remain the person's responsibility.
+tab forward for direct interaction. The agent handles checks and enters `{team_key}` from FIVEU_API_KEY; the UI is for observation, not required assistance.
 
 Chrome uses `backend/data/portal-chrome/`, a private, gitignored profile whose cookies survive sidecar restarts.
 It is launched directly, without headless mode, automation launcher flags, or device emulation. Playwright
 attaches through a loopback CDP port with `no_defaults=True`. Keep the profile and CDP port private. Optional
 `PORTAL_CHROME_PATH` and `PORTAL_BROWSER_PROFILE` override the executable and dedicated profile; never point it
 at a personal browser profile. This needs a desktop session; a headless Docker server cannot provide it.
-If Chrome cannot start or Cloudflare still refuses the check, the card retains the external-browser/paste path.
+If the page changes or a check expires, the agent sees the actual error and can inspect a screenshot, reload and retry.
+If the browser cannot run, the tool returns an error and the agent continues through available channels; it never
+waits for a human answer. Alerts can be muted without affecting autonomy.
 
 ## Moving production between the Mac and a server over SSH (keeps every deal and session)
 

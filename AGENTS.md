@@ -37,6 +37,9 @@ mail in -> register (SQLite) -> router (code, by sender/thread)
 - `backend/app/agent.py` the harness: sessions in the register (restart-safe, cache-warm), the required outcome
   (a mail is answered, or a reasoned no_reply) as the one system constraint, one stop for spinning (10 turns
   without progress). No caps on steps, tokens or output: the model decides how much work a deal needs.
+- `browser.py` the shared desktop Chrome: the agent reads text or screenshots, batches inputs and handles page
+  checks itself. `{team_key}` resolves from the environment; `save_rate` returns computed options. The live UI
+  and alerts observe progress. The organiser clarified at 04:03: no human assistance, including the portal.
 - `tools.py` the tools: thin over the engine. They guarantee what must be guaranteed (totals computed by code,
   mails only to people in the thread and carriers on the list, the first quote recorded with its option).
 - `forwarder.py` the system under the agent: polling, routing, carrier replies, tariffs, bookings, board watcher,

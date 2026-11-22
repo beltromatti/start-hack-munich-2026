@@ -1,7 +1,10 @@
+export type BrowserActivity = { since: number; updated_at: number; active: boolean; action: string; airline: string | null; note: string };
+
 export type DealRow = {
   id: string; status: string; updated_at: number; customer: string | null; subject: string | null;
   route: string | null; weight_kg: string | null; preference: string | null; quote: string | null;
   response_seconds: number | null; booking: string | null; flag: string | null; cost_usd: number;
+  browser_activity?: BrowserActivity | null;
   needs_person?: { since: number; kind: "page" | "answer"; note: string; airline: string | null } | null;
 };
 
@@ -14,7 +17,7 @@ export type Mail = {
 
 export type Item = {
   type?: string; role?: string; content?: unknown; name?: string; arguments?: string; call_id?: string;
-  output?: string;
+  output?: string | { type: string; text?: string; image_url?: string }[];
 };
 
 export type Option = {
@@ -37,6 +40,7 @@ export type Deal = {
       via?: string; amount?: string; price_changed?: { quoted: string; booked: string };
       carrier_status?: { text: string; at: string } };
     notes?: { at: number; text: string; flag: string }[]; flag?: string;
+    browser_activity?: BrowserActivity | null;
     person_needed?: { since: number; kind: "page" | "answer"; note: string; airline: string | null } | null;
   };
   mails: Mail[]; carrier_mails?: Mail[]; events: EventRow[];

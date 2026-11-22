@@ -84,7 +84,8 @@ def deals() -> list[dict]:
                     "quote": (d.get("quote") or {}).get("amount"),
                     "response_seconds": (d.get("quote") or {}).get("response_seconds"),
                     "booking": (d.get("booking") or {}).get("booking_reference"), "flag": d.get("flag"),
-                    "needs_person": d.get("person_needed"),  # the agent asked the team (ask_person)
+                    "needs_person": d.get("person_needed"),  # legacy session history
+                    "browser_activity": d.get("browser_activity"),
                     "cost_usd": store.usage(r["id"])["cost_usd"]})
     return out
 
@@ -165,9 +166,7 @@ def human_reply(deal_id: str, payload: dict) -> dict:
 
 @app.get("/api/operator")
 def operator_mode() -> dict:
-    """Operator mode: a person is at the desk and reads 5U's portal page when its rate API fails; the agent then
-    waits up to 80 s after the customer's mail for their prices."""
-    from .forwarder import OPERATOR_WAIT
+    """Observer alerts only. Browser work is autonomous, including when alerts are off."""
     needed = []
     for r in store.records("deal"):
         pm = r["data"].get("portal_missing") or {}
@@ -180,13 +179,13 @@ def operator_mode() -> dict:
                        "origin": req.get("origin"), "destination": req.get("destination"),
                        "gross_kg": req.get("weight_kg"), "volume_cbm": req.get("volume_cbm"),
                        "chargeable_kg": req.get("chargeable_kg"), **pm})
-    return {"on": store.kv_get("operator_on") == "1", "wait_seconds": OPERATOR_WAIT, "needed": needed}
+    return {"on": store.kv_get("operator_on", "1") == "1", "autonomous": True, "needed": needed}
 
 
 @app.post("/api/operator")
 def set_operator_mode(payload: dict) -> dict:
     store.kv_set("operator_on", "1" if payload.get("on") else "0")
-    store.log("human", "decision", f"operator mode {'on' if payload.get('on') else 'off'}")
+    store.log("human", "decision", f"observer alerts {'on' if payload.get('on') else 'off'}")
     return operator_mode()
 
 
@@ -211,7 +210,7 @@ def portal_shot(deal_id: str) -> Response:
     """The shared browser's page for this deal, live, for the person in the deal's conversation."""
     import httpx
     try:
-        r = httpx.get(f"http://127.0.0.1:8010/pages/{deal_id}/shot", timeout=10)
+        r = httpx.get(f"{settings.browser_base_url}/pages/{deal_id}/shot", timeout=10, trust_env=False)
     except Exception:
         raise HTTPException(503, "the shared browser is not running")
     if r.status_code != 200:
@@ -231,7 +230,7 @@ def portal_input(deal_id: str, what: str, payload: dict) -> dict:
     if what == "open":
         payload = {"reload": bool(payload.get("reload"))}
     try:
-        r = httpx.post(f"http://127.0.0.1:8010{path}", json=payload, timeout=30, trust_env=False)
+        r = httpx.post(f"{settings.browser_base_url}{path}", json=payload, timeout=30, trust_env=False)
     except httpx.HTTPError:
         raise HTTPException(503, "the shared browser is not running")
     if r.status_code >= 400:

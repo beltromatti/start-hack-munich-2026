@@ -31,6 +31,7 @@ class Settings:
     model_tariff: str = os.getenv("LLM_MODEL_TARIFF", "gpt-6-luna")
     db_path: str = os.getenv("DB_PATH", str(ROOT / "backend" / "data" / "forwarder.db"))
     worker: bool = os.getenv("WORKER", "0") == "1"
+    browser_base_url: str = os.getenv("PORTAL_BROWSER_URL", "http://127.0.0.1:8010")
     poll_seconds: float = float(os.getenv("POLL_SECONDS", "1.5"))
     # How long get_offers waits for carrier and trucker replies by default (the agent may ask for less or more).
     bid_wait_seconds: float = float(os.getenv("BID_WAIT_SECONDS", "85"))

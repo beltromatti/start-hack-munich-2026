@@ -87,11 +87,15 @@ def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> 
                 result = tools.run(ctx, c["name"], json.loads(c.get("arguments") or "{}"))
             except Exception as e:  # the model sees what went wrong and decides
                 result = {"error": f"{type(e).__name__}: {e}"}
+            picture = result.pop("_image", None) if isinstance(result, dict) else None
             ok += 0 if isinstance(result, dict) and "error" in result else 1
             store.log("forwarder", "tool", f"{c['name']}({_short(c.get('arguments'))})",
                       {"args": c.get("arguments"), "result": result}, run_id=deal_id)
-            s["items"].append({"type": "function_call_output", "call_id": c["call_id"],
-                               "output": json.dumps(result, default=str, ensure_ascii=False)})
+            output = json.dumps(result, default=str, ensure_ascii=False)
+            if picture:
+                output = [{"type": "input_text", "text": output},
+                          {"type": "input_image", "image_url": picture, "detail": "high"}]
+            s["items"].append({"type": "function_call_output", "call_id": c["call_id"], "output": output})
             store.put(sid, "session", "running", s)
         failing = 0 if ok else failing + 1
         if ctx.done and (mail is None or ctx.outcome):  # the model said it is done, and the mail is answered:
@@ -100,6 +104,8 @@ def execute(fw: Any, root: int, task: str, *, mail: dict | None, event: str) -> 
             store.log("forwarder", "error", f"stopped: {SPINNING} turns without progress", run_id=deal_id)
             break
     store.put(sid, "session", "idle", s)
+    store.update(deal_id, lambda r: (r["status"], {**r["data"], "browser_activity": {
+        **r["data"]["browser_activity"], "active": False}}) if r["data"].get("browser_activity") else None)
 
 
 def notify(session_id: str, text: str) -> None:

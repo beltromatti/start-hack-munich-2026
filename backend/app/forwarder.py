@@ -168,14 +168,21 @@ class Forwarder:
                 return {"carrier_messages": d.get("carrier_messages", []), "still_waiting_for": waiting_for(d)}
             return {"error": "no shipment yet: call get_offers with the shipment"}
         pm = deal["data"].get("portal_missing") or {}
-        if pm.get("airlines") and not pm.get("shown") and store.kv_get("operator_on") == "1":
-            # the portal turned airlines away and a person is at the desk: the agent hears it now, not after the
-            # carriers' wait, so the person gets the minutes they need while the carriers answer (rounds 93-100)
+        if pm.get("airlines") and not pm.get("shown"):
+            # Start the agent's browser work while carriers answer; there is no operator prerequisite.
             store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_missing": {
                 **(r["data"].get("portal_missing") or {}), "shown": True}}))
             wait = 0
+        browser_active = bool((deal["data"].get("browser_activity") or {}).get("active"))
+        if browser_active:
+            # Mail handlers keep collecting in the background. A blocking wait here would let the browser's
+            # already-observed challenge expire before the model can act on it (parallel tool calls run in order).
+            wait = 0
         self._wait(deal_id, wait)
-        return self.options(deal_id, preference)
+        result = self.options(deal_id, preference)
+        if browser_active:
+            result["browser_in_progress"] = "Current prices returned without blocking: carrier replies continue in the background while you complete the browser page."
+        return result
 
     def _wait(self, deal_id: str, wait: float) -> None:
         end = time.time() + max(0.0, float(wait))
@@ -248,7 +255,7 @@ class Forwarder:
         self._gone.pop(deal_id, None)
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
         fallback: list = []  # mails to portal airlines while the portal fails: tried, never awaited (round 94)
-        if failed:  # a person on the team can read these on 5U's portal page (it asks people to pass a check)
+        if failed:  # the agent can read these on 5U's browser page while mail replies arrive
             nb_all = {a["name"]: pricing.next_break(w.brackets.get(a["code"], []), cw)
                       for a in w.portal.get((o, d), []) if a["name"] in failed}
             store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_missing": {
@@ -382,13 +389,15 @@ class Forwarder:
                                    is not None else {"included_in_every_total": False, "why": "the goods value is "
                                    "not in EUR or a term is missing: ask, never compute it yourself"})
         pm = d.get("portal_missing") or {}
-        if pm.get("airlines"):  # their rates are on 5U's portal page, for people who pass its check
+        missing_page = [a for a in pm.get("airlines", []) if a["name"] not in live]
+        if missing_page:
             result["portal_page"] = {
-                "airlines": [f"{a['name']} ({a.get('code')})" for a in pm["airlines"]],
-                "person_at_desk": store.kv_get("operator_on") == "1",
-                "how": "with a person at the desk: now, while the carriers answer, ask_person kind page for the "
-                       "airline that matters most for this request (they read it in their own browser: Cloudflare "
-                       "stops ours); its price then joins these options. Without one: quote with what you have"}
+                "airlines": [f"{a['name']} ({a.get('code')})" for a in missing_page],
+                "breaks_above": {a["name"]: a.get("break_above") for a in missing_page if a.get("break_above")},
+                "how": "Use browser now for the missing airline(s) that matter: open, observe the current labels "
+                       "and checks, act with batched inputs including {team_key} and submit, then save_rate with "
+                       "the airline. look gives you a screenshot when text is not enough. Work autonomously; "
+                       "notifications only let the team watch. Then get_offers with shipment null for the totals."}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]
@@ -933,28 +942,36 @@ def remembered_offer(a: dict, o: str, d: str, billed: Decimal, breaks: list | No
                                               f"fresh rate when the portal answers"})
 
 
-# Seconds after the customer's mail a person on 5U's portal page may take: the teams that won the outage rounds
-# (93-100) booked the turned-away airline 83-358 s after the request, people on the page. A right quote late beats
-# a fast wrong one (accuracy 45, and x3 to x10 when few teams get it; time 15, zero at 6 minutes); what is left
-# after it is for the agent to write the quote before the request closes at 360 s (round 94, 499 s: out of time).
-OPERATOR_WAIT = 240  # round 122: 290 left the quote at 355 s, 5 s before the close
-
-
 def read_portal_page(text: str) -> dict:
-    """What a person copied from 5U's portal page result: the total in EUR, the transit days and the rate_id, read by
-    code (the person checks them before they are added)."""
+    """Read a rate in prose or a labelled result table. Numbers remain source-backed, never model arithmetic."""
     t = text or ""
-    rid = re.search(r"\bR-[A-Za-z0-9_-]{6,}", t)
-    money = [a for tok in re.findall(r"(\d[\d.,' \u00a0]*\d|\d)\s*(?:EUR|€)", t) for a in amounts_in(tok)]
+    references = set(re.findall(r"\bR-[A-Za-z0-9_-]{6,}", t))
+    money = {a for tok in re.findall(r"(\d[\d.,' \u00a0]*\d|\d)\s*(?:EUR|€)", t) for a in amounts_in(tok)}
     days = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:days?|Tage?n?|d\b)", t, re.I)
-    return {"total": str(money[0]) if len(money) == 1 else None, "totals_seen": [str(x) for x in money],
-            "days": days.group(1).replace(",", ".") if days else None, "rate_id": rid.group(0) if rid else None}
+    # Tables render as label TAB value; copied cards may use label: value. Row order is irrelevant.
+    rows = {}
+    for label, value in re.findall(r"(?m)^[ \t]*([^\n\t:]+?)[\t:][ \t]*([^\n]+)$", t):
+        rows[re.sub(r"\s+", " ", label.strip().lower())] = value.strip()
+    currency = rows.get("currency", "").upper() or None
+    if currency == "EUR":
+        for label in ("total", "total (eur)", "total price", "amount"):
+            if label in rows and re.fullmatch(r"\d[\d.,' \u00a0]*", rows[label]):
+                money.update(amounts_in(rows[label]))
+    transit = days.group(1).replace(",", ".") if days else None
+    for label in ("transit days", "transit time (days)", "transit (days)"):
+        if label in rows and re.fullmatch(r"\d+(?:[.,]\d+)?", rows[label]):
+            transit = rows[label].replace(",", ".")
+    return {"total": str(next(iter(money))) if len(money) == 1 and currency in (None, "EUR") else None,
+            "totals_seen": [str(x) for x in sorted(money)], "days": transit,
+            "rate_id": next(iter(references)) if len(references) == 1 else None,
+            "airline": rows.get("airline"), "lane": rows.get("lane"),
+            "weight_kg": rows.get("chargeable weight (kg)"), "currency": currency,
+            "valid_until": rows.get("valid until")}
 
 
 def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate_id: str | None,
                          weight_kg: Any = None, who: str = "operator") -> dict:
-    """A person on the team read this airline's rate on 5U's portal page (by hand: the page asks people to pass a
-    check) while the rate API answered 503. It joins the deal's offers like a portal price: the total as the page
+    """An observed result from 5U's portal page, read by code. It joins the deal's offers like a portal price: the total as the page
     gave it, its rate_id bookable on the portal; every option total is then computed by code as usual."""
     rec = store.get(deal_id)
     if not rec:
@@ -972,13 +989,25 @@ def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate
                                                                                     d["request"]["chargeable_kg"])
     except Exception:
         return {"error": "total, days and weight must be numbers"}
+    if not all(x.is_finite() for x in (amount, transit, billed)) or amount <= 0 or transit < 0 or billed <= 0:
+        return {"error": "the page must show a positive price and weight, and nonnegative transit days"}
+    if not (a or known):
+        return {"error": "unknown airline: use a carrier in this deal's missing portal airlines or our carrier list"}
+    if not rate_id or not re.fullmatch(r"R-[A-Za-z0-9_-]+", rate_id.strip()):
+        return {"error": "the page must show a bookable R- rate reference"}
+    existing = next((o for o in d.get("offers", []) if o.get("source") == "portal_page" and o.get("rate_id") == rate_id.strip()), None)
+    if existing:
+        return {"ok": True, "offer": existing, "already_saved": True}
     offer = Offer("air", name, amount, transit, "portal_page", (rate_id or "").strip() or None, billed,
                   extra={"code": (a or {}).get("code"), "weight": str(billed), "note": f"read on 5U's portal page by {who}"})
-    store.update(deal_id, lambda r: (r["status"], {**r["data"], "offers": r["data"]["offers"] + [offer.as_dict()],
-                                                   "portal_missing": {**pm, "airlines": [
-                                                       x for x in pm.get("airlines", []) if x["name"] != name]}}))
-    store.log("human", "info", f"portal page rate for {name}: {amount} EUR, {transit} days, {rate_id}", run_id=deal_id)
-    return {"ok": True, "offer": offer.as_dict()}
+    saved = store.update(deal_id, lambda r: None if any(o.get("source") == "portal_page" and o.get("rate_id") == rate_id.strip()
+                                                       for o in r["data"].get("offers", [])) else
+        (r["status"], {**r["data"], "offers": r["data"]["offers"] + [offer.as_dict()],
+                       "portal_missing": {**r["data"].get("portal_missing", {}), "airlines": [
+                           x for x in r["data"].get("portal_missing", {}).get("airlines", []) if x["name"] != name]}}))
+    store.log("browser" if who == "agent" else "human", "info", f"portal page rate for {name}: {amount} EUR, {transit} days, {rate_id}", run_id=deal_id)
+    actual = next(o for o in saved["data"]["offers"] if o.get("source") == "portal_page" and o.get("rate_id") == rate_id.strip())
+    return {"ok": True, "offer": actual}
 
 
 def waiting_for(d: dict) -> list[str]:

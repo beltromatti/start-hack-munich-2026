@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Attachment, Deal, Item, Mail, Option, post } from "./api";
-import { PersonCard } from "./PortalView";
+import { PortalView } from "./PortalView";
 import { STATUS, clock, parseJSON, usd, who } from "./format";
 
 type Step =
@@ -14,7 +14,7 @@ const MAIL = /New mail in this thread: id (\d+), from (\S+), at (\S+)\n(?:Their 
 
 function steps(items: Item[]): Step[] {
   const outputs = new Map<string, Record<string, any> | null>();
-  for (const it of items) if (it.type === "function_call_output" && it.call_id) outputs.set(it.call_id, parseJSON(it.output));
+  for (const it of items) if (it.type === "function_call_output" && it.call_id) outputs.set(it.call_id, parseJSON(Array.isArray(it.output) ? it.output.find((x) => x.type === "input_text")?.text : it.output));
   const out: Step[] = [];
   for (const it of items) {
     if (it.role === "user" && typeof it.content === "string") {
@@ -258,7 +258,7 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
         <div className="banner warn-banner"><strong>Booked at another price</strong> · the airline booked {d.booking.price_changed.booked} all-in, against the {d.booking.price_changed.quoted} quoted</div>
       ) : null}
 
-      {d.person_needed ? <PersonCard dealId={deal.id} need={d.person_needed} /> : null}
+      {d.browser_activity ? <PortalView dealId={deal.id} activity={d.browser_activity} /> : null}
 
       <CarrierMails mails={deal.carrier_mails ?? []} />
 

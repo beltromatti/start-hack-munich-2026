@@ -1,14 +1,13 @@
-"""A browser the agent and a person share, for 5U's portal page (the one place its rates live when the rate API
-answers 503, behind a check meant for people).
+"""The agent's desktop browser, visible and interactive in the deal's conversation.
 
 One page per deal, in the installed desktop Chrome with a dedicated persistent profile. The agent reads and fills it through the `browser`
-tool (by the labels a person sees, so the page may change its field names every load); the person sees it live in
-the deal's conversation in our UI and does what only a person may do there: the check, the team key, a banner if
-the agent cannot. Runs beside production, so a browser problem never stops the forwarder:
+tool by current labels or screenshots, including 5U's checks and the team key. Observers can watch without
+being needed for progress. Runs beside production, so a browser problem never stops the forwarder:
 
     cd backend && uv run python -m app.browser        (listens on 127.0.0.1:8010)
 """
 import asyncio
+import base64
 import os
 import shutil
 import socket
@@ -22,6 +21,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from playwright.async_api import async_playwright
+from .config import settings
 
 PORT = 8010
 PROFILE = Path(os.environ.get("PORTAL_BROWSER_PROFILE", Path(__file__).resolve().parents[1] / "data" / "portal-chrome"))
@@ -29,6 +29,18 @@ PORTAL = "https://start-hack.5u.ai/portal/ui"
 state: dict = {"pw": None, "ctx": None, "browser": None, "pages": {}}
 start_lock = asyncio.Lock()
 SIZE = {"width": 720, "height": 860}
+
+
+def allowed(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and (parsed.hostname == "5u.ai" or (parsed.hostname or "").endswith(".5u.ai"))
+
+
+def safe_page(deal: str):
+    p = page(deal)
+    if not allowed(p.url):
+        raise HTTPException(400, "the browser acts on 5U's sites only; reopen the portal")
+    return p
 
 
 @asynccontextmanager
@@ -94,16 +106,19 @@ FORM_JS = """() => [...document.querySelectorAll('input, select, textarea, butto
        || (e.closest('label') && e.closest('label').innerText)
        || (t !== 'button' && e.previousElementSibling && e.previousElementSibling.innerText)
        || e.getAttribute('aria-label') || e.placeholder || (t === 'button' ? e.innerText : '') || '';
-     return {i, tag: t, type: e.type || '', label: l.trim().slice(0, 80), value: t === 'button' ? '' : (e.value || '')}; })"""
+     if (!e.hasAttribute('data-forwarder-field')) {
+       window.__forwarderNextField = (window.__forwarderNextField || 0) + 1;
+       e.setAttribute('data-forwarder-field', String(window.__forwarderNextField));
+     }
+     i = Number(e.getAttribute('data-forwarder-field'));
+     const r = e.getBoundingClientRect();
+     return {i, tag: t, type: e.type || '', label: l.trim().slice(0, 120), value: t === 'button' ? '' : (e.value || ''),
+       disabled: e.disabled, options: t === 'select' ? [...e.options].map(o => ({value:o.value, label:o.label})) : undefined,
+       box: {x:r.x, y:r.y, width:r.width, height:r.height}}; })"""
 
-FILL_JS = """([i, v]) => { const els = [...document.querySelectorAll('input, select, textarea, button')]
-  .filter(e => e.offsetParent !== null); const e = els[i]; if (!e) return false;
+FILL_JS = """([i, v]) => { const e = document.querySelector('[data-forwarder-field="' + i + '"]'); if (!e) return false;
   const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(e), 'value').set; set.call(e, v);
   e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); return true; }"""
-
-CLICK_JS = """(i) => { const els = [...document.querySelectorAll('input, select, textarea, button')]
-  .filter(e => e.offsetParent !== null); const e = els[i]; if (!e) return false; e.click(); return true; }"""
-
 
 async def browser():
     async with start_lock:
@@ -123,7 +138,7 @@ def page(deal: str):
     return p
 
 
-async def view(p) -> dict:
+async def view(p, include_image: bool = False) -> dict:
     """What a person would see: the form's visible fields by label, and the page's visible text."""
     try:
         form = await p.evaluate(FORM_JS)
@@ -136,14 +151,28 @@ async def view(p) -> dict:
                 field["value"] = "{team_key}"
     except Exception as e:
         return {"error": repr(e)[:200]}
-    return {"url": p.url, "form": form, "text": text[:3000]}
+    if settings.fiveu_api_key:
+        text = text.replace(settings.fiveu_api_key, "{team_key}")
+    visual = await p.evaluate("""() => [...document.querySelectorAll('canvas, img, iframe')]
+        .filter(e => e.getBoundingClientRect().width > 30 && e.getBoundingClientRect().height > 20)
+        .map(e => ({tag:e.tagName.toLowerCase(), label:e.getAttribute('alt') || e.title || '',
+          box:{x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y,
+               width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height}}))""")
+    out = {"url": p.url, "form": form, "text": text[:6000], "visual_elements": visual,
+           "hint": "look returns a screenshot when a check or control is not readable in text" if visual else None}
+    if include_image or any(e.get("tag") in ("canvas", "iframe") for e in visual):
+        # A drawn check must be seen before it expires; include it in this same observation, no extra model turn.
+        sensitive = [p.locator(f'[data-forwarder-field="{f["i"]}"]') for f in form
+                     if f.get("value") == "{team_key}" or f.get("type") == "password"]
+        raw = await p.screenshot(type="jpeg", quality=80, scale="css", mask=sensitive)
+        out["_image"] = "data:image/jpeg;base64," + base64.b64encode(raw).decode()
+    return out
 
 
 @app.post("/pages/{deal}")
 async def open_page(deal: str, body: dict) -> dict:
     target = body.get("url") or PORTAL
-    parsed = urlparse(target)
-    if parsed.scheme != "https" or not (parsed.hostname == "5u.ai" or (parsed.hostname or "").endswith(".5u.ai")):
+    if not allowed(target):
         raise HTTPException(400, "the browser opens 5U's sites only (https, *.5u.ai)")
     ctx = await browser()
     old = state["pages"].get(deal)
@@ -155,8 +184,89 @@ async def open_page(deal: str, body: dict) -> dict:
         return await view(old)
     p = await ctx.new_page()
     state["pages"][deal] = p
+    await p.bring_to_front()
     await p.goto(target, wait_until="domcontentloaded")
     return await view(p)
+
+
+async def fill_fields(deal: str, fields: dict) -> dict:
+    """Trusted browser input, resolving a credential alias only on the approved origin."""
+    p = safe_page(deal)
+    form = await p.evaluate(FORM_JS)
+    done = []
+    for i, value in fields.items():
+        f = next((x for x in form if str(x["i"]) == str(i)), None)
+        if not f or f["tag"] == "button":
+            return {"error": f"no editable field {i}; read the current form", "filled": done}
+        sensitive = f["type"] == "password" or any(w in f["label"].lower() for w in ("key", "password", "token", "secret"))
+        value = str(value)
+        if value == "{team_key}":
+            if not sensitive:
+                return {"error": "the team key can only fill a labelled key/password field", "filled": done}
+            if not settings.fiveu_api_key:
+                return {"error": "FIVEU_API_KEY is not configured", "filled": done}
+            value = settings.fiveu_api_key
+            state.setdefault("key_field", {})[deal] = int(i)
+        elif sensitive:
+            return {"error": "use {team_key} for the key; it is resolved by the backend", "filled": done}
+        element = p.locator(f'[data-forwarder-field="{int(i)}"]')
+        if f["tag"] == "select":
+            choice = next((o["value"] for o in f.get("options", []) if o["value"] == value or o["label"] == value), value)
+            await element.select_option(value=choice, timeout=2000)
+        elif f["type"] in ("checkbox", "radio"):
+            await element.set_checked(value.lower() in ("true", "1", "yes", "checked"), timeout=2000)
+        else:
+            await element.fill(value, timeout=2000)
+        done.append(f["label"])
+    return {"filled": done}
+
+
+@app.post("/pages/{deal}/act")
+async def act(deal: str, body: dict) -> dict:
+    """One ordered batch; stop on the first failed action and return the actual page for recovery."""
+    completed = []
+    await safe_page(deal).bring_to_front()  # Native Chrome throttles background tabs; input needs a live render loop.
+    for step in body.get("actions") or []:
+        try:
+            p = safe_page(deal)
+            kind = step["kind"]
+            if kind == "fill":
+                result = await fill_fields(deal, {str(step["i"]): step.get("value") or ""})
+                if result.get("error"):
+                    return {**await view(p), **result, "completed": completed}
+            elif kind == "click":
+                if step.get("i") is not None:
+                    # Assign stable references to any controls added since the last observation.
+                    await p.evaluate(FORM_JS)
+                    await p.locator(f'[data-forwarder-field="{int(step["i"])}"]').click(timeout=2000)
+                else:
+                    await p.mouse.click(float(step["x"]), float(step["y"]))
+            elif kind == "press":
+                await p.keyboard.press(step["value"])
+            elif kind == "type":
+                await p.keyboard.insert_text(step.get("value") or "")
+            elif kind == "scroll":
+                await p.mouse.wheel(float(step.get("x") or 0), float(step.get("y") or 0))
+            elif kind == "wait":
+                await asyncio.sleep(min(max(float(step.get("ms") or 0), 0), 3000) / 1000)
+            elif kind == "reload":
+                await p.reload(wait_until="domcontentloaded")
+                state.get("key_field", {}).pop(deal, None)
+            else:
+                raise ValueError(f"unknown browser action {kind}")
+            completed.append(kind)
+        except Exception as exc:
+            error = str(exc).replace(settings.fiveu_api_key, "{team_key}") if settings.fiveu_api_key else str(exc)
+            return {**await view(page(deal)), "error": error[:400], "completed": completed}
+    # Allow immediate DOM results and navigation to settle, not a fixed multi-second delay per field.
+    await asyncio.sleep(0.15)
+    return {**await view(page(deal)), "completed": completed}
+
+
+@app.get("/pages/{deal}/look")
+async def look(deal: str) -> dict:
+    p = safe_page(deal)
+    return await view(p, include_image=True)
 
 
 @app.get("/pages/{deal}")
@@ -166,35 +276,14 @@ async def read_page(deal: str) -> dict:
 
 @app.post("/pages/{deal}/fill")
 async def fill(deal: str, body: dict) -> dict:
-    """Fill fields by index (from the form view). Secrets are typed by the person, never here."""
-    p = page(deal)
-    form = await p.evaluate(FORM_JS)
-    done, refused = [], []
-    for i, v in body.get("fields", {}).items():
-        f = next((x for x in form if str(x["i"]) == str(i)), None)
-        if f is None or f["tag"] == "button":
-            refused.append({"i": i, "why": "no such field"})
-            continue
-        if str(v).strip() == "{team_key}":  # the agent says where the key goes; the person's click types it
-            state.setdefault("key_field", {})[deal] = int(i)
-            done.append(f"{f['label']} (the person's key, on their click)")
-            continue
-        if any(w in f["label"].lower() for w in ("key", "password", "token", "secret")) or f["type"] == "password":
-            refused.append({"i": i, "why": "a key or password: pass {team_key}, the person types it"})
-            continue
-        await p.evaluate(FILL_JS, [int(i), str(v)])
-        done.append(f["label"])
-    out = await view(p)
-    return {**out, "filled": done, "refused": refused}
+    result = await fill_fields(deal, body.get("fields", {}))
+    return {**await view(page(deal)), **result}
 
 
 @app.post("/pages/{deal}/press")
 async def press(deal: str, body: dict) -> dict:
     """Click a visible button by index (a banner's choice, a popup's close)."""
-    p = page(deal)
-    await p.evaluate(CLICK_JS, int(body["i"]))
-    await asyncio.sleep(0.4)
-    return await view(p)
+    return await act(deal, {"actions": [{"kind": "click", "i": int(body["i"])}]})
 
 
 @app.get("/pages/{deal}/shot")

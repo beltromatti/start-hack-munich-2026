@@ -1005,6 +1005,8 @@ def test_a_portal_outage_is_retried_while_the_carriers_are_awaited(monkeypatch):
             "lots": [{"pieces": 10, "weight": q(102, "kg"), "volume": q(0.76, "cbm"), "dimensions": None}],
             "insurance": None, "extra_charges": []}
     out = tools.get_offers(ctx, ship, "fastest", 20)
+    assert out.get("portal_page")  # the browser is offered immediately, before waiting for the API retry
+    out = tools.get_offers(ctx, None, "fastest", 20)
     assert any(o["source"] == "portal" for o in out["options"])
     assert not store.get(ctx.deal_id)["data"]["portal_retry"]["names"]
 
@@ -1361,11 +1363,9 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     f.watch_scoring({"requests": ["row", r84], "frozen_at": None}, {"rules": "changed", "rounds": {"84": {}}, "ranking": None})
 
 
-def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
-    """Rounds 93-98: the rate API answered 503 for some airlines; 5U's portal page still shows them, to people who
-    pass its check. With operator mode on, the agent hears it at once and the person gets minutes (people took
-    83-358 s in those rounds); the
-    price joins the offers like a portal price, and every total is still computed by code."""
+def test_portal_fallback_is_immediate_without_an_operator_and_prices_by_code():
+    """An API outage reaches the agent immediately even with observer alerts off. Its browser rate joins normal
+    priced options, and a carrier wait cannot expire a browser check that is already being worked on."""
     from decimal import Decimal
     from app import tools
     from app.forwarder import add_portal_page_rate, waiting_for
@@ -1373,7 +1373,7 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     kit.load(api)
     f = Sync(api)
     api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
-    store.kv_set("operator_on", "1")
+    store.kv_set("operator_on", "0")
     rfq = api.customer("k@k.example", "Quote", "320 kg FRA to ORD")
     for m in api.poll(0)[0]:
         store.save_mail(m, "in", handled=True)
@@ -1385,12 +1385,16 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
             "insurance": None, "extra_charges": []}
     import time
     t0 = time.time()
-    first = tools.get_offers(ctx, ship, "fastest", 60)  # with a person at the desk it does not wait for carriers:
-    assert time.time() - t0 < 10  # the agent brings the person in at once (rounds 93-100: people took 83-358 s)
+    first = tools.get_offers(ctx, ship, "fastest", 60)  # the agent can start the browser while carriers answer
+    assert time.time() - t0 < 10
     d = store.get(ctx.deal_id)["data"]
     missing = [a["name"] for a in d["portal_missing"]["airlines"]]
-    assert missing and first["portal_page"]["person_at_desk"]  # the agent is told, and drives the page itself
+    assert missing and "browser" in first["portal_page"]["how"]  # the agent is told, and drives the page itself
     assert d["portal_missing"]["shown"]  # only once: the next get_offers waits for the carriers as usual
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "browser_activity": {"active": True}}))
+    t0 = time.time()
+    while_open = tools.get_offers(ctx, None, "fastest", 60)
+    assert time.time() - t0 < 1 and while_open.get("browser_in_progress")
     assert not any(x.startswith("person:") for x in waiting_for(d))  # get_offers does not block on a person
     code = d["portal_missing"]["airlines"][0]["code"]
     out = add_portal_page_rate(ctx.deal_id, f"{missing[0]} ({code})", "1696,00", 1, "R-page1")  # as the agent says it
@@ -1399,16 +1403,14 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     opts = tools.get_offers(ctx, None, "fastest", 0)["options"]
     page = next(o for o in opts if o["airline"] == missing[0])
     assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
-    from app.forwarder import OPERATOR_WAIT
-    assert 200 <= OPERATOR_WAIT <= 300  # minutes for the person, and the quote still inside the 6-minute close
     store.kv_set("operator_on", "0")
-    assert "operator mode off" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
+    assert "fully autonomous" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
 
 
 def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_airlines_away():
     """5U's rate desk is one of the portal's three forms (brief). It answered "Rate request FRA-ORD 320 kg" in 61 s with
     a bookable rate_id (probe Sun 02:54); the outage's asks, titled "Portal rates ...", got nothing. Now it gets the
-    carrier request, is awaited like a carrier, and a person on the page is let go once it has priced the airline."""
+    carrier request, is awaited like a carrier, and a browser fallback is unnecessary once it has priced the airline."""
     from app import tools
     from app.forwarder import waiting_for
     from app.kit import RATEDESK
@@ -1436,7 +1438,7 @@ def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_air
          "rate_id": "R-desk1", "billed_kg": "320"}]}))
     store.kv_set("operator_on", "1")
     out = tools.ask_person(ctx, "page", "pass the check", missing, 30)
-    assert out["priced_meanwhile"] == "ratedesk"  # the person is free again at once
+    assert "fully autonomous" in out["error"]  # no human wait, even from an older session
     store.kv_set("operator_on", "0")
 
 
@@ -1454,10 +1456,7 @@ def test_a_carrier_writing_unprompted_is_read_as_its_tariff():
     assert f.classify(mail("Re: Rate request FRA-ORD 320 kg", 99)) == "other"  # a reply of theirs is not a tariff
 
 
-def test_the_browser_opens_5u_sites_only_and_ask_person_brings_back_an_answer():
-    """The browser is a general tool with one boundary (5U's sites); ask_person interrupts the team for anything only
-    a person can do (SIEVER's `avvisa`, for us), and returns their answer."""
-    import threading
+def test_browser_boundary_and_old_human_calls_cannot_wait_for_a_person():
     from app import tools
     api = FakeFiveU()
     kit.load(api)
@@ -1468,16 +1467,11 @@ def test_the_browser_opens_5u_sites_only_and_ask_person_brings_back_an_answer():
     ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
     assert "5U's sites only" in tools.browser(ctx, "open", "https://evil.example/login")["error"]
     assert "5U's sites only" in tools.browser(ctx, "open", "http://start-hack.5u.ai/portal/ui")["error"]
-    store.kv_set("operator_on", "1")
-    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "quote": {"amount": "1 EUR"}}))  # no 2-minute clock
-
-    def person():
-        while not (store.get(ctx.deal_id)["data"].get("person_needed")):
-            time.sleep(0.05)
-        store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "person_needed": {
-            **r["data"]["person_needed"], "answer": "Yes, accept the 40 EUR cancellation fee."}}))
-    threading.Thread(target=person).start()
-    out = tools.ask_person(ctx, "answer", "Accept the airline's 40 EUR cancellation fee?", None, 10)
-    assert out["answer"].startswith("Yes")
-    assert store.get(ctx.deal_id)["data"]["person_needed"] is None
-    store.kv_set("operator_on", "0")
+    assert "ask_person" not in {t["name"] for t in tools.TOOLS}
+    for operator in ("0", "1"):
+        store.kv_set("operator_on", operator)
+        before = time.time()
+        out = tools.ask_person(ctx, "answer", "Accept the cancellation fee?", None, 60)
+        assert "fully autonomous" in out["error"]
+        assert time.time() - before < 0.5
+        assert not store.get(ctx.deal_id)["data"].get("person_needed")
