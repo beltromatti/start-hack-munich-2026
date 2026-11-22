@@ -66,7 +66,7 @@ export default function App() {
           <small>{health ? `${health.models.agent} · ${health.models.effort}` : ""}</small>
         </div>
       </header>
-      <OperatorStrip />
+      <OperatorStrip deals={deals ?? []} onOpen={setSelected} />
       <main className="grid">
         <DealList deals={deals ?? []} selected={selected} onSelect={setSelected} />
         {deal ? <DealView deal={deal} onSent={reload} /> : (

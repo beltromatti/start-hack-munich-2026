@@ -225,3 +225,10 @@ button, input, textarea { font: inherit; color: inherit; }
 .op-log .ok { color: #16a34a; }
 .late { color: #dc2626; }
 .chip.active { border: 2px solid #2563eb; }
+
+/* 5U's portal page live in the conversation, for the person's part */
+.card.portal { border: 2px solid #f59e0b; }
+.portal-shot { display: block; width: min(100%, 560px); aspect-ratio: 720 / 860; margin: 8px 0; border-radius: 8px; border: 1px solid var(--line, #8885); cursor: crosshair; background: #fff; }
+.portal-keys { display: flex; gap: 6px; flex-wrap: wrap; }
+.portal-keys input { flex: 1; min-width: 220px; padding: 6px 8px; font: inherit; }
+.portal-hint { font-size: 12px; margin-top: 4px; }

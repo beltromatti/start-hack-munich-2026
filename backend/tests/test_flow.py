@@ -1351,14 +1351,15 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
             "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
             "lots": [{"pieces": 1, "weight": q(320, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}],
             "insurance": None, "extra_charges": []}
-    tools.get_offers(ctx, ship, "fastest", 0)
+    first = tools.get_offers(ctx, ship, "fastest", 0)
     d = store.get(ctx.deal_id)["data"]
     missing = [a["name"] for a in d["portal_missing"]["airlines"]]
-    assert missing and any(x.startswith("person:") for x in waiting_for(d))
+    assert missing and first["portal_page"]["person_at_desk"]  # the agent is told, and drives the page itself
+    assert not any(x.startswith("person:") for x in waiting_for(d))  # get_offers does not block on a person
     out = add_portal_page_rate(ctx.deal_id, missing[0], "1696,00", 1, "R-page1")
     assert out["ok"] and out["offer"]["source"] == "portal_page"
     opts = tools.get_offers(ctx, None, "fastest", 0)["options"]
     page = next(o for o in opts if o["airline"] == missing[0])
     assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
     store.kv_set("operator_on", "0")
-    assert not any(x.startswith("person:") for x in waiting_for(store.get(ctx.deal_id)["data"]))
+    assert "operator mode off" in tools.portal_page(ctx, "ask_person", airline=missing[0])["error"]

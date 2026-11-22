@@ -84,6 +84,7 @@ def deals() -> list[dict]:
                     "quote": (d.get("quote") or {}).get("amount"),
                     "response_seconds": (d.get("quote") or {}).get("response_seconds"),
                     "booking": (d.get("booking") or {}).get("booking_reference"), "flag": d.get("flag"),
+                    "needs_person": d.get("portal_view"),  # the agent asked a person on 5U's portal page
                     "cost_usd": store.usage(r["id"])["cost_usd"]})
     return out
 
@@ -203,6 +204,31 @@ def portal_rate(deal_id: str, payload: dict) -> dict:
     if out.get("error"):
         raise HTTPException(400, out["error"])
     return out
+
+
+@app.get("/api/portal/{deal_id}/shot")
+def portal_shot(deal_id: str) -> Response:
+    """The shared browser's page for this deal, live, for the person in the deal's conversation."""
+    import httpx
+    try:
+        r = httpx.get(f"http://127.0.0.1:8010/pages/{deal_id}/shot", timeout=10)
+    except Exception:
+        raise HTTPException(503, "the shared browser is not running")
+    if r.status_code != 200:
+        raise HTTPException(r.status_code, r.text[:200])
+    return Response(r.content, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/portal/{deal_id}/{what}")
+def portal_input(deal_id: str, what: str, payload: dict) -> dict:
+    """The person's click or typing in the live view (what: click | type)."""
+    import httpx
+    if what not in ("click", "type"):
+        raise HTTPException(404)
+    try:
+        return httpx.post(f"http://127.0.0.1:8010/pages/{deal_id}/{what}", json=payload, timeout=10).json()
+    except Exception:
+        raise HTTPException(503, "the shared browser is not running")
 
 
 @app.get("/api/bookings")

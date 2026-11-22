@@ -2,6 +2,7 @@ export type DealRow = {
   id: string; status: string; updated_at: number; customer: string | null; subject: string | null;
   route: string | null; weight_kg: string | null; preference: string | null; quote: string | null;
   response_seconds: number | null; booking: string | null; flag: string | null; cost_usd: number;
+  needs_person?: { since: number; note: string; airline: string | null } | null;
 };
 
 export type Attachment = { id: number; filename: string; content_type?: string; size?: number };
@@ -36,6 +37,7 @@ export type Deal = {
       via?: string; amount?: string; price_changed?: { quoted: string; booked: string };
       carrier_status?: { text: string; at: string } };
     notes?: { at: number; text: string; flag: string }[]; flag?: string;
+    portal_view?: { since: number; note: string; airline: string | null } | null;
   };
   mails: Mail[]; carrier_mails?: Mail[]; events: EventRow[];
   usage: { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };

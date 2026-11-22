@@ -1,27 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { get, post } from "./api";
+import { DealRow, get, post } from "./api";
 
-// When 5U's rate API answers 503 for some airlines, their prices are still on 5U's portal page, which asks people
-// to pass a check. A person reads them there by hand: one compact card per request, the form's values to copy, and
-// one paste box that reads airline, total, days and rate_id in code and adds the price at once.
-const PORTAL = "https://start-hack.5u.ai/portal/ui";
+// Operator mode: a person is at the desk. When the agent asks for one on 5U's portal page (portal_page ask_person),
+// an alarm rings, a notification comes, and the deal opens with the page live in its conversation.
+type Op = { on: boolean };
 
-type Missing = { name: string; code: string | null; break_above: string | null };
-type Needed = {
-  deal: string; subject: string; received_at: string; preference: string | null;
-  origin: string; destination: string; gross_kg: string; volume_cbm: string | null; chargeable_kg: string;
-  airlines: Missing[];
-};
-type Op = { on: boolean; wait_seconds: number; needed: Needed[] };
-type Read = { total: string | null; days: string | null; rate_id: string | null; totals_seen: string[] };
-
-let portalTab: Window | null = null;
-function openPortal() {  // one tab for 5U's portal page, reused
-  if (portalTab && !portalTab.closed) { portalTab.focus(); return; }
-  portalTab = window.open(PORTAL, "five-u-portal");
-}
-
-function alarm(text: string) {
+function alarm() {
   try {
     const ctx = new AudioContext();
     [0, 0.25, 0.5].forEach((t) => {
@@ -32,115 +16,48 @@ function alarm(text: string) {
       o.stop(ctx.currentTime + t + 0.15);
     });
   } catch { /* no audio */ }
-  try {
-    if ("Notification" in window && Notification.permission === "granted") {
-      const n = new Notification("Portal price needed", { body: `${text} · click to open the portal`, requireInteraction: true });
-      n.onclick = () => { window.focus(); openPortal(); n.close(); };
-    }
-  } catch { /* none */ }
 }
 
-function Chip({ label, value, big, active, onPick }: { label?: string; value: string; big?: boolean; active?: boolean; onPick?: () => void }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button className={`chip${big ? " big" : ""}${done ? " done" : ""}${active ? " active" : ""}`} title="Click to copy"
-      onClick={() => { onPick?.(); navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 900); }); }}>
-      {label ? <small>{label}</small> : null}<b>{value}</b>
-    </button>
-  );
-}
-
-function Card({ n, left }: { n: Needed; left: number }) {
-  const [log, setLog] = useState<string[]>([]);
-  const [text, setText] = useState("");
-  const [current, setCurrent] = useState<string | null>(n.airlines.length === 1 ? n.airlines[0].name : null);
-  const kg = String(Number(n.gross_kg)).replace(/\.0+$/, "");
-  async function paste(t: string) {
-    setText(t);
-    if (!t.trim()) return;
-    const low = t.toLowerCase();
-    const a = n.airlines.find((x) => (x.code && new RegExp(`\\b${x.code}\\b`).test(t)) || low.includes(x.name.toLowerCase()))
-      ?? n.airlines.find((x) => x.name === current);
-    const r = (await post<{ read: Read }>(`/api/deals/${n.deal}/portal_rate`, { airline: a?.name ?? "", pasted: t, dry: true })).read;
-    if (!a || !r.total || !r.days || r.totals_seen.length > 1) {
-      setLog((l) => [`✗ not added: ${!a ? "which airline? click its code first, then paste" : !r.total ? "no total in EUR" : !r.days ? "no transit days" : "several amounts, paste only the result box"}`, ...l]);
-      return;
-    }
-    try {
-      await post(`/api/deals/${n.deal}/portal_rate`, { airline: a.name, pasted: t, weight_kg: kg, who: "Mattia" });
-      setLog((l) => [`✓ ${a.code ?? a.name} ${r.total} EUR · ${r.days} d · ${r.rate_id ?? "no rate_id"}`, ...l]);
-      setText("");
-    } catch (e) { setLog((l) => [`✗ ${String(e)}`, ...l]); }
-  }
-  const last = useRef("");
-  useEffect(() => {
-    const onFocus = () => {
-      navigator.clipboard?.readText?.().then((t) => {
-        if (t && t !== last.current && /\bR-[A-Za-z0-9_-]{6,}/.test(t) && /(EUR|€)/.test(t)) { last.current = t; paste(t); }
-      }).catch(() => undefined);
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  });
-  return (
-    <div className="op-card">
-      <div className="op-line">
-        <b className="op-lane">{n.origin} → {n.destination}</b>
-        <span className="op-pref">{n.preference ?? "any"}</span>
-        <span className={`op-left${left < 25 ? " late" : ""}`}>{left}s</span>
-      </div>
-      <div className="op-line">
-        <Chip big label="Origin" value={n.origin} />
-        <Chip big label="Destination" value={n.destination} />
-        <Chip big label="Weight kg" value={kg} />
-        {n.volume_cbm ? <Chip big label="Volume cbm" value={String(Number(n.volume_cbm))} /> : null}
-        <span className="op-sep">Airline:</span>
-        {n.airlines.map((a) => <Chip key={a.name} value={a.code ?? a.name} active={current === a.name}
-          onPick={() => { setCurrent(a.name); openPortal(); }} />)}
-      </div>
-      <textarea className="op-paste" rows={2} value={text} placeholder="Copy the portal's result and come back to this tab: it is read and added at once (or paste it here)"
-        onChange={(e) => paste(e.target.value)} />
-      {log.length ? <div className="op-log">{log.slice(0, 4).map((x, i) => <div key={i} className={x.startsWith("✓") ? "ok" : "late"}>{x}</div>)}</div> : null}
-    </div>
-  );
-}
-
-export function OperatorStrip() {
+export function OperatorStrip({ deals, onOpen }: { deals: DealRow[]; onOpen: (id: string) => void }) {
   const [op, setOp] = useState<Op | null>(null);
-  const [now, setNow] = useState(Date.now());
   const seen = useRef<Set<string>>(new Set());
   const title = useRef(document.title);
   useEffect(() => {
     const load = () => get<Op>("/api/operator").then(setOp).catch(() => undefined);
     load();
-    const t = setInterval(() => { load(); setNow(Date.now()); }, 1000);
+    const t = setInterval(load, 3000);
     return () => clearInterval(t);
   }, []);
-  const live = (op?.needed ?? [])
-    .map((n) => ({ n, left: (op?.wait_seconds ?? 95) - Math.round((now - Date.parse(n.received_at)) / 1000) }))
-    .filter((x) => x.left > 0);
+  const waiting = deals.filter((d) => d.needs_person);
   useEffect(() => {
-    for (const { n } of live) {
-      if (!seen.current.has(n.deal)) {
-        seen.current.add(n.deal);
-        if (op?.on) alarm(`${n.origin}-${n.destination} ${n.gross_kg} kg: ${n.airlines.map((a) => a.code ?? a.name).join(", ")}`);
-      }
+    for (const d of waiting) {
+      const key = `${d.id}:${d.needs_person?.since}`;
+      if (seen.current.has(key)) continue;
+      seen.current.add(key);
+      alarm();
+      onOpen(d.id);
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          const n = new Notification("Your turn on 5U's portal", { body: `${d.route ?? ""} ${d.needs_person?.airline ?? ""}: pass the check and send`, requireInteraction: true });
+          n.onclick = () => { window.focus(); onOpen(d.id); n.close(); };
+        }
+      } catch { /* none */ }
     }
-    document.title = live.length ? `(!) Portal price · ${title.current}` : title.current;
+    document.title = waiting.length ? `(!) Your turn · ${title.current}` : title.current;
   });
   if (!op) return null;
-  const toggle = () => post<Op>("/api/operator", { on: !op.on }).then(setOp);
+  const toggle = () => post<Op>("/api/operator", { on: !op.on }).then((x) => setOp({ on: x.on }));
   return (
-    <section className={`operator${live.length ? " needed" : ""}`}>
+    <section className={`operator${waiting.length ? " needed" : ""}`}>
       <div className="op-line">
         <button className={`op-toggle${op.on ? " on" : ""}`} onClick={toggle}>{op.on ? "Operator ON" : "Operator OFF"}</button>
-        <a className="op-link" href={PORTAL} target="_blank" rel="noreferrer">5U portal ↗</a>
         {"Notification" in window && Notification.permission !== "granted"
           ? <button className="chip" onClick={() => Notification.requestPermission()}>Allow alerts</button> : null}
-        <span className="muted op-hint">{op.on ? (live.length ? "click the airline (copies it, opens the portal) → fill → pass the check → copy the result → come back here" : "waiting: an alarm rings when a price is needed")
-          : "turn on when you are at the desk"}</span>
+        <span className="muted op-hint">
+          {waiting.length ? waiting.map((d) => <a key={d.id} href="#" onClick={(e) => { e.preventDefault(); onOpen(d.id); }}>{d.route}: your turn </a>)
+            : op.on ? "at the desk: when 5U's portal needs a person, the deal opens with the page in its conversation" : "off: the agent quotes without asking anyone"}
+        </span>
       </div>
-      {live.map(({ n, left }) => <Card key={n.deal} n={n} left={left} />)}
     </section>
   );
 }

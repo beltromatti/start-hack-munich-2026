@@ -173,7 +173,7 @@ class Forwarder:
             self._retry_portal(deal_id)
             self.wait_step()
 
-    PORTAL_RETRY = (15, 45)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for (round 94: it stayed down for minutes; the quote must still go out inside 2 minutes)
+    PORTAL_RETRY = (10, 20)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for (round 94: it stayed down for minutes; the quote must still go out inside 2 minutes)
 
     def _retry_portal(self, deal_id: str) -> None:
         """The portal answered 5xx or 429 for some airlines of this request: try them again while we wait for the
@@ -374,6 +374,14 @@ class Forwarder:
             result["insurance"] = ({"premium": pricing.fmt(premium), "included_in_every_total": True} if premium
                                    is not None else {"included_in_every_total": False, "why": "the goods value is "
                                    "not in EUR or a term is missing: ask, never compute it yourself"})
+        pm = d.get("portal_missing") or {}
+        if pm.get("airlines"):  # their rates are on 5U's portal page, for people who pass its check
+            result["portal_page"] = {
+                "airlines": [f"{a['name']} ({a.get('code')})" for a in pm["airlines"]],
+                "person_at_desk": store.kv_get("operator_on") == "1",
+                "how": "with a person at the desk: portal_page open, fill the form for the airline that matters "
+                       "most for this request, ask_person; its price then joins these options. Without one: "
+                       "quote with what you have"}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]
@@ -966,9 +974,6 @@ def waiting_for(d: dict) -> list[str]:
     asked = Counter(e for mid, e in d.get("asked", {}).items() if mid not in fallback)
     replied = Counter(d.get("replied", []))
     owed = sorted(email for email, n in asked.items() if replied[email] < n)
-    pm = d.get("portal_missing") or {}
-    if pm.get("airlines") and store.kv_get("operator_on") == "1" and (_since(d.get("received_at")) or 0) <= OPERATOR_WAIT:
-        owed += [f"person: portal page for {', '.join(a['name'] for a in pm['airlines'])}"]
     pr = d.get("portal_retry") or {}
     if pr.get("names") and time.time() - pr.get("since", 0) <= Forwarder.PORTAL_RETRY[1]:
         owed += [f"portal: {n}" for n in pr["names"]]  # a portal outage is waited out, like a carrier's answer
