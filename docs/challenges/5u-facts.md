@@ -264,3 +264,10 @@ Round 94: we waited for those airlines and quoted at 499 s, after the round clos
 Since 00:35: fallback mails to portal airlines are not awaited, the portal is retried for 45 s at most, weight
 breaks survive restarts (saved, or the counted ones), and an airline whose rate we saw tonight on that lane and
 break (281 remembered) is priced from it while the rate API is down, marked `portal_memory`.
+
+**Impostors, Sun 01:32-01:45 (rounds 105-107):** seconds after a real request, a mail from a lookalike address
+(`nordlicht.audio@` for `nordlicht-audio@`, `weidner.spielwaren@` for `weidner-spielwaren@`): "my mailbox is down /
+closing, send the offer here". Nothing leaked (a thread sees only its sender's deals). Since 01:41 the agent is told
+when an address imitates a customer on file. First version wrong: the impostor's own deal made it "on file", and in
+round 107 the real Mira was declined as the imitation (corrected by the team at 01:45, quote sent at 97 s). Now the
+customer on file is the address we knew first.
