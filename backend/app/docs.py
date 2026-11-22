@@ -10,7 +10,7 @@ AUDIO = (".mp3", ".wav", ".m4a", ".ogg", ".oga", ".aac", ".flac", ".webm", ".mp4
 PICTURE = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
 CONVERTED = (".tif", ".tiff", ".bmp", ".heic", ".heif")  # pictures the model does not take as they are: made png first
 MATERIAL = 20_000   # bytes: a picture inside a document from this size on is content (a scan, a photo), below a logo
-MOST = 12           # pictures read per file: each is a model call of a few seconds, and a quote has two minutes
+MOST = 4            # pictures read per file: each is a model call of a few seconds, and a quote has two minutes
 
 
 def kind(filename: str, raw: bytes) -> str:
