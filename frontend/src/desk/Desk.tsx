@@ -653,7 +653,7 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
     return () => { document.removeEventListener("pointerdown", out); document.removeEventListener("keydown", key); };
   }, [menu]);
   // the account signed in (null on a laptop without accounts: the desk is open, as before)
-  const me: Person = account ? { id: account.username, name: account.name, role: account.role } : { id: "you", name: "there", role: "ops" };
+  const me: Person = account ? { id: account.username, name: account.name, role: account.role } : { id: "you", name: "You", role: "ops" };
   ME = me.name.split(" ")[0];
   useEffect(() => { // the tab carries our mark, light or dark with the browser
     const svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><style>.m{fill:#141414;stroke:#141414}@media(prefers-color-scheme:dark){.m{fill:#fff;stroke:#fff}}</style><g class='m'><circle cx='21' cy='42' r='15' stroke='none'/><circle cx='42' cy='23' r='9.5' stroke='none'/><path d='M25 37 40 25' stroke-width='14' stroke-linecap='round' fill='none'/><circle cx='56' cy='10' r='4.6' stroke='none'/></g></svg>";
@@ -716,7 +716,7 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
         </aside>
         <div className="dk-main">
           <header className="dk-bar">
-            <div><small>{greet}, <b>{ME}</b></small><h1>{TITLE[page]}</h1></div>
+            <div><small>{greet}{account ? <>, <b>{ME}</b></> : null}</small><h1>{TITLE[page]}</h1></div>
             <div className="dk-rt">
               {DEMO ? <span className="dk-demo">{recorded() ?? "Example data"}</span> : null}
               {page !== "ask" ? <button className="dk-btn" onClick={() => go("ask")}><Icon n="search" size={15} />Ask<kbd>⌘K</kbd></button> : turns.length ? <button className="dk-btn" onClick={() => setTurns([])}>New question</button> : null}
