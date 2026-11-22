@@ -103,8 +103,10 @@ TOOLS = [
        {"deal_id": S}),
     fn("mail_carrier",
        "Write to a carrier or trucker from our carrier list, or to the rate desk: to answer a question they asked, "
-       "to ask for something, to book by mail. Their answer comes back into this deal (get_offers with shipment "
-       "null waits for it). in_reply_to: the id of their mail you answer, if any.",
+       "to ask for something, to book by mail, to cancel. One clear mail says it all; an automatic reply is not a "
+       "reason to write again (twice in 10 minutes per carrier is the most this tool sends). Their answer comes "
+       "back into this deal (get_offers with shipment null waits for it). in_reply_to: the id of their mail you "
+       "answer, if any.",
        {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}, "in_reply_to": I}),
     fn("carrier_status",
        "Ask the airline of a booked shipment where it is now: there is no status API, the airline answers by mail "
@@ -335,8 +337,18 @@ def mail_carrier(ctx: Ctx, to: str, subject: str, body: str, in_reply_to: int | 
     if to != RATEDESK and not kit.world().carrier_by_email(to):
         return {"error": f"{to} is not on our carrier list"}
     _ensure_deal(ctx)
+    # never spam a counterpart (AGENTS.md rule 3): round 88 wrote six cancellation mails to one airline in six
+    # minutes, each answer of its automatic desk waking the session for one more; 5U took 20 points off that round
+    recent = [x for x in (store.get(ctx.deal_id)["data"].get("agent_mails") or [])
+              if x["to"] == to and time.time() - x["at"] < 600]
+    if len(recent) >= 2:
+        return {"error": f"you already wrote to {to} twice in the last 10 minutes in this deal: more mails read as "
+                         "spam to a carrier and to 5U. Their answer comes back here; meanwhile tell the customer "
+                         "plainly what you know and what you are waiting for"}
     mid = ctx.fw.mail_carrier(ctx.deal_id, to, subject, body, in_reply_to=in_reply_to)
     store.kv_set(f"agentmail:{mid}", ctx.deal_id)  # the agent's own question: after a booking its answer is news
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "agent_mails": (r["data"].get("agent_mails") or [])
+                                                       + [{"to": to, "at": time.time(), "mail": mid}]}))
     store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"].get("asked", {}),
                                                                               str(mid): to}}))
     booked = bool((store.get(ctx.deal_id) or {}).get("data", {}).get("booking"))

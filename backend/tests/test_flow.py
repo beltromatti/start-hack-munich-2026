@@ -871,3 +871,19 @@ def test_two_shipments_of_one_deal_are_two_bookings():
     found = tools.crm(ctx, "ORD")["matches"][0]
     assert {x["weight_kg"] for x in found["all_bookings"]} == {"320", "900"}
     assert tools.book(ctx, a)["team_reference"] == f"SM-{rfq['id']}"  # booking an option again keeps its own
+
+
+def test_the_agent_writes_to_one_carrier_at_most_twice_in_ten_minutes():
+    """Round 88: six cancellation mails to one airline in six minutes (each automatic answer woke the session for
+    one more); 5U took 20 points off the round. Never spam a counterpart: the tool says no to a third mail."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    store.put("deal-79", "deal", "booked", {"root": 79, "asked": {}})
+    ctx = tools.Ctx(f, "session-79", "deal-79", 79, "customer", None)
+    to_airline = lambda: tools.mail_carrier(ctx, "meridian-freightways@hackloop.mail", "Cancel", "Please cancel.", None)
+    assert "sent" in to_airline() and "sent" in to_airline()
+    third = to_airline()
+    assert "error" in third and "twice" in third["error"]
+    assert "sent" in tools.mail_carrier(ctx, "solace-air-cargo@hackloop.mail", "Q", "A question.", None)
