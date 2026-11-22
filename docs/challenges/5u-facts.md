@@ -245,3 +245,8 @@ to whole days by 5U.
   quoted with one total line per shipment; "book the first one now, the second later". The booking record took
   the route and weight of the last pricing (fixed by hand; since 23:58 each option carries its own shipment and
   each booking its own reference, SM-<root>-2 for the next).
+- Round 88's score: accepted, `tracking: 0.0` (no tracking question came for the cancelled shipment) and
+  `adjustment: -20.0`, no reason given. What we did that a forwarder would not: six mails to the airline in six
+  minutes (each automatic answer woke the session, which wrote again). Since 00:04 `mail_carrier` sends at most
+  two mails to one carrier per deal in ten minutes. Round 90 (RUH and GRU in one mail, book RUH now) booked with
+  the right route and weight under SM-26221.
