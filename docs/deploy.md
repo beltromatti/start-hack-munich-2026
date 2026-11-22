@@ -16,6 +16,35 @@ curl localhost:8000/api/health  # {"ok": true, "worker": true, ...}
 
 UI: `http://<server>:8000`. Behind a firewall: `ssh -L 8000:localhost:8000 <server>` and open `localhost:8000`.
 
+## Sign-in
+
+The desk is closed to anyone without an account once the register holds one. Accounts live in the register
+(`backend/app/accounts.py`: a salted PBKDF2 hash, never the password; a signed session cookie for 14 days;
+ten wrong passwords from one address in ten minutes, then a pause). With no account the desk is open, as on a laptop.
+
+```sh
+make account USERNAME=mattia NAME="Mattia Beltrami"     # prints a generated password once
+cd backend && uv run python -m app.accounts list
+```
+
+Changes a person makes on the desk (a message to Giulia, a rate entered) are recorded under their account.
+The challenge leaderboard is at `/leaderboard/challenge` for the team; the product does not link to it.
+
+## Public address (Cloudflare Tunnel)
+
+The machine dials out to Cloudflare, so no port is opened and production can stay on the Mac. Needs
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (Tunnel edit, DNS edit on the zone) in `.env`, and `cloudflared`
+(`brew install cloudflared`). `DESK_HOSTNAME` defaults to `milan.noesisai.it`.
+
+```sh
+deploy/tunnel.sh setup    # the tunnel and where it points (127.0.0.1:8000); writes TUNNEL_TOKEN to .env
+deploy/tunnel.sh route    # DNS: the hostname to the tunnel
+make tunnel               # the connector; refuses while the register holds no account
+deploy/tunnel.sh down     # take the address off DNS again
+```
+
+On a server with Docker: `docker compose --profile public up -d` runs the same connector next to the forwarder.
+
 ## Shared portal browser on the desk's Mac
 
 Run `cd backend && uv run python -m app.browser` alongside the existing server. It listens only on
