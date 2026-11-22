@@ -163,7 +163,7 @@ body.click{cursor:pointer}
   background:radial-gradient(1100px 520px at 50% 118%,#c9f0cf 0%,#c9f0cf00 70%),linear-gradient(180deg,var(--cream) 0,var(--cream) 640px,#dcebdc 641px,#e6efe2 860px,var(--cream) 1080px)}
 #calm.on{display:block}
 #calm svg.ghost{position:absolute;inset:0}
-#hz{position:absolute;left:0;top:640px;height:1.5px;width:1920px;background:var(--calm-ink);transform-origin:left center;transform:scaleX(0)}
+#hz{position:absolute;left:0;top:640px;height:1.5px;width:100%;background:var(--calm-ink);transform-origin:left center;transform:scaleX(0)}
 #simp{position:absolute;left:0;right:0;top:392px;text-align:center;font-family:var(--sans);font-weight:600;
   font-size:196px;line-height:1;letter-spacing:-.05em;color:var(--calm-ink);opacity:0}
 #one{position:absolute;left:0;right:0;top:700px;text-align:center;font-family:"Inter",system-ui,sans-serif;font-weight:500;
@@ -308,6 +308,10 @@ function rect(node) {
 }
 function fit() {
   S = Math.min(innerWidth / 1920, innerHeight / 1080);
+  // The stage grows to the window's own shape, so the scene has no bars on a 16:10 or wider screen.
+  const W = innerWidth / S, H = innerHeight / S;
+  stage.style.width = W + "px"; stage.style.height = H + "px";
+  stage.style.margin = `${-H / 2}px 0 0 ${-W / 2}px`;
   stage.style.transform = `scale(${S})`;
   B = Math.min((canvas.clientWidth - 80) / 1280, (canvas.clientHeight - 70) / 880);
   board.style.transform = `translateX(${-640 * B}px) scale(${B})`;

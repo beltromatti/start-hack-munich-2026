@@ -57,7 +57,9 @@ html,body{margin:0;height:100%;background:#101210;overflow:hidden;font-family:va
 
 /* 3 swarm */
 .swarm{background:var(--paper,#eef2e8) url(frames/swarm-poster.jpg) center/cover}
-.swarm iframe{left:0;top:0;width:1920px;height:1080px;border:0;transform-origin:0 0}
+/* the swarm slide fills the whole window, whatever its shape: no bars */
+.ts.swarm{width:100vw;height:100vh;aspect-ratio:auto}
+.swarm iframe{left:0;top:0;width:100%;height:100%;border:0}
 .play{left:50%;top:50%;transform:translate(-50%,-50%);font:500 1.5cqw var(--sans);padding:1cqw 1.8cqw;border-radius:99cqw;border:0;background:#141414;color:#fff;cursor:pointer;box-shadow:0 1.2cqw 2.6cqw -1cqw #14141480,0 .2cqw .5cqw #14141433}
 
 /* 4 decides / guarantees */

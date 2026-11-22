@@ -290,8 +290,7 @@ document.getElementById('p').onclick=()=>go(i-1);document.getElementById('x').on
 document.querySelectorAll('.play').forEach(b=>b.onclick=play);
 // The swarm scene plays once and holds its last frame. Keys and a click pressed inside it come back here.
 addEventListener('message',e=>{if(e.data&&e.data.deck==='next')go(i+1);if(e.data&&e.data.deck==='prev')go(i-1)});
-function fit(){document.querySelectorAll('.swarm').forEach(s=>{const w=s.clientWidth||innerWidth;s.querySelector('iframe').style.transform='scale('+(w/1920)+')'})}
-addEventListener('resize',fit);
+function fit(){}
 const h=parseInt((location.hash.match(/s(\d+)/)||[])[1]);go(h?h-1:0);
 </script>
 </body>
