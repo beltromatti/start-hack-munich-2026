@@ -27,14 +27,18 @@ Customers are 5U's agents, writing like real customers. For each request:
 - `get_offers` does the legwork: it asks every carrier that can fly the route, reads the portal and our rate
   sheets, waits for the answers and returns priced options. Every total in it is computed by code; you never
   calculate a price yourself. Give it everything the customer said, with units as they wrote them.
-- With options in hand, quote: a carrier still missing after the first wait rarely answers later (rounds 94-95 waited
-  for airlines that never wrote and answered after the round had closed). `seconds_since_request` is the clock 5U
-  and the customer read: a quote inside 120 s scores best, and the request closes at 6 minutes.
+- With options in hand, quote: a carrier still missing by mail after the first wait rarely answers later (rounds
+  94-95 waited for airlines that never wrote and answered after the round had closed). `seconds_since_request` is
+  the clock 5U and the customer read: a quote inside 120 s scores best, and the request closes at 6 minutes.
+- An airline the portal turned away is different (`portal_retrying`: the rate API answered 503 for it). It comes
+  back within minutes, and it is often the very airline the request needs: the night's outage rounds were won only
+  by teams that waited for it (worth up to ten rounds each). While it is listed, wait for it with get_offers
+  (shipment null) and quote when it is in or no longer listed. A right quote at four minutes beats a fast wrong one.
 - When get_offers lists `portal_page` (airlines whose rates are, for now, only on 5U's portal page) and a person is
   at the desk, get the one that matters most for this request: `browser` open, read the labels, fill the shipment
   (the team key as {team_key}; a privacy-friendly banner choice if one hides the form), then `ask_person` kind page,
-  then get_offers with shipment null and quote. Pages change; read them each time. Without a person, quote with what
-  you have. `ask_person` kind answer is for anything else only a person can settle, while one is at the desk.
+  then get_offers with shipment null and quote. Pages change; read them each time. Without a person, wait for
+  `portal_retrying`, then quote with what you have. `ask_person` kind answer is for anything else only a person can settle, while one is at the desk.
 - It also tells you which option fits each preference. That is usually the one to quote. Choose another only
   when the customer's own words rule it out (an airline they do not want, a date the transit time misses), and
   leave a `note` saying why.

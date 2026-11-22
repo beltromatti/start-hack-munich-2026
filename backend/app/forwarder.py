@@ -173,7 +173,12 @@ class Forwarder:
             self._retry_portal(deal_id)
             self.wait_step()
 
-    PORTAL_RETRY = (10, 20)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for (round 94: it stayed down for minutes; the quote must still go out inside 2 minutes)
+    # Seconds between tries of one airline, and how long after the ask an airline the rate API turned away (503, 429)
+    # is retried and waited for. Rounds 93-100 (Sun 00:19-01:03): one airline per lane answered 503, always the one
+    # 5U's answer needed; the teams that won those rounds (x3 to x10) booked it 83-358 s after the request, Mythos
+    # at 83-114 s every time. We stopped after 20 s and lost all eight. A request closes at 6 minutes (round 94
+    # answered at 499 s: out of time), so the wait ends with time left to write.
+    PORTAL_RETRY = (20, 230)
 
     def _retry_portal(self, deal_id: str) -> None:
         """The portal answered 5xx or 429 for some airlines of this request: try them again while we wait for the
@@ -186,8 +191,9 @@ class Forwarder:
         if time.time() - pr["since"] > self.PORTAL_RETRY[1]:
             store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {**pr, "names": []}}))
             return
+        gap = max(self.PORTAL_RETRY[0], 6.5 * len(pr["names"]))  # under the team's 10 rates a minute
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {
-            **pr, "next": time.time() + self.PORTAL_RETRY[0]}}))
+            **pr, "next": time.time() + gap}}))
         cbm = Decimal(pr["cbm"]) if pr.get("cbm") else None
         got, failed = self.portal_offers(deal_id, pr["o"], pr["d"], Decimal(pr["kg"]), cbm, Decimal(pr["cw"]),
                                          only=set(pr["names"]))
@@ -374,6 +380,12 @@ class Forwarder:
             result["insurance"] = ({"premium": pricing.fmt(premium), "included_in_every_total": True} if premium
                                    is not None else {"included_in_every_total": False, "why": "the goods value is "
                                    "not in EUR or a term is missing: ask, never compute it yourself"})
+        pr = d.get("portal_retry") or {}
+        left = Forwarder.PORTAL_RETRY[1] - (time.time() - pr.get("since", 0))
+        if pr.get("names") and left > 0:  # the rate API turned them away a moment ago: tried again every 20 s
+            result["portal_retrying"] = {"airlines": pr["names"], "seconds_left": int(left),
+                                         "why": "the rate API answers 503 for them right now; in the night outage it "
+                                                "came back within 80-360 s, and the teams that waited won those rounds"}
         pm = d.get("portal_missing") or {}
         if pm.get("airlines"):  # their rates are on 5U's portal page, for people who pass its check
             result["portal_page"] = {
@@ -381,7 +393,7 @@ class Forwarder:
                 "person_at_desk": store.kv_get("operator_on") == "1",
                 "how": "with a person at the desk: browser open (5U's portal page), fill the form for the airline "
                        "that matters most for this request, ask_person kind page; its price then joins these "
-                       "options. Without one: quote with what you have"}
+                       "options. Without one: wait while portal_retrying lists it, then quote with what you have"}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]

@@ -1001,6 +1001,19 @@ def test_a_portal_outage_is_retried_while_the_carriers_are_awaited(monkeypatch):
     assert not store.get(ctx.deal_id)["data"]["portal_retry"]["names"]
 
 
+def test_an_airline_the_rate_api_turned_away_is_waited_for_minutes_not_seconds():
+    """Rounds 93-100: one airline per lane answered 503, always the one the answer needed; the winning teams booked it
+    83-358 s after the request, we stopped trying after 20 s. It is now awaited until about 230 s after the ask,
+    and dropped after, so the quote still goes out before the request closes at 6 minutes."""
+    import time
+    from app.forwarder import Forwarder, waiting_for
+    pr = lambda age: {"portal_retry": {"names": ["Borealis Freight Airways"], "since": time.time() - age}}
+    assert "portal: Borealis Freight Airways" in waiting_for(pr(100))
+    assert "portal: Borealis Freight Airways" in waiting_for(pr(200))
+    assert not waiting_for(pr(Forwarder.PORTAL_RETRY[1] + 5))
+    assert Forwarder.PORTAL_RETRY[1] + 30 < 360
+
+
 def test_while_the_rate_api_is_down_an_airline_is_priced_from_its_own_portal_rate():
     """Rounds 93-94: the rate API answered 503 for minutes and the portal airlines answer no mail; quoted without
     them, 'too low' (0 of 13 teams accepted round 93). A portal price is a rate per kg per airline, lane and weight

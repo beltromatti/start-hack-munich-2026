@@ -96,7 +96,8 @@ TOOLS = [
        "each preference. Pass the shipment as the customer described it, units as written. With shipment null it "
        "only waits for the replies still missing and returns the options again (or, when there is nothing to "
        "price, what the carriers answered). Carriers answer in 15-60 s (live, "
-       "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. "
+       "Sat 21 Nov); waiting up to about 90 s still gets the quote out within the 2 minutes that score best. An "
+       "airline the rate API turned away (portal_retrying) is tried again for about 4 minutes and is worth waiting for. "
        "wait_seconds is how long to wait at most: it returns as soon as everyone answered.",
        {"shipment": nullable(SHIPMENT),
         "preference": {"type": "string", "enum": ["cheapest", "fastest", "unspecified"]},
