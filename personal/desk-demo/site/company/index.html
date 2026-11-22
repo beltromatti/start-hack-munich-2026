@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milan Forwarding</title>
+<meta name="description" content="A customer mails an air freight request. The desk reads it, asks the airlines, sends one price and books when the customer says yes.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* One page in the desk's own language: a frosted sheet over spheres of colour with grain. Controls are round,
+   surfaces are soft, one easing for everything. Green, amber and red are the three states of the desk. */
+:root { --ink: #141414; --ink2: #3b3b3b; --muted: #747474; --line: rgba(0,0,0,.07); --ease: cubic-bezier(.22, 1, .36, 1); --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); color-scheme: light; }
+* { box-sizing: border-box; } html { scroll-behavior: smooth; }
+body { margin: 0; color: var(--ink); font: 16px/1.55 "Inter", ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; background: #eef2e8; overflow-x: hidden; }
+h1, h2, h3, p { margin: 0; } a { color: inherit; }
+.ground { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.ground i { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+.ground i::before, .ground i::after { content: ""; position: absolute; border-radius: 50%; filter: blur(50px); }
+.ground i::before { width: 74vmax; height: 74vmax; left: -22vmax; bottom: -30vmax; background: radial-gradient(circle at 34% 30%, var(--a), var(--b) 46%, var(--c) 74%, transparent 76%); animation: drift 26s ease-in-out infinite alternate; }
+.ground i::after { width: 50vmax; height: 50vmax; right: -14vmax; top: -20vmax; background: radial-gradient(circle at 34% 30%, var(--a), var(--b) 50%, transparent 74%); animation: drift 32s ease-in-out infinite alternate-reverse; }
+.ground .calm { --a: #c9f0cf; --b: #3fae6c; --c: #1d7d4b; } .ground .watch { --a: #fbe7b2; --b: #e7a83a; --c: #c27d14; } .ground .alert { --a: #fbcdbd; --b: #e8573c; --c: #b9341f; }
+body[data-mood="calm"] .ground .calm, body[data-mood="watch"] .ground .watch, body[data-mood="alert"] .ground .alert { opacity: 1; }
+.ground::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .55; mix-blend-mode: overlay; }
+@keyframes drift { to { transform: translate(5vmax, -4vmax) scale(1.08); } }
+.sheet { position: relative; z-index: 1; margin: 18px; border-radius: 26px; background: rgba(255,255,255,.76); backdrop-filter: blur(34px) saturate(1.2); -webkit-backdrop-filter: blur(34px) saturate(1.2); box-shadow: 0 30px 80px rgba(30,40,30,.14), 0 0 0 1px rgba(255,255,255,.55); }
+.in { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+nav { display: flex; align-items: center; gap: 26px; padding: 18px 0; } nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; text-decoration: none; margin-right: auto; } nav .brand svg { width: 34px; height: 34px; }
+nav a.l { text-decoration: none; color: var(--ink2); font-weight: 500; font-size: 15px; transition: color .2s; } nav a.l:hover { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 22px; border-radius: 999px; font-weight: 600; font-size: 15px; text-decoration: none; border: 1px solid rgba(0,0,0,.12); background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); transition: transform .45s var(--ease), box-shadow .3s; }
+.btn.k { color: #fff; border-color: #111; background: linear-gradient(180deg, #2c2c2c, #111); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 1px 2px rgba(0,0,0,.25), 0 10px 20px -10px rgba(0,0,0,.5); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(0,0,0,.25); } .btn:active { transform: scale(.97); } .btn.s { height: 40px; padding: 0 18px; font-size: 14px; }
+.hero { text-align: center; padding: 64px 0 36px; display: grid; justify-items: center; }
+.orb { width: 72px; height: 72px; position: relative; overflow: hidden; border-radius: 58% 42% 52% 48% / 46% 54% 46% 54%; background: radial-gradient(circle at 70% 80%, var(--o3), transparent 62%), var(--o2); box-shadow: 0 18px 40px -12px var(--o2), inset 0 -8px 16px -8px var(--o3); animation: morph 11s ease-in-out infinite, turn 30s linear infinite; transition: box-shadow 1.4s; }
+.orb::before { content: ""; position: absolute; inset: -25%; background: radial-gradient(circle at 42% 38%, var(--o1), transparent 44%); filter: blur(6px); animation: swim 6.5s ease-in-out infinite alternate; }
+.orb::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); background-size: 120px; opacity: .6; mix-blend-mode: overlay; }
+body[data-mood="calm"] { --o1: #c9f0cf; --o2: #3fae6c; --o3: #1d7d4b; } body[data-mood="watch"] { --o1: #fbe7b2; --o2: #e7a83a; --o3: #c27d14; } body[data-mood="alert"] { --o1: #fbcdbd; --o2: #e8573c; --o3: #b9341f; }
+@keyframes morph { 0%, 100% { border-radius: 58% 42% 52% 48% / 46% 54% 46% 54%; } 33% { border-radius: 43% 57% 45% 55% / 57% 43% 58% 42%; } 66% { border-radius: 52% 48% 61% 39% / 41% 59% 44% 56%; } }
+@keyframes turn { to { rotate: 360deg; } } @keyframes swim { from { transform: translate(-14%, -10%) scale(.9); } to { transform: translate(16%, 12%) scale(1.2); } }
+h1 { font-size: clamp(38px, 6vw, 68px); line-height: 1.04; letter-spacing: -.04em; font-weight: 600; margin: 26px 0 18px; text-wrap: balance; max-width: 19ch; }
+.hero > p:not(.fine) { font-size: clamp(17px, 1.6vw, 20px); color: var(--ink2); max-width: 58ch; text-wrap: pretty; }
+.ask { margin: 30px 0 14px; width: min(660px, 100%); height: 62px; border-radius: 999px; background: #fff; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 16px 40px -16px rgba(30,40,30,.28); display: flex; align-items: center; padding: 0 10px 0 26px; text-decoration: none; text-align: left; transition: transform .5s var(--ease), box-shadow .4s; }
+.ask:hover { transform: translateY(-2px); box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 24px 50px -18px rgba(30,40,30,.36); }
+.ask span { flex: 1; color: #8f8f8f; font-size: 17px; white-space: nowrap; overflow: hidden; } .ask span i { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: -.18em; background: var(--o2); border-radius: 2px; animation: caret 1.05s steps(1) infinite; } @keyframes caret { 50% { opacity: 0; } }
+.ask b { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(180deg, #2c2c2c, #111); display: grid; place-items: center; color: #fff; } .ask b svg { width: 18px; height: 18px; }
+.fine { color: var(--muted); font-size: 13.5px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 22px; }
+.frame { margin: 30px auto 0; border-radius: 22px; overflow: hidden; background: #fff; box-shadow: 0 40px 90px -30px rgba(20,30,20,.45), 0 0 0 1px rgba(0,0,0,.06); aspect-ratio: 16 / 10; max-width: 100%; position: relative; }
+.frame iframe { border: 0; width: 125%; height: 125%; transform: scale(.8); transform-origin: 0 0; display: block; }
+.moods { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; } .moods button { font: inherit; font-size: 14px; font-weight: 500; border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.7); border-radius: 999px; height: 38px; padding: 0 16px 0 12px; display: inline-flex; gap: 9px; align-items: center; cursor: pointer; color: var(--ink2); transition: transform .45s var(--ease), background-color .25s; }
+.moods button:hover { transform: translateY(-1px); } .moods button[aria-pressed="true"] { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 4px 14px -6px rgba(0,0,0,.25); } .moods i { width: 12px; height: 12px; border-radius: 50%; }
+section { padding: 84px 0 0; } .eyebrow { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
+h2 { font-size: clamp(28px, 3.4vw, 42px); line-height: 1.1; letter-spacing: -.03em; font-weight: 600; text-wrap: balance; max-width: 22ch; } .lead { font-size: 18px; color: var(--ink2); max-width: 60ch; margin-top: 14px; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 34px; } .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 34px; }
+.card { background: #fff; border-radius: 22px; padding: 24px; box-shadow: 0 1px 2px rgba(30,40,30,.04), 0 0 0 1px var(--line); display: grid; gap: 10px; align-content: start; transition: transform .6s var(--ease), box-shadow .5s; } .card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px -28px rgba(30,40,30,.4), 0 0 0 1px var(--line); }
+.card h3 { font-size: 19px; font-weight: 600; letter-spacing: -.015em; } .card p { color: var(--ink2); font-size: 15.5px; }
+.say { margin-top: 6px; background: #f5f5f5; border-radius: 16px; padding: 12px 14px; font-size: 14.5px; display: grid; gap: 8px; } .say .q { justify-self: end; background: #fff; border-radius: 16px; padding: 7px 12px; box-shadow: 0 0 0 1px var(--line); } .say .a { color: var(--ink2); }
+.row { display: flex; gap: 10px; align-items: center; font-size: 14.5px; padding: 8px 0; border-top: 1px solid var(--line); } .row:first-child { border-top: 0; } .row i { width: 26px; height: 26px; border-radius: 50%; flex: none; } .row small { margin-left: auto; color: var(--muted); }
+.nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 34px; } .num b { display: block; font-size: clamp(30px, 3.6vw, 46px); font-weight: 600; letter-spacing: -.035em; line-height: 1.05; } .num span { color: var(--ink2); font-size: 15px; }
+pre { margin: 0; font: 13.5px/1.6 "JetBrains Mono", ui-monospace, Menlo, monospace; background: #161616; color: #e9e9e9; border-radius: 16px; padding: 16px 18px; overflow-x: auto; } pre i { color: #8fd3a5; font-style: normal; } pre u { color: #9a9a9a; text-decoration: none; }
+.who { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; align-items: center; } .who img { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px #fff, 0 8px 20px -8px rgba(0,0,0,.3); } .who small { display: block; color: var(--muted); font-size: 14px; font-weight: 500; }
+footer { padding: 70px 0 34px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; color: var(--muted); font-size: 14px; } footer .brand { display: flex; gap: 8px; align-items: center; color: var(--ink); font-weight: 600; margin-right: auto; } footer svg { width: 26px; height: 26px; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 48px; align-items: center; }
+.tl { list-style: none; margin: 0; padding: 24px; background: #fff; border-radius: 22px; box-shadow: 0 1px 2px rgba(30,40,30,.04), 0 0 0 1px var(--line), 0 30px 60px -40px rgba(30,40,30,.4); }
+.tl li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 14px; padding-bottom: 20px; position: relative; } .tl li:last-child { padding-bottom: 0; }
+.tl li::before { content: ""; position: absolute; left: 16px; top: 38px; bottom: 4px; width: 2px; border-radius: 2px; background: var(--line); } .tl li:last-child::before { display: none; }
+.tl i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #f1f1f1; color: var(--ink2); } .tl i svg, .gl i svg { width: 16px; height: 16px; } .tl i.k { background: #141414; color: #fff; } .tl i.g { background: #e6f5ec; color: #1d7d4b; } .tl i.a { background: #fff2de; color: #a86a0c; }
+.tl b { display: block; font-weight: 600; font-size: 15.5px; } .tl small { display: block; color: var(--ink2); font-size: 14.5px; line-height: 1.45; } .tl time { color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.gl { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; } .gl li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; align-items: center; background: #fff; border-radius: 16px; padding: 14px 16px; box-shadow: 0 0 0 1px var(--line); font-size: 15.5px; } .gl i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #e6f5ec; color: #1d7d4b; }
+.try { background: #fff; border-radius: 22px; padding: 22px; box-shadow: 0 1px 2px rgba(30,40,30,.04), 0 0 0 1px var(--line), 0 30px 60px -40px rgba(30,40,30,.4); display: grid; gap: 14px; }
+.try form { display: flex; align-items: center; height: 54px; border-radius: 999px; border: 1px solid rgba(0,0,0,.1); padding: 0 8px 0 20px; transition: border-color .25s, box-shadow .25s; } .try form:focus-within { border-color: #141414; box-shadow: 0 0 0 4px rgba(0,0,0,.06); }
+.try label { color: var(--muted); font-size: 15px; margin-right: 8px; white-space: nowrap; } .try input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 16px; font-weight: 500; background: none; color: var(--ink); }
+.try button { width: 38px; height: 38px; border-radius: 50%; border: 0; background: linear-gradient(180deg, #2c2c2c, #111); color: #fff; display: grid; place-items: center; cursor: pointer; transition: transform .45s var(--ease); } .try button:hover { transform: scale(1.08); } .try button svg { width: 16px; height: 16px; }
+.best { font-size: 19px; font-weight: 600; letter-spacing: -.015em; } .best small { display: block; font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.lane { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14.5px; animation: arrive .5s var(--ease) both; } .lane > span:first-child { font-weight: 500; }
+.lane p { display: flex; flex-wrap: wrap; gap: 6px; } .lane u { text-decoration: none; background: #f3f3f3; border-radius: 999px; padding: 4px 11px; font-variant-numeric: tabular-nums; white-space: nowrap; } .lane u:first-child { background: #e6f5ec; color: #14613a; font-weight: 600; }
+@keyframes arrive { from { opacity: 0; transform: translateY(8px); } }
+.js .rv { opacity: 0; transform: translateY(18px); transition: opacity .9s var(--ease), transform .9s var(--ease); } .js .rv.on { opacity: 1; transform: none; }
+@media (max-width: 860px) { .sheet { margin: 10px; border-radius: 20px; } .in { padding: 0 18px; } nav a.l { display: none; } .three, .two, .split { grid-template-columns: minmax(0, 1fr); } .split { gap: 24px; } .lane { grid-template-columns: minmax(0, 1fr); gap: 6px; } .try label { display: none; } .nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } section { padding-top: 60px; } .hero { padding-top: 40px; } .frame { aspect-ratio: 4 / 5; } .frame iframe { width: 200%; height: 200%; transform: scale(.5); } }
+@media (prefers-reduced-motion: reduce) { .orb, .orb::before, .ground i::before, .ground i::after, .ask span i, .lane { animation: none; } .js .rv { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body data-mood="calm">
+<div class="ground" aria-hidden="true"><i class="calm"></i><i class="watch"></i><i class="alert"></i></div>
+<div class="sheet"><div class="in">
+  <nav><a class="brand" href="#top"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="3.4"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -12"/></filter></defs><g filter="url(#goo)" fill="currentColor" stroke="currentColor"><circle cx="21" cy="42" r="15" stroke="none"/><circle cx="42" cy="23" r="9.5" stroke="none"/><path d="M28 36 39 26" stroke-width="6.5" stroke-linecap="round"/></g><circle cx="56" cy="10" r="4.4" fill="currentColor"/></svg>Milan Forwarding</a><a class="l" href="#product">Product</a><a class="l" href="#try">Try it</a><a class="l" href="#proof">Proof</a><a class="l" href="#plug">Plug in</a><a class="l" href="#team">Team</a><a class="btn k s" href="/">Open the desk</a></nav>
+
+  <header class="hero" id="top">
+    <span class="orb"></span>
+    <h1>Air freight quotes, answered in under two minutes.</h1>
+    <p>A customer mails a request. The desk reads it with every attachment, asks the airlines, sends one price and books when the customer says yes. You read what it was unsure about.</p>
+    <a class="ask" href="/" aria-label="Open the desk and ask a question"><span id="typed">What should I look at first?<i></i></span><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7M12 19V5"/></svg></b></a>
+    <p class="fine">Opens the desk with example data.</p>
+  </header>
+
+  <div class="frame rv"><iframe src="/" title="The desk, live with example data" loading="lazy"></iframe></div>
+  <div class="moods" role="group" aria-label="The three states of the desk">
+    <button data-m="calm" aria-pressed="true"><i style="background:#3fae6c"></i>All quiet</button>
+    <button data-m="watch" aria-pressed="false"><i style="background:#e7a83a"></i>Notes to read</button>
+    <button data-m="alert" aria-pressed="false"><i style="background:#e8573c"></i>One to check</button>
+  </div>
+  <p class="fine" style="text-align:center;margin-top:10px">The desk has a colour. Green while everything runs on its own, amber when it left you notes, red when something looks wrong.</p>
+
+  <section id="product">
+    <div class="split">
+      <div>
+        <p class="eyebrow">Product</p>
+        <h2 class="rv">What it does with one request</h2>
+        <p class="lead rv">Most of a forwarder's day is mail: a request comes in, the airlines are asked, one price goes back. The desk does that typing. On the right is an example request, from the first mail to the booking.</p>
+      </div>
+      <ol class="tl rv">
+        <li><i class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2" /> <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg></i><span><b>Request came in</b><small>14 cartons to Dubai, with a packing list as PDF</small></span><time>06:23:10</time></li>
+        <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /> <path d="m21 21-4.3-4.3" /></svg></i><span><b>Read the mail and the packing list</b><small>It also reads a scan, a spreadsheet or a voice message</small></span><time>06:23:14</time></li>
+        <li><i class="a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /> <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg></i><span><b>Compared 3 offers</b><small>Every total is added up by code, never by the model</small></span><time>06:23:41</time></li>
+        <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /> <path d="m21.854 2.147-10.94 10.939" /></svg></i><span><b>Quote sent</b><small>One option, one total, in the customer's language</small></span><time>06:23:57</time></li>
+        <li><i class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" /></svg></i><span><b>Booked after the customer said yes</b><small>With the airline. If the price moved, it tells the customer</small></span><time>06:44:02</time></li>
+      </ol>
+    </div>
+    <div class="two">
+      <div class="card rv"><h3>When it was unsure, it says so</h3><p>It does not wait for a person. If something does not add up, it decides, tells the customer and leaves a note on the desk.</p>
+        <div class="say"><span class="a"><b>Flagged.</b> The packing list says 1.92 cbm and the mail says 2.78 cbm. I priced from the packing list and said so in the quote.</span></div></div>
+      <div class="card rv"><h3>What a customer asked for once is kept</h3><p>A wish like the one below is noted with that customer and used on their next request. You can add one yourself in a sentence.</p>
+        <div class="say"><span class="q">Kessler never flies with Zephyr.</span><span class="a">Passed on. The AI Worker reads it on its next step.</span></div></div>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="split">
+      <div>
+        <p class="eyebrow">Try it</p>
+        <h2 class="rv">Look up a price yourself</h2>
+        <p class="lead rv">Type a destination. The prices come live from the demo rate sheets, through the interface an outside assistant would also use.</p>
+        <p class="fine rv" style="margin-top:14px">Demo rate sheets: ten airlines, six German airports, 36 destinations. All-in price per kg at 100 kg.</p>
+      </div>
+      <div class="try rv">
+        <form id="tryf"><label for="dest">From Germany to</label><input id="dest" value="Hong Kong" autocomplete="off" spellcheck="false" aria-label="Destination"><button aria-label="Look up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7" /> <path d="M12 19V5" /></svg></button></form>
+        <div id="tryo" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trust">
+    <div class="split">
+      <div>
+        <p class="eyebrow">Control</p>
+        <h2 class="rv">What it cannot get wrong</h2>
+        <p class="lead rv">The agent judges a request the way a person would. Four things are not left to its judgement. They are built into the system under it.</p>
+        <p class="fine rv" style="margin-top:14px">In the desk you add people and set their rights. Switches for what the agent may do on its own are there as a draft.</p>
+      </div>
+      <ul class="gl rv">
+        <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></i>Every price and date a customer reads is computed by code.</li>
+        <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></i>A mail goes only to people in that thread and to carriers on our list.</li>
+        <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></i>A customer's thread sees only that customer's shipments.</li>
+        <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></i>After a restart nothing is lost and nothing is answered twice.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="proof">
+    <p class="eyebrow">Proof</p>
+    <h2 class="rv">Tested for one night against 5U's simulation</h2>
+    <p class="lead rv">We built it at START Hack Munich, in the challenge set by 5U AI. Their simulation sent a request every six minutes through the night, changed the setup about once an hour and scored every answer.</p>
+    <div class="nums rv">
+      <div class="num"><b>116 of 136</b><span>requests accepted by 05:45 on Sunday</span></div>
+      <div class="num"><b>2nd</b><span>on the live board at that time, 94 points behind first</span></div>
+      <div class="num"><b>under 2 min</b><span>from request to quote, full marks for speed on scored answers</span></div>
+      <div class="num"><b>0</b><span>people it waits for before it answers</span></div>
+    </div>
+    <p class="fine" style="margin-top:16px">Standing on the challenge board at 05:45, 22 November 2026, round 136. The final ranking was not out when this page was written.</p>
+  </section>
+
+  <section id="plug">
+    <p class="eyebrow">Plug in</p>
+    <h2 class="rv">Start with your rate sheets</h2>
+    <p class="lead rv">It reads rates the way your airlines send them: PDF, Excel, Word, plain text or a photo of a printout. Mail runs through the challenge's mailbox today. Outlook and Gmail are not connected yet.</p>
+    <div class="two">
+      <div class="card rv"><h3>It prices the next weight break too</h3><p>299 kg can cost more than 300 kg. It checks the next break and takes the cheaper total.</p>
+        <h3 style="margin-top:8px">An API for your own tools</h3><p>The desk you see reads the same endpoints you would.</p>
+<pre><u># every shipment, newest first</u>
+GET  /api/deals
+<u># one shipment with its mails and every step</u>
+GET  /api/deals/{id}
+<u># a question in plain words</u>
+POST /api/ask</pre></div>
+      <div class="card rv"><h3>A price lookup for the assistant you already use</h3><p>The rates are reachable as an MCP server. Add the address below to your assistant and ask it for a route. It runs on the demo rate sheets.</p>
+<pre><u># add as a remote MCP server</u>
+<i id="mcp">https://milan-desk.samsonntag11.workers.dev/mcp</i>
+
+<u># tools</u>
+price_route(destination, origin?)
+routes_with_one_airline(origin?)</pre>
+        <p class="fine">Two tools, read only. No customer data behind it.</p></div>
+    </div>
+  </section>
+
+  <section id="team">
+    <p class="eyebrow">Team</p>
+    <h2 class="rv">Who built it</h2>
+    <div class="three">
+      <div class="card rv"><div class="who"><img src="/people/mattia.png" alt="Mattia"><span><h3>Mattia</h3><small>Agent and system</small></span></div><p>Built the agent and the system under it: the mailbox, the pricing and the bookings.</p></div>
+      <div class="card rv"><div class="who"><img src="/people/jan.png" alt="Jan"><span><h3>Jan</h3><small>Trade and pricing</small></span></div><p>Researched how forwarders price a shipment and what the simulation would test next.</p></div>
+      <div class="card rv"><div class="who"><img src="/people/sam.png" alt="Sam"><span><h3>Sam</h3><small>Product and desk</small></span></div><p>Built the desk on this page and the field you ask questions in.</p></div>
+    </div>
+    <div class="cta" style="margin-top:40px"><a class="btn k" href="/">Open the live desk</a><a class="btn" href="#product">See what it does</a></div>
+  </section>
+
+  <footer><span class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="3.4"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -12"/></filter></defs><g filter="url(#goo)" fill="currentColor" stroke="currentColor"><circle cx="21" cy="42" r="15" stroke="none"/><circle cx="42" cy="23" r="9.5" stroke="none"/><path d="M28 36 39 26" stroke-width="6.5" stroke-linecap="round"/></g><circle cx="56" cy="10" r="4.4" fill="currentColor"/></svg>Milan Forwarding</span><span>Piazza del Duomo, 20122 Milano · start-milan@hackloop.mail</span><span>Built at START Hack Munich, November 2026.</span><span>The desk on this page shows example data.</span></footer>
+</div></div>
+<script>
+document.documentElement.classList.add("js");
+// the three states of the desk, as colour
+// they cycle only while the switch is in view; everywhere else the page stays calm and green
+var auto = 0, picked = false;
+function cycle(on) { clearInterval(auto); auto = 0; if (picked) return; if (!on) { mood("calm"); return; } auto = setInterval(function () { var o = ["calm", "watch", "alert"], i = (o.indexOf(document.body.dataset.mood) + 1) % 3; mood(o[i]); }, 5000); }
+new IntersectionObserver(function (es) { cycle(es[0].isIntersecting); }, { threshold: 0.6 }).observe(document.querySelector(".moods"));
+function mood(m) { document.body.dataset.mood = m; document.querySelectorAll(".moods button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m); }); }
+document.querySelectorAll(".moods button").forEach(function (b) { b.addEventListener("click", function () { picked = true; clearInterval(auto); mood(b.dataset.m); }); });
+// the ask field writes example questions
+(function () {
+  var el = document.getElementById("typed"), lines = ["What should I look at first?", "Which airline do we book most?", "What do we know about Kessler?", "What is the cheapest way to Hong Kong?", "Who has not answered our quote yet?"], i = 0, n = lines[0].length, back = true;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  function show(t) { el.firstChild.nodeValue = t; }
+  function tick() { var l = lines[i % lines.length];
+    if (!back && n < l.length) { n++; show(l.slice(0, n)); setTimeout(tick, 38 + Math.random() * 70); }
+    else if (!back) { back = true; setTimeout(tick, 2200); }
+    else if (n > 0) { n = Math.max(0, n - 2); show(l.slice(0, n)); setTimeout(tick, 16); }
+    else { back = false; i++; setTimeout(tick, 400); } }
+  setTimeout(tick, 2400);
+})();
+// sections arrive as you reach them
+var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("on"); io.unobserve(e.target); } }); }, { threshold: 0.12 });
+document.querySelectorAll(".rv").forEach(function (e, k) { e.style.transitionDelay = (k % 3) * 70 + "ms"; io.observe(e); });
+document.getElementById("mcp").textContent = location.origin + "/mcp";
+// Try it: the page calls the same MCP tool an assistant would
+(function () {
+  var f = document.getElementById("tryf"), inp = document.getElementById("dest"), out = document.getElementById("tryo"), n = 0;
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function show(text) {
+    out.textContent = "";
+    var lines = text.split("\n"), best = lines.filter(function (l) { return l.indexOf("Cheapest:") === 0; })[0], rows = lines.filter(function (l) { return l.indexOf("from ") === 0; });
+    if (!rows.length) { out.appendChild(el("p", "fine", text)); return; }
+    if (best) { var b = el("p", "best", best.replace("Cheapest: ", "").replace(/\.$/, "")); b.appendChild(el("small", "", "cheapest of " + rows.length + (rows.length === 1 ? " airport" : " airports") + " that fly there")); out.appendChild(b); }
+    rows.forEach(function (l, k) { var m = l.match(/^from (.+?): (.+)$/); if (!m) return; var r = el("div", "lane"); r.style.animationDelay = k * 60 + "ms"; r.appendChild(el("span", "", m[1])); var p = el("p"); m[2].split(", ").forEach(function (a) { p.appendChild(el("u", "", a.replace(/ \((\d+) days\)/, " · $1 d"))); }); r.appendChild(p); out.appendChild(r); });
+  }
+  function ask() {
+    var q = inp.value.trim().slice(0, 40), mine = ++n; if (!q) return;
+    fetch("/mcp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: mine, method: "tools/call", params: { name: "price_route", arguments: { destination: q } } }) })
+      .then(function (r) { return r.json(); }).then(function (j) { if (mine === n) show(j.result ? j.result.content[0].text : "That did not work. Try a city like Tokyo."); })
+      .catch(function () { if (mine === n) show("The rates are not reachable right now."); });
+  }
+  f.addEventListener("submit", function (e) { e.preventDefault(); ask(); });
+  ask();
+})();
+</script>
+</body>
+</html>
