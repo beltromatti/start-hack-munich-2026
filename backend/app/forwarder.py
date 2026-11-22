@@ -172,7 +172,7 @@ class Forwarder:
             self._retry_portal(deal_id)
             self.wait_step()
 
-    PORTAL_RETRY = (20, 90)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for
+    PORTAL_RETRY = (15, 45)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for (round 94: it stayed down for minutes; the quote must still go out inside 2 minutes)
 
     def _retry_portal(self, deal_id: str) -> None:
         """The portal answered 5xx or 429 for some airlines of this request: try them again while we wait for the
@@ -193,8 +193,12 @@ class Forwarder:
         left = sorted(set(pr["names"]) & failed)
         if got:
             store.log("bids", "info", f"portal back for {', '.join(sorted({x.carrier for x in got}))}", run_id=deal_id)
-        store.update(deal_id, lambda r: (r["status"], {**r["data"], "offers": r["data"]["offers"] + [
-            x.as_dict() for x in got], "portal_retry": {**r["data"].get("portal_retry", pr), "names": left}}))
+        back = {x.carrier for x in got if x.source == "portal"}
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "offers": [
+            o for o in r["data"]["offers"] if not (o["source"] == "portal_memory" and o["carrier"] in back)] + [
+            x.as_dict() for x in got if x.source == "portal" or x.carrier not in {
+                o["carrier"] for o in r["data"]["offers"] if o["source"] == "portal_memory"}],
+            "portal_retry": {**r["data"].get("portal_retry", pr), "names": left}}))
 
     def wait_step(self) -> None:
         """While a tool waits for carriers, the loop's other threads read their replies."""
@@ -231,6 +235,7 @@ class Forwarder:
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "not_asked": not_asked}))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
+        fallback: list = []  # mails to portal airlines while the portal fails: tried, never awaited (round 94)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {
             "o": o, "d": d, "kg": str(kg), "cbm": str(cbm) if cbm else None, "cw": str(cw), "names": sorted(failed),
             "since": time.time(), "next": time.time() + self.PORTAL_RETRY[0]}}))
@@ -244,7 +249,9 @@ class Forwarder:
                     else pricing.breaks_to_try(cw)
                 for wt in [cw] + above:
                     self._ask(asked, deal_id, c, self.ask_airline, deal_id, c, o, d, wt, cbm, req)
+                    fallback.append(next(reversed(asked)) if asked else None)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
+                                                       "fallback_asks": [x for x in fallback if x],
                                                        "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
         store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",
                   run_id=deal_id)
@@ -317,6 +324,8 @@ class Forwarder:
                 "pickup_alternatives": [{"trucker": p.carrier, "total": pricing.fmt(p.total),
                                          "pickup_hours": round(float(p.days) * 24, 1)} for p in pickups],
                 "still_waiting_for": waiting,
+                # the clock the customer and 5U read: the quote scores best inside 120 s of their mail
+                "seconds_since_request": _since(d.get("received_at")),
                 # answers that change the picture: a carrier we had a price for says no, or a carrier asks back
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
@@ -391,12 +400,18 @@ class Forwarder:
                 if r.get("error"):
                     store.log("bids", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
                               run_id=deal_id)
-                    if r["status"] in (429, 500, 502, 503, 504) and wt == kg:
-                        failed.add(a["name"])
+                    if r["status"] in (429, 500, 502, 503, 504):
+                        if wt == kg:
+                            failed.add(a["name"])
+                        mem = remembered_offer(a, o, d, cw if wt == kg else Decimal(wt), w.brackets.get(a["code"]))
+                        if mem:  # the portal is down: this airline's own rate on this lane, from earlier tonight
+                            out.append(mem)
                     continue
                 total = self.eur(Decimal(r["total"]), r["currency"], r.get("fx_eur_per_usd"))
                 if total is None:
                     continue
+                remember_rate(a, o, d, total, Decimal(r["chargeable_weight_kg"]), r["transit_days"],
+                              w.brackets.get(a["code"]))
                 out.append(Offer("air", r["airline"], total, Decimal(r["transit_days"]), "portal", r["rate_id"],
                                  Decimal(r["chargeable_weight_kg"]),
                                  extra={"code": a["code"], "valid_until": r["valid_until"], "weight": str(wt)}))
@@ -417,6 +432,11 @@ class Forwarder:
         mine = next((b for b in done if b.get("option") == option_id), None)
         ref = mine["team_reference"] if mine else f"SM-{d['root']}" + (f"-{len(done) + 1}" if done else "")
         status, body = 0, {}
+        if not air.get("rate_id") and air.get("source") == "portal_memory":  # priced while the portal was down
+            r = self.api.rate(req["origin"], req["destination"], air["extra"]["code"],
+                              air["extra"].get("weight") or req["weight_kg"], req.get("volume_cbm"))
+            if not r.get("error"):
+                air = {**air, "rate_id": r["rate_id"]}
         if air.get("rate_id"):
             status, body = self.api.book(air["rate_id"], ref)
             if status == 410 and (air.get("extra") or {}).get("code"):  # expired: fresh rate, same airline and weight
@@ -692,9 +712,50 @@ class Forwarder:
 
 # ---- helpers -----------------------------------------------------------------------------------------------
 
+def _since(iso: str | None) -> int | None:
+    from datetime import datetime
+    try:
+        return round(time.time() - datetime.fromisoformat(str(iso)).timestamp())
+    except (TypeError, ValueError):
+        return None
+
+
+def _break_of(breaks: list | None, kg: Decimal) -> int | None:
+    return max((int(b) for b in breaks if Decimal(b) <= kg), default=None) if breaks else None
+
+
+def remember_rate(a: dict, o: str, d: str, total: Decimal, billed: Decimal, days, breaks: list | None) -> None:
+    """A portal price is a rate per kg for its airline, lane and weight break (stable all night: Fjordline DUS-JFK
+    2.40 at 15:13 and at 21:53). Kept, so an outage of the rate API can still be priced (rounds 93-94)."""
+    lower = _break_of(breaks, billed)
+    if lower is None or not billed:
+        return
+    store.kv_set(f"portalrate:{a['code']}:{o}-{d}:{lower}", json.dumps(
+        {"per_kg": str((total / billed).quantize(Decimal("0.0001"))), "days": str(days), "name": a["name"],
+         "at": time.time()}))
+
+
+def remembered_offer(a: dict, o: str, d: str, billed: Decimal, breaks: list | None) -> Offer | None:
+    """This airline's own portal rate on this lane in this weight break, as last seen: a price by code while the
+    rate API is down, marked as such, and booked at a fresh rate when the portal answers again."""
+    lower = _break_of(breaks, billed)
+    raw = store.kv_get(f"portalrate:{a['code']}:{o}-{d}:{lower}") if lower is not None else None
+    if not raw:
+        return None
+    m = json.loads(raw)
+    seen = time.strftime("%H:%M", time.localtime(m["at"]))
+    return Offer("air", a["name"], pricing.money(Decimal(m["per_kg"]) * billed), Decimal(m["days"]), "portal_memory",
+                 None, billed, extra={"code": a["code"], "weight": str(billed), "remembered_at": seen,
+                                      "note": f"portal rate API unavailable: priced from this airline's own portal "
+                                              f"rate on this lane and weight break, seen at {seen}; booked at a "
+                                              f"fresh rate when the portal answers"})
+
+
 def waiting_for(d: dict) -> list[str]:
     """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""
-    asked, replied = Counter(d.get("asked", {}).values()), Counter(d.get("replied", []))
+    fallback = set(d.get("fallback_asks") or [])  # portal airlines mailed during an outage answer no mail
+    asked = Counter(e for mid, e in d.get("asked", {}).items() if mid not in fallback)
+    replied = Counter(d.get("replied", []))
     owed = sorted(email for email, n in asked.items() if replied[email] < n)
     pr = d.get("portal_retry") or {}
     if pr.get("names") and time.time() - pr.get("since", 0) <= Forwarder.PORTAL_RETRY[1]:

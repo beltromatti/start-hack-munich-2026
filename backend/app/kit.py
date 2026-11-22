@@ -138,6 +138,12 @@ def load(api=None) -> World:
     return w
 
 
+# the portal's weight breaks as counted on Sat (docs/challenges/5u-facts.md): the fallback when /brackets is down
+KNOWN_BRACKETS = {**{c: [0, 45, 100, 250, 500, 1000, 2000] for c in ("AU", "FQ", "IB", "NV")},
+                  **{c: [0, 45, 100, 300, 500, 1000, 2000] for c in ("BX", "RV", "SL", "XC")},
+                  **{c: [0, 45, 100, 300, 500, 1000] for c in ("GN", "JP", "LM", "MD", "PL", "TM", "UV")}}
+
+
 def refresh_portal(api, w: World | None = None) -> None:
     """The portal's lanes and weight breaks. The portal can be down (Sat 20:26: /ports answered 503 at a restart):
     then we keep what we knew and carry on; the next refresh tries again, and prices come by mail meanwhile."""
@@ -153,6 +159,12 @@ def refresh_portal(api, w: World | None = None) -> None:
         b = api.brackets(code)
         if b:
             w.brackets[code] = b
+            store.kv_set(f"brackets:{code}", json.dumps(b))  # kept: a restart during an outage must not lose them
+        elif code not in w.brackets:  # the portal is down (Sun 00:22: 503, and a restart had emptied them)
+            saved = store.kv_get(f"brackets:{code}")
+            b = json.loads(saved) if saved else KNOWN_BRACKETS.get(code)
+            if b:
+                w.brackets[code] = b
     w.portal_at = time.time()
     store.log("kit", "info", f"portal: {len(w.portal)} lanes, {len(w.brackets)} airlines")
 

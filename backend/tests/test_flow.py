@@ -993,3 +993,36 @@ def test_a_portal_outage_is_retried_while_the_carriers_are_awaited(monkeypatch):
     out = tools.get_offers(ctx, ship, "fastest", 20)
     assert any(o["source"] == "portal" for o in out["options"])
     assert not store.get(ctx.deal_id)["data"]["portal_retry"]["names"]
+
+
+def test_while_the_rate_api_is_down_an_airline_is_priced_from_its_own_portal_rate():
+    """Rounds 93-94: the rate API answered 503 for minutes and the portal airlines answer no mail; quoted without
+    them, 'too low' (0 of 13 teams accepted round 93). A portal price is a rate per kg per airline, lane and weight
+    break, stable all night: remembered, it prices the airline while the portal is down, marked as such."""
+    from decimal import Decimal
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = lambda kg: {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+                       "cargo": {"commodity": "parts", "ready_date": "2026-11-25", "notes": None},
+                       "lots": [{"pieces": 1, "weight": q(kg, "kg"), "volume": q(0.5, "cbm"), "dimensions": None}],
+                       "insurance": None, "extra_charges": []}
+
+    def ctx_for(who):
+        rfq = api.customer(who, "Quote", "FRA to ORD")
+        for m in api.poll(0)[0]:
+            store.save_mail(m, "in", handled=True)
+        return tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    seen = tools.get_offers(ctx_for("a@a.example"), ship(600), "cheapest", 5)
+    live = {o["airline"]: Decimal(o["total"].split()[0]) for o in seen["options"] if o["source"] == "portal"}
+    assert live
+    api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+    down = tools.get_offers(ctx_for("b@b.example"), ship(700), "cheapest", 1)
+    mem = {o["airline"]: o for o in down["options"] if o["source"] == "portal_memory"}
+    assert set(mem) == set(live)
+    for name, o in mem.items():  # the same rate per kg, at the new weight
+        assert Decimal(o["total"].split()[0]) == (live[name] / 600 * 700).quantize(Decimal("0.01")) or \
+            abs(Decimal(o["total"].split()[0]) - live[name] / 600 * 700) < Decimal("0.05")
+        assert "unavailable" in o["carrier_note"]
