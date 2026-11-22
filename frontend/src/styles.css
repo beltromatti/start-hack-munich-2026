@@ -233,3 +233,11 @@ button, input, textarea { font: inherit; color: inherit; }
 .portal-keys input { flex: 1; min-width: 220px; padding: 6px 8px; font: inherit; }
 .portal-hint { font-size: 12px; margin-top: 4px; }
 .portal-question { font-size: 15px; margin: 6px 0 8px; }
+
+/* the person's steps on 5U's portal, in their own browser */
+.portal-steps { display: grid; gap: 6px; margin: 8px 0; }
+.portal-step b { display: inline-block; min-width: 1.4em; }
+.portal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.portal-paste { width: 100%; box-sizing: border-box; font: inherit; }
+.portal-read { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 6px; }
+.primary-link { font-weight: 600; }

@@ -434,7 +434,7 @@ def ask_person(ctx: Ctx, kind: str, note: str, airline: str | None = None, wait_
         while time.time() < end:
             if kind == "page":
                 live = next((o for o in store.get(deal)["data"].get("offers", []) if airline and o["source"] in
-                             ("portal", "ratedesk") and o["carrier"].lower() in airline.lower()), None)
+                             ("portal", "ratedesk", "portal_page") and o["carrier"].lower() in airline.lower()), None)
                 if live:  # another of 5U's channels priced it meanwhile (the rate desk, the API back): the person
                     return {"priced_meanwhile": live["source"], "airline": live["carrier"],  # is free again
                             "note": "the price is in this deal's options: get_offers with shipment null shows them"}

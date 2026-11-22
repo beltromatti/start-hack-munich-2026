@@ -386,9 +386,9 @@ class Forwarder:
             result["portal_page"] = {
                 "airlines": [f"{a['name']} ({a.get('code')})" for a in pm["airlines"]],
                 "person_at_desk": store.kv_get("operator_on") == "1",
-                "how": "with a person at the desk: now, while the carriers answer, browser open (5U's portal "
-                       "page), fill the form for the airline that matters most for this request, ask_person kind "
-                       "page; its price then joins these options. Without one: quote with what you have"}
+                "how": "with a person at the desk: now, while the carriers answer, ask_person kind page for the "
+                       "airline that matters most for this request (they read it in their own browser: Cloudflare "
+                       "stops ours); its price then joins these options. Without one: quote with what you have"}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]
