@@ -238,6 +238,21 @@ class Forwarder:
         self._gone.pop(deal_id, None)
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
         fallback: list = []  # mails to portal airlines while the portal fails: tried, never awaited (round 94)
+        if failed:  # the portal's rate API is unavailable for some airlines: its rate desk answers by mail in ~47 s
+            # with every portal airline of the lane, total, transit and a bookable rate_id (rounds 93-97 were lost
+            # without it; one team won round 95 alone, x10). Asked at the weight and at the break above.
+            nb = max((pricing.next_break(w.brackets.get(a["code"], []), cw) or 0
+                      for a in w.portal.get((o, d), []) if a["name"] in failed), default=0)
+            for wt in [cw] + ([Decimal(nb)] if nb and Decimal(nb) / cw < Decimal("1.5") else []):
+                try:
+                    mid = self.mail_carrier(deal_id, RATEDESK, f"Portal rates {o}-{d} {kg_text(wt)} kg",
+                                            f"Hello,\n\nthe rate API is unavailable: please send the portal rates "
+                                            f"for {o}-{d}, {kg_text(wt)} kg" + (f", {cbm} cbm" if cbm else "")
+                                            + f", every airline on the lane, with total, transit time and rate "
+                                            f"reference.\n\nThanks,\n{settings.persona}, {settings.company}")
+                    asked[str(mid)] = RATEDESK
+                except Exception as e:
+                    store.log("bids", "error", f"could not ask the rate desk: {e!r}"[:300], run_id=deal_id)
         # airlines that may have moved from the portal to mail: off the portal for this lane, or a 404 for it
         for c in w.portal_airlines_off_lane(o, d) + [x for x in (w.carrier_by_name(n) for n in
                                                                  self._gone.pop(deal_id, set())) if x]:
@@ -282,6 +297,8 @@ class Forwarder:
         declined = {n.lower() for n in d.get("declined", [])}
         offers = [x for x in (Offer.of(x) for x in d.get("offers", []))
                   if not (x.source == "sheet" and x.carrier.lower() in declined)]
+        live = {x.carrier for x in offers if x.source in ("portal", "ratedesk")}  # a live price beats a remembered one
+        offers = [x for x in offers if not (x.source == "portal_memory" and x.carrier in live)]
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
         air, pickups = pricing.unknown_times_last(air), pricing.unknown_times_last(pickups)
