@@ -10,3 +10,14 @@ services:
     volumes:
       - ./backend/data:/app/backend/data   # the register (SQLite): survives rebuilds and restarts
     restart: unless-stopped
+
+  # The desk on a public address without opening a port: docker compose --profile public up -d
+  # (TUNNEL_TOKEN in .env from deploy/tunnel.sh setup; it shares the forwarder's network, so 127.0.0.1:8000 is the desk)
+  tunnel:
+    image: cloudflare/cloudflared:2026.11.1
+    profiles: ["public"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    network_mode: "service:forwarder"
+    restart: unless-stopped

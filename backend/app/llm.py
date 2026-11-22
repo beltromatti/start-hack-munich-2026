@@ -212,3 +212,33 @@ def strict(properties: dict, required: list[str] | None = None) -> dict:
     """Schema helper: an object where every property is required (OpenAI strict mode), nullables via type lists."""
     return {"type": "object", "additionalProperties": False, "properties": properties,
             "required": required or list(properties)}
+
+
+_own: OpenAI | None = None
+
+
+_fake_desk: Callable[..., list] | None = None
+
+
+def respond_direct(instructions: str, items: list[dict], tools: list[dict], *, schema: dict, name: str,
+                   model: str = "gpt-6-luna", effort: str = "low") -> list[dict]:
+    """One turn of the desk's assistant on the Responses API with our own OpenAI key, never through the gateway:
+    a person's tool at the desk, no part of a quote, so it must not count as spend on one. The final reply follows
+    `schema`. No key: an error the caller turns into "not available"."""
+    global _own
+    if _fake_desk is not None:
+        return _fake_desk(items, tools)
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("no OpenAI key for the desk's assistant")
+    if _own is None:
+        _own = OpenAI(api_key=key, timeout=90, max_retries=2)
+    t = time.time()
+    res = _own.responses.create(model=model, instructions=instructions, input=items, tools=tools, store=False,
+                                include=["reasoning.encrypted_content"], parallel_tool_calls=True,
+                                reasoning={"effort": effort},
+                                text={"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}})
+    u = res.usage
+    store.log("desk", "llm", f"{model} [{name}] {time.time() - t:.1f}s, {u.input_tokens} in, {u.output_tokens} out, "
+              "DIRECT, not gateway")
+    return [i.model_dump(exclude_none=True) for i in res.output]

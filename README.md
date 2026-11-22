@@ -29,8 +29,10 @@ make test                         # pricing rules + the whole flow against a fak
 make sim                          # realistic mails, real model (OpenAI direct, not scored), fake 5U
 make api                          # http://127.0.0.1:8000  API only
 make live                         # THE production forwarder (one machine only!)
-make web                          # http://127.0.0.1:5173  sessions UI (dev); built, it is on :8000
+make web                          # http://127.0.0.1:5173  the desk (dev); built (make build), it is on :8000
+make account USERNAME=mattia NAME="Mattia Beltrami"   # the desk's sign-in (docs/deploy.md)
 docker compose up -d --build      # the server: forwarder + API + UI on :8000 (docs/deploy.md)
+deploy/tunnel.sh setup && deploy/tunnel.sh route && make tunnel   # the desk on its public address
 ```
 
 ## What is in here
@@ -45,8 +47,11 @@ docker compose up -d --build      # the server: forwarder + API + UI on :8000 (d
 | `backend/app/fiveu.py` / `fake5u.py` | The 5U API (rate limit, outbound caps) and a local copy for tests. |
 | `backend/app/kit.py` | Carriers, pickup zones, rate sheets (`docs/challenges/5u-kit/tariffs.json`), portal lanes. |
 | `backend/app/store.py` | SQLite register: mails, records (rfq, booking, tariff), event log. |
-| `backend/app/main.py` | API for the sessions UI: `/api/deals`, `/api/deals/{id}`, `/api/sessions/{id}` (+ `/message`), `/api/board`. |
-| `frontend/` | Sessions UI (base): live timeline, cost. |
+| `backend/app/main.py` | The desk's API: `/api/deals`, `/api/deals/{id}`, `/api/sessions/{id}` (+ `/message`), `/api/ask`, `/api/login`, `/api/board`. |
+| `backend/app/accounts.py` | Sign-in: accounts in the register, signed session cookie. |
+| `backend/app/desk.py` | The desk's assistant: an agent over the register with read-only tools (our own key, never the gateway). |
+| `backend/app/voice.py` | The voice desk: speech in (`llm.transcribe`) and out (ElevenLabs); meaning stays with `/api/ask`. |
+| `frontend/` | The desk: what Giulia flagged, shipments, customers, network, efficiency, every session live; `/?voice`; `/leaderboard/challenge` for the team. |
 | `docs/challenges/` | The 5U brief, slides, kit, API spec, counted facts. `docs/discussion-*.md`: team decisions. |
 | `reference/` | Sempli AI layer (Sam) and SIEVER Mail vision (Mattia). Private, delete before going public. |
 | `docs/transcripts/` | Raw Whisper transcripts of the talks (noisy, but complete). |

@@ -2,18 +2,17 @@
 
 Run: uv run uvicorn app.main:app --port 8000   (make api / make live)
 """
-import base64
-import hmac
 import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import agent, store
+from . import accounts, agent, store
 from .config import settings
 
 forwarder = None
@@ -34,24 +33,73 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="START Milan Forwarding", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+_OPEN = {"/api/health", "/api/login", "/api/me", "/api/logout"}
 
-_PASSWORD = os.getenv("UI_PASSWORD", "")
+
+def _here(request: Request) -> bool:
+    """A process on this machine (the monitor, a script, the browser on the Mac that runs the forwarder). What comes
+    through the Cloudflare tunnel also arrives on loopback, but always carries Cloudflare's headers."""
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1") and not any(
+        h in request.headers for h in ("cf-ray", "cf-connecting-ip", "x-forwarded-for", "forwarded"))
 
 
 @app.middleware("http")
-async def team_only(request: Request, call_next):
-    """On a public address (the server), the UI and the API ask for the team password (browser login box).
-    /api/health stays open for health checks. No UI_PASSWORD set (a laptop): open, as before."""
-    if _PASSWORD and request.url.path != "/api/health":
-        auth = request.headers.get("authorization", "")
-        try:
-            given = base64.b64decode(auth.split(" ", 1)[1]).decode().split(":", 1)[1] if auth.startswith("Basic ") else ""
-        except Exception:
-            given = ""
-        if not hmac.compare_digest(given, _PASSWORD):
-            return Response("Team only", status_code=401, headers={"WWW-Authenticate": 'Basic realm="START Milan"'})
+async def signed_in(request: Request, call_next):
+    """Every /api call from elsewhere needs a signed-in account once the register holds one (accounts.py); this
+    machine itself reads freely. The page loads for anyone and shows the sign-in. Nothing from 5U calls us (we poll),
+    so nothing else stays open."""
+    path = request.url.path
+    request.state.account = None
+    if path.startswith("/api/") and path not in _OPEN and accounts.any_() and not _here(request):
+        request.state.account = accounts.who(request.cookies.get(accounts.COOKIE))
+        if not request.state.account:
+            return JSONResponse({"detail": "sign in"}, status_code=401)
     return await call_next(request)
+
+
+def _person(request: Request, payload: dict) -> str:
+    """Who a person-made change is recorded under: the signed-in account, else what the page said."""
+    a = getattr(request.state, "account", None) or accounts.who(request.cookies.get(accounts.COOKIE))
+    return a["name"] if a else (payload.get("who") or "operator")
+
+
+@app.post("/api/login")
+def login(payload: dict, request: Request, response: Response) -> dict:
+    address = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+    if accounts.braked(address):
+        raise HTTPException(429, "Too many tries. Wait ten minutes.")
+    a = accounts.check(str(payload.get("username") or ""), str(payload.get("password") or ""))
+    if not a:
+        accounts.failed(address)
+        raise HTTPException(401, "Wrong username or password.")
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    response.set_cookie(accounts.COOKIE, accounts.token(a["username"]), max_age=accounts.DAYS * 86400,
+                        httponly=True, samesite="lax", secure=https, path="/")
+    store.log("desk", "info", f"{a['username']} signed in")
+    return {"account": a, "open": False}
+
+
+@app.post("/api/logout")
+def logout(response: Response) -> dict:
+    response.delete_cookie(accounts.COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def me(request: Request) -> dict:
+    """The signed-in account; `open` while the register holds no account, or on this machine itself."""
+    a = accounts.who(request.cookies.get(accounts.COOKIE)) if accounts.any_() else None
+    if a:
+        return {"account": a, "open": False}
+    if not accounts.any_() or _here(request):
+        return {"account": None, "open": True}
+    raise HTTPException(401, "sign in")
+
+
+@app.get("/api/accounts")
+def account_list() -> list[dict]:
+    return accounts.all_()
 
 
 @app.get("/api/health")
@@ -136,12 +184,12 @@ def session(session_id: str) -> dict:
 
 
 @app.post("/api/sessions/{session_id}/message")
-def message(session_id: str, payload: dict) -> dict:
+def message(session_id: str, payload: dict, request: Request) -> dict:
     """A person writes into a session: the forwarder resumes it and follows them (their word wins)."""
     text = (payload.get("text") or "").strip()
     if not text:
         raise HTTPException(400, "empty message")
-    s = agent.operator_message(session_id, text, payload.get("who") or "operator")
+    s = agent.operator_message(session_id, text, _person(request, payload))
     if not s:
         raise HTTPException(404)
     store.log("human", "decision", f"message to {session_id}: {text[:200]}", run_id=f"deal-{s['data']['root']}")
@@ -190,7 +238,7 @@ def set_operator_mode(payload: dict) -> dict:
 
 
 @app.post("/api/deals/{deal_id}/portal_rate")
-def portal_rate(deal_id: str, payload: dict) -> dict:
+def portal_rate(deal_id: str, payload: dict, request: Request) -> dict:
     """A person enters a rate they read on 5U's portal page (airline, total EUR, transit days, rate_id)."""
     from .forwarder import add_portal_page_rate, read_portal_page
     if payload.get("pasted") is not None:  # the page's result as copied: read by code, shown back before it is added
@@ -199,7 +247,7 @@ def portal_rate(deal_id: str, payload: dict) -> dict:
             return {"read": read}
         payload = {**payload, **{k: v for k, v in read.items() if v and not payload.get(k)}}
     out = add_portal_page_rate(deal_id, payload.get("airline") or "", payload.get("total"), payload.get("days"),
-                               payload.get("rate_id"), payload.get("weight_kg"), payload.get("who") or "operator")
+                               payload.get("rate_id"), payload.get("weight_kg"), _person(request, payload))
     if out.get("error"):
         raise HTTPException(400, out["error"])
     return out
@@ -274,7 +322,69 @@ def board_history(limit: int = 200) -> list[dict]:
 
 
 # Last: the UI mount at "/" would shadow any route added after it.
+@app.post("/api/ask")
+def ask(payload: dict) -> dict:
+    """The desk's ask field (app/desk.py): our own OpenAI key, never the gateway; the answer is checked against the
+    desk data the page sent. 503 when there is no key or too many questions: the page then answers by plain lookup."""
+    from . import desk
+    try:
+        return desk.answer(payload.get("question") or "", payload.get("desk") or {}, payload.get("earlier"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:  # no key, the brake, OpenAI unreachable: the desk works without it
+        raise HTTPException(503, str(e)[:200])
+
+
+@app.get("/api/voice")
+def voice_status() -> dict:
+    """Whether the voice desk speaks (ElevenLabs) and hears (llm.transcribe) here; else the browser's own voice."""
+    from . import voice
+    return voice.status()
+
+
+@app.post("/api/voice/speak")
+def voice_speak(payload: dict):
+    """The desk's answer as audio (app/voice.py), streamed. 503 without a key: the browser speaks instead."""
+    from fastapi.responses import StreamingResponse
+    from . import voice
+    try:
+        return StreamingResponse(voice.speak(payload.get("text") or ""), media_type="audio/mpeg")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, str(e)[:200])
+
+
+@app.post("/api/voice/hear")
+async def voice_hear(request: Request) -> dict:
+    """A recording (the raw body, its type in Content-Type) as words (llm.transcribe). 503 without a key: the
+    browser listens."""
+    from . import voice
+    audio = await request.body()
+    kind = request.headers.get("content-type", "audio/webm").split(";")[0]
+    ext = {"audio/mp4": "m4a", "audio/aac": "aac", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/ogg": "ogg"}.get(kind, "webm")
+    try:
+        return voice.hear(audio, "speech." + ext)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, str(e)[:200])
+
+
 # The sessions UI, built (frontend/dist): served by the same process on a server (Docker), so one port is enough.
 _dist = Path(os.getenv("FRONTEND_DIST", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
+
+
+class _Pages(StaticFiles):
+    """The built UI; a page address it does not know (/leaderboard/challenge) gets the app, which routes it."""
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as e:
+            if e.status_code != 404 or path.startswith("api"):
+                raise
+            return await super().get_response("index.html", scope)
+
+
 if _dist.is_dir():
-    app.mount("/", StaticFiles(directory=_dist, html=True), name="ui")
+    app.mount("/", _Pages(directory=_dist, html=True), name="ui")
