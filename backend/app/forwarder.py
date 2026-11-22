@@ -375,8 +375,13 @@ class Forwarder:
             **{k: v for k, v in (r["data"].get("options") or {}).items() if not k.startswith(letter)}, **table}}))
         waiting = waiting_for(d)
         pref_key = preference if preference in ("cheapest", "fastest") else settings.unspecified_rule
-        result = {"shipment": {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
-                                                 "pieces", "pickup_zone", "pickup_postcode")},
+        shipment = {k: req[k] for k in ("origin", "destination", "weight_kg", "volume_cbm", "chargeable_kg",
+                                        "pieces", "pickup_zone", "pickup_postcode")}
+        # what the chargeable weight rests on, said by code (round 157 told a customer "based on the volume" when the
+        # gross weight was the higher one); an option billed at a higher break says so in its own billed weight
+        shipment["chargeable_is"] = ("the volume weight (cbm x 167)" if req.get("volume_cbm") and
+                                     Decimal(req["chargeable_kg"]) > Decimal(req["weight_kg"]) else "the gross weight")
+        result = {"shipment": shipment,
                 "options": rows, "recommended": rec.get(pref_key), "recommended_for": pref_key,
                 "recommended_by_preference": rec,
                 "pickup_alternatives": [{"trucker": p.carrier, "total": pricing.fmt(p.total),
