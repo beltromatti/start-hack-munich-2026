@@ -963,3 +963,33 @@ def test_an_airline_confirming_the_flight_price_of_an_insured_booking_changes_no
     out, facts, changed = price_in_airline_mail(b, mail, True)
     assert not changed and out["amount"] == "3569.18 EUR" and "3569.18 EUR" in facts
     assert confirmation_matches(b, mail)
+
+
+def test_a_portal_outage_is_retried_while_the_carriers_are_awaited(monkeypatch):
+    """Round 93: '503 The rate API is unavailable' for the two fastest airlines, which sell only on the portal; the
+    portal was asked once, the quote went out without them, 'too low to be right'. Now it is tried again while we
+    wait, and waited for like a carrier's answer."""
+    from app import tools
+    from app.forwarder import Forwarder
+    monkeypatch.setattr(Forwarder, "PORTAL_RETRY", (0, 90))
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    real, calls = api.rate, {"n": 0}
+
+    def down_first(*a, **k):
+        calls["n"] += 1
+        return {"error": True, "status": 503, "detail": "The rate API is unavailable."} if calls["n"] <= 2 else real(*a, **k)
+    api.rate = down_first
+    rfq = api.customer("mira@nord.example", "Quote", "102 kg FRA to ORD, fastest")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-25", "notes": None},
+            "lots": [{"pieces": 10, "weight": q(102, "kg"), "volume": q(0.76, "cbm"), "dimensions": None}],
+            "insurance": None, "extra_charges": []}
+    out = tools.get_offers(ctx, ship, "fastest", 20)
+    assert any(o["source"] == "portal" for o in out["options"])
+    assert not store.get(ctx.deal_id)["data"]["portal_retry"]["names"]

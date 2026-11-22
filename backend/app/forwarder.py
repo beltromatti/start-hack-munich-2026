@@ -169,7 +169,32 @@ class Forwarder:
     def _wait(self, deal_id: str, wait: float) -> None:
         end = time.time() + max(0.0, float(wait))
         while time.time() < end and waiting_for(store.get(deal_id)["data"]):
+            self._retry_portal(deal_id)
             self.wait_step()
+
+    PORTAL_RETRY = (20, 90)  # seconds between tries (the portal allows 10 rates a minute for the team), and how long a lane's portal outage is worth waiting for
+
+    def _retry_portal(self, deal_id: str) -> None:
+        """The portal answered 5xx or 429 for some airlines of this request: try them again while we wait for the
+        carriers (round 93: '503 The rate API is unavailable' for the two fastest airlines, which sell only there;
+        quoted without them, 'too low to be right')."""
+        d = store.get(deal_id)["data"]
+        pr = d.get("portal_retry")
+        if not pr or not pr.get("names") or time.time() < pr.get("next", 0):
+            return
+        if time.time() - pr["since"] > self.PORTAL_RETRY[1]:
+            store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {**pr, "names": []}}))
+            return
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {
+            **pr, "next": time.time() + self.PORTAL_RETRY[0]}}))
+        cbm = Decimal(pr["cbm"]) if pr.get("cbm") else None
+        got, failed = self.portal_offers(deal_id, pr["o"], pr["d"], Decimal(pr["kg"]), cbm, Decimal(pr["cw"]),
+                                         only=set(pr["names"]))
+        left = sorted(set(pr["names"]) & failed)
+        if got:
+            store.log("bids", "info", f"portal back for {', '.join(sorted({x.carrier for x in got}))}", run_id=deal_id)
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "offers": r["data"]["offers"] + [
+            x.as_dict() for x in got], "portal_retry": {**r["data"].get("portal_retry", pr), "names": left}}))
 
     def wait_step(self) -> None:
         """While a tool waits for carriers, the loop's other threads read their replies."""
@@ -206,6 +231,9 @@ class Forwarder:
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "not_asked": not_asked}))
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
+        store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {
+            "o": o, "d": d, "kg": str(kg), "cbm": str(cbm) if cbm else None, "cw": str(cw), "names": sorted(failed),
+            "since": time.time(), "next": time.time() + self.PORTAL_RETRY[0]}}))
         for name in failed:  # portal down or over the limit for this airline: ask the airline by mail, also at the
             c = w.carrier_by_name(name)  # break above when it can bill cheaper there (as for every mail airline)
             if c and c.email not in asked.values():
@@ -348,10 +376,12 @@ class Forwarder:
         return sent["id"]
 
     def portal_offers(self, deal_id: str, o: str, d: str, kg: Decimal, cbm: Decimal | None,
-                      cw: Decimal) -> tuple[list[Offer], set[str]]:
+                      cw: Decimal, only: set[str] | None = None) -> tuple[list[Offer], set[str]]:
         """Portal prices at the chargeable weight and at the next break; airlines the portal failed for."""
         w, out, failed = kit.world(), [], set()
         for a in w.portal.get((o, d), []):
+            if only is not None and a["name"] not in only:
+                continue
             weights = [kg]
             nb = pricing.next_break(w.brackets.get(a["code"], []), cw)
             if nb is not None and nb / cw < Decimal("1.5"):
@@ -665,7 +695,11 @@ class Forwarder:
 def waiting_for(d: dict) -> list[str]:
     """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""
     asked, replied = Counter(d.get("asked", {}).values()), Counter(d.get("replied", []))
-    return sorted(email for email, n in asked.items() if replied[email] < n)
+    owed = sorted(email for email, n in asked.items() if replied[email] < n)
+    pr = d.get("portal_retry") or {}
+    if pr.get("names") and time.time() - pr.get("since", 0) <= Forwarder.PORTAL_RETRY[1]:
+        owed += [f"portal: {n}" for n in pr["names"]]  # a portal outage is waited out, like a carrier's answer
+    return owed
 
 
 def pickup_variants(pickups: list[Offer], preference: str = "cheapest") -> list[tuple[str, Offer | None]]:
