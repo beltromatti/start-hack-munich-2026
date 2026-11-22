@@ -75,7 +75,7 @@ export function Numbers({ deals, board }: { deals: DealRow[]; board: Board | nul
     <>
       <section className="dk-lead">
         <h2>{total ? pct(quoted.length, total) + " of requests were answered without a person" + (med != null ? ", typically in " + secs(med) + "." : ".") : "No requests yet."}</h2>
-        <p>Counted from the shipments on this desk. {flaggedN ? flaggedN + (flaggedN === 1 ? " of them carries" : " of them carry") + " a note from the AI Worker." : "None of them carries a note from the AI Worker."}</p>
+        <p>Counted from the shipments on this desk. {flaggedN ? flaggedN + (flaggedN === 1 ? " of them carries" : " of them carry") + " a note from Giulia." : "None of them carries a note from Giulia."}</p>
       </section>
       <div className="dk-kpis">{tiles.map(([label, big, sub]) => <section key={label} className="dk-box dk-kpi"><small>{label}</small><b>{big}</b><span>{sub}</span></section>)}</div>
       <div className="dk-two even">

@@ -22,7 +22,7 @@ export function Ground({ mood }: { mood: Mood }) {
     const cv = ref.current, ctx = cv?.getContext("2d");
     if (!cv || !ctx) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let now = PAL[target.current].map(rgb), raf = 0, px = 0.5, py = 0.5;
+    let now = PAL[target.current].map(rgb), raf = 0, px = 0.5, py = 0.5, sx = 0.5, sy = 0.5;
     const move = (e: PointerEvent) => { px = e.clientX / window.innerWidth; py = e.clientY / window.innerHeight; };
     window.addEventListener("pointermove", move, { passive: true });
     const sphere = (x: number, y: number, r: number, i: number) => {
@@ -37,8 +37,9 @@ export function Ground({ mood }: { mood: Mood }) {
       swell.current *= 0.982;
       const s = 1 + swell.current * 0.22 + (still ? 0 : Math.sin(t * 0.5) * 0.025);
       ctx.fillStyle = "rgb(" + now[0].map(Math.round).join(",") + ")"; ctx.fillRect(0, 0, w, h);
-      sphere(w * (0.13 + Math.sin(t * 0.07) * 0.04 + (px - 0.5) * 0.03), h * (0.72 + Math.cos(t * 0.06) * 0.06 + (py - 0.5) * 0.03), h * 0.62 * s, 1);
-      sphere(w * (0.9 + Math.cos(t * 0.05) * 0.04 - (px - 0.5) * 0.02), h * (0.16 + Math.sin(t * 0.08) * 0.05), h * 0.44 * s, 4);
+      sx += (px - sx) * 0.05; sy += (py - sy) * 0.05; // the colour leans toward the pointer, a moment behind it
+      sphere(w * (0.13 + Math.sin(t * 0.07) * 0.04 + (sx - 0.5) * 0.12), h * (0.72 + Math.cos(t * 0.06) * 0.06 + (sy - 0.5) * 0.1), h * 0.62 * s, 1);
+      sphere(w * (0.9 + Math.cos(t * 0.05) * 0.04 - (sx - 0.5) * 0.1), h * (0.16 + Math.sin(t * 0.08) * 0.05 - (sy - 0.5) * 0.08), h * 0.44 * s, 4);
       if (!still) raf = requestAnimationFrame(draw);
     };
     const tick = still ? window.setInterval(() => draw(0), 1200) : 0;

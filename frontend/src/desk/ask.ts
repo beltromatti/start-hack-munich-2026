@@ -1,11 +1,12 @@
 import type { DealRow } from "../api";
+import type { Matrix } from "./analysis";
 import { CITY, LANES, ORIGINS } from "./network";
 import { Cust, amount, city, customers, ends, groupOf, kg, lane, median, money, name, since, why } from "./util";
 
 // The ask bar. It answers from the desk's own record, in code: no model call, no cost, the same answer every time.
 // Three things it can do for you go through the API the desk already has, each after one click on the button.
 export type Act = { label: string; kind: "tell"; deal: string; text: string };
-export type Answer = { via?: "assistant" | "record"; text: string; rows?: DealRow[]; facts?: [string, string][]; customer?: string; act?: Act; page?: "ship" | "cust" | "net" };
+export type Answer = { via?: "assistant" | "record"; text: string; rows?: DealRow[]; facts?: [string, string][]; customer?: string; act?: Act; page?: "ship" | "cust" | "net" | "jobs"; matrix?: Matrix };
 export const TRY = ["What should I look at?", "Give me the overview", "Which airline do we book most?", "Which quotes are still open?", "Cheapest way to Hong Kong"];
 
 const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? one : many);
@@ -37,7 +38,7 @@ export function answer(question: string, deals: DealRow[]): Answer {
 
   // things it does for you
   const tell = q.match(/^(?:tell|ask|remind)\s+(?:the ai worker\s+)?(?:about\s+|for\s+|on\s+)?(.+?)\s*[:,]\s*(.+)$/i);
-  if (tell && who) return { text: "This goes to the AI Worker for " + who.name + "'s latest shipment: “" + tell[2] + "”", act: { label: "Send it", kind: "tell", deal: who.deals[0].id, text: tell[2] }, rows: [who.deals[0]] };
+  if (tell && who) return { text: "This goes to Giulia for " + who.name + "'s latest shipment: “" + tell[2] + "”", act: { label: "Send it", kind: "tell", deal: who.deals[0].id, text: tell[2] }, rows: [who.deals[0]] };
 
   // prices and the network
   const dest = at.find((c) => !ORIGINS.includes(c)), org = at.find((c) => ORIGINS.includes(c));
@@ -48,7 +49,7 @@ export function answer(question: string, deals: DealRow[]): Answer {
   }
   if (dest && /price|cost|cheap|rate|how much|quote for|fastest/.test(low)) {
     const ls = LANES.filter((l) => l[1] === dest && (!org || l[0] === org)).sort((a, b) => a[2][0][1] - b[2][0][1]);
-    if (!ls.length) return { text: "No rate sheet covers " + city(dest) + (org ? " from " + city(org) : "") + ". The AI Worker asks the rate portal for that." };
+    if (!ls.length) return { text: "No rate sheet covers " + city(dest) + (org ? " from " + city(org) : "") + ". Giulia asks the rate portal for that." };
     return { text: city(dest) + " is cheapest from " + city(ls[0][0]) + " with " + ls[0][2][0][0] + ": " + ls[0][2][0][1].toFixed(2) + " EUR per kg, " + ls[0][2][0][2] + " days.", page: "net",
       facts: ls.map((l) => ["From " + city(l[0]), l[2].map((a) => a[0] + " " + a[1].toFixed(2)).join(" · ") + " EUR/kg"] as [string, string]).concat([["Priced for", "100 kg, fuel and security included"]]) };
   }
@@ -67,11 +68,11 @@ export function answer(question: string, deals: DealRow[]): Answer {
 
   // lists
   if (/overview|summary|how (are|is|did)|status|last night|overnight|today|report|recap|berblick|bersicht/.test(low)) return overview(deals);
-  if (/need|flag|look at|attention|for me|to do|todo|unusual|odd|check/.test(low)) { const n = g("needs"); return n.length ? { text: plural(n.length, "shipment is", "shipments are") + " flagged. The AI Worker already handled each and left a note.", rows: n } : { text: "Nothing is flagged." }; }
+  if (/need|flag|look at|attention|for me|to do|todo|unusual|odd|check/.test(low)) { const n = g("needs"); return n.length ? { text: plural(n.length, "shipment is", "shipments are") + " flagged. Giulia already handled each and left a note.", rows: n } : { text: "Nothing is flagged." }; }
   if (/open quote|still open|no answer|no yes|follow.?up|chase|waiting for (the )?customer|pending|not booked/.test(low)) { const o = g("quoted").sort((a, b) => a.updated_at - b.updated_at); return o.length ? { text: plural(o.length, "quote is", "quotes are") + " out without a yes. The oldest went out " + since(o[0].updated_at) + " ago.", rows: o.slice(0, 8), page: "ship" } : { text: "Every quote has an answer." }; }
   if (/lost|lose|declin|reject/.test(low)) { const l = g("lost"); return l.length ? { text: plural(l.length, "request was", "requests were") + " lost. Open one to read why.", rows: l.slice(0, 8), page: "ship" } : { text: "Nothing was lost." }; }
   if (/book|confirmed|flying/.test(low)) { const b = g("booked"); return { text: plural(b.length, "shipment is", "shipments are") + " booked.", rows: b.slice(0, 8), page: "ship" }; }
-  if (/progress|working|right now|pricing|busy/.test(low)) { const w = g("working"); return w.length ? { text: "The AI Worker is on " + plural(w.length, "shipment", "shipments") + " right now.", rows: w } : { text: "Nothing is in progress." }; }
+  if (/progress|working|right now|pricing|busy/.test(low)) { const w = g("working"); return w.length ? { text: "Giulia is on " + plural(w.length, "shipment", "shipments") + " right now.", rows: w } : { text: "Nothing is in progress." }; }
   if (/slow|longest|took/.test(low)) { const s = deals.filter((d) => d.response_seconds != null).sort((a, b) => b.response_seconds! - a.response_seconds!).slice(0, 5); return { text: "These quotes took the longest.", rows: s, facts: s.map((d) => [name(d), Math.round(d.response_seconds!) + " s"] as [string, string]) }; }
   if (/biggest|largest|highest|top|most valuable/.test(low)) { const s = deals.filter((d) => amount(d.quote) != null).sort((a, b) => amount(b.quote)! - amount(a.quote)!).slice(0, 5); return { text: "The biggest quotes on the desk.", rows: s }; }
   if (/customer/.test(low)) return { text: plural(list.length, "customer", "customers") + " on record. The latest request came from " + (list[0]?.name ?? "nobody") + ".", page: "cust" };
@@ -90,7 +91,7 @@ export async function askModel(question: string, deals: DealRow[], desk: unknown
   if (!r.ok) throw new Error(String(r.status));
   const j = await r.json() as { text: string; facts: [string, string][]; rows: string[]; customer: string | null; page: Answer["page"] | null; act: { kind: "tell"; deal: string; text: string } | null };
   const list = customers(deals), c = j.customer ? list.find((x) => x.name === j.customer) : undefined;
-  const label = j.act ? "Tell the AI Worker: " + j.act.text : "";
+  const label = j.act ? "Tell Giulia: " + j.act.text : "";
   return { via: "assistant", text: j.text, facts: j.facts?.length ? j.facts : undefined, rows: j.rows.map((id) => deals.find((d) => d.id === id)).filter((d): d is DealRow => !!d),
     customer: c?.email, page: j.page ?? undefined, act: j.act ? { label, ...j.act } : undefined };
 }

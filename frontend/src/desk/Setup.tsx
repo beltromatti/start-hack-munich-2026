@@ -1,19 +1,19 @@
 import { useState } from "react";
 import { Icon } from "./icons";
 
-// The hub behind the status card: how the AI Worker is doing, and how the desk is set up, in the three levels
-// forwarders run such a system on. Rules for the whole company (what the AI Worker may do on its own, and the
+// The hub behind the status card: how Giulia is doing, and how the desk is set up, in the three levels
+// forwarders run such a system on. Rules for the whole company (what Giulia may do on her own, and the
 // guarantees that are never switched off), wishes per customer (the notes kept with that customer), and people
 // with their rights. The switches and the people are a draft of the controls: kept in this browser, there is no
 // sign-in, and the agent does not read them. The rights do apply inside this desk.
 export type Role = "ops" | "sales" | "carriers";
 export const ROLE_NAME: Record<Role, string> = { ops: "Operations", sales: "Sales", carriers: "Carriers and rates" };
-export const ROLE_SEES: Record<Role, string> = { ops: "What the AI Worker flagged, and everything in progress", sales: "Quotes without a yes, customers to watch", carriers: "Shipments with one airline, where comparing pays" };
+export const ROLE_SEES: Record<Role, string> = { ops: "What Giulia flagged, and everything in progress", sales: "Quotes without a yes, customers to watch", carriers: "Shipments with one airline, where comparing pays" };
 type Mode = "own" | "flag" | "off";
 const MODES: [Mode, string][] = [["own", "On its own"], ["flag", "On its own, and tell me"], ["off", "Off"]];
 const DOES: { id: string; icon: string; what: string; how: string; fence: string }[] = [
   { id: "quote", icon: "send", what: "Answer a request with a quote", how: "Asks the airlines, reads the rate sheets and the rate portal, and takes the option the customer asked for.", fence: "Every price is computed by code. One mail, one option, one total." },
-  { id: "ask", icon: "circleHelp", what: "Ask the customer for what is missing", how: "A postcode, a weight, the papers for dangerous goods.", fence: "It asks once, then goes on with what it has." },
+  { id: "ask", icon: "circleHelp", what: "Ask the customer for what is missing", how: "A postcode, a weight, the papers for dangerous goods.", fence: "She asks once, then goes on with what she has." },
   { id: "book", icon: "plane", what: "Book after the customer says yes", how: "Books the option it quoted, by the rate portal or by mail to the airline.", fence: "A price that changed at booking goes into the confirmation." },
   { id: "cancel", icon: "x", what: "Cancel a booking the customer withdraws", how: "Cancels with the airline and says so in our record.", fence: "Only that customer's own booking." },
   { id: "carrier", icon: "mail", what: "Write to airlines and truckers", how: "Asks for a price, a status or a booking.", fence: "Only carriers on our list, at most two mails per carrier and shipment in ten minutes." },
@@ -26,7 +26,7 @@ const load = <T,>(k: string, d: T): T => { try { return { ...d, ...JSON.parse(lo
 const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* this browser keeps nothing */ } };
 
 export type Rights = { tell: boolean; sessions: boolean; setup: boolean };
-const RIGHTS: [keyof Rights, string][] = [["tell", "Write to the AI Worker"], ["sessions", "Open Sessions"], ["setup", "Change this page"]];
+const RIGHTS: [keyof Rights, string][] = [["tell", "Write to Giulia"], ["sessions", "Open Sessions"], ["setup", "Change this page"]];
 type Status = { mood: "calm" | "watch" | "alert" | "off"; title: string; sub: string; flagged: number; openFlagged: () => void };
 type P = { id: string; name: string; added?: boolean };
 
@@ -58,13 +58,13 @@ export function Setup({ status, people, roles, setRole, rights, setRight, add, r
     <>
       <section className="dk-hub">
         <span className="dk-orb l" />
-        <div><h2>{status.title}</h2><p>{status.sub} {off || flag ? "It does " + (DOES.length - off) + " of " + DOES.length + " things, " + flag + " of them with a note to you." : "It does all " + DOES.length + " things below on its own."}</p></div>
+        <div><h2>{status.title}</h2><p>{status.sub} {off || flag ? "She does " + (DOES.length - off) + " of " + DOES.length + " things, " + flag + " of them with a note to you." : "She does all " + DOES.length + " things below on her own."}</p></div>
         {status.flagged ? <button className="dk-btn k" onClick={status.openFlagged}>Read what it flagged</button> : null}
       </section>
-      <p className="dk-bs" style={{ padding: "0 4px" }}><b>A draft of the controls.</b> The switches and people are kept in this browser, there is no sign-in yet, and the agent does not read the switches.{may ? "" : " You can read this page. Changing it is switched off for you."}</p>
+      <p className="dk-bs" style={{ padding: "0 4px" }}><b>A draft of the controls.</b> The switches and people are kept in this browser, there is no sign-in yet, and Giulia does not read the switches.{may ? "" : " You can read this page. Changing it is switched off for you."}</p>
       <p className="dk-layer">For the whole company</p>
       <section className="dk-box">
-        <div className="dk-bh"><h2>What the AI Worker may do</h2></div>
+        <div className="dk-bh"><h2>What Giulia may do</h2></div>
         {DOES.map((d) => (
           <div key={d.id} className={"dk-set" + (modes[d.id] === "off" ? " is-off" : "")}>
             <span className="dk-sq q"><Icon n={d.icon} size={15} /></span>
@@ -75,7 +75,7 @@ export function Setup({ status, people, roles, setRole, rights, setRight, add, r
       </section>
       <section className="dk-box">
         <div className="dk-bh"><h2>Always on</h2></div>
-        <p className="dk-bs">These are built into the system under the agent. They hold today and cannot be switched off.</p>
+        <p className="dk-bs">These are built into the system under Giulia. They hold today and cannot be switched off.</p>
         {ALWAYS.map((a) => <div key={a} className="dk-set fixed"><span className="dk-sq g"><Icon n="check" size={15} /></span><span><b>{a}</b></span></div>)}
       </section>
       <p className="dk-layer">For one customer</p>
@@ -89,7 +89,7 @@ export function Setup({ status, people, roles, setRole, rights, setRight, add, r
       <p className="dk-layer">People and rights</p>
       <section className="dk-box">
         <div className="dk-bh"><h2>Who works at this desk</h2></div>
-        <p className="dk-bs">The role sets a person's start page. The rights set what they can do in this desk. Neither changes what the AI Worker does.</p>
+        <p className="dk-bs">The role sets a person's start page. The rights set what they can do in this desk. Neither changes what Giulia does.</p>
         {people.map((p) => (
           <div key={p.id} className="dk-set dk-person">
             {face(p.id)}

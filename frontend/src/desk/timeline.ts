@@ -1,7 +1,7 @@
 import type { Deal, Item } from "../api";
 import { who } from "../format";
 
-// One shipment as a short story: every mail and every tool the AI Worker used, in order, in plain words.
+// One shipment as a short story: every mail and every tool Giulia used, in order, in plain words.
 // It reads the same session the sessions view shows and leaves nothing out; that view stays the full record.
 export type Step = { icon: string; tone: "in" | "out" | "work" | "ok" | "hot" | "you"; title: string; sub?: string; at?: string | null; body?: string; rows?: [string, string, string, boolean][] };
 
@@ -34,7 +34,7 @@ export function timeline(deal: Deal): Step[] {
       }
       for (const part of it.content.split(/\n\n(?=Message from |Update from the system)/)) {
         const op = part.match(/Message from (.+?) \(a person on our team[^)]*\): ([\s\S]*)/), sys = part.match(/Update from the system \(([^)]*)\): ([\s\S]*)/);
-        if (op) out.push({ icon: "user", tone: "you", title: op[1] + " told the AI Worker", sub: op[2].trim() });
+        if (op) out.push({ icon: "user", tone: "you", title: op[1] + " told Giulia", sub: op[2].trim() });
         else if (sys) out.push({ icon: "info", tone: "work", title: "News on this shipment", sub: sys[2].trim().split("\n")[0], body: sys[2].trim() });
       }
     } else if (it.type === "function_call" && it.name) {

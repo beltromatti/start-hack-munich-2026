@@ -10,7 +10,10 @@ import { CarrierFacts, Seen, carrierFacts, context, customerExtra, expect, useKn
 import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
+import { Jobs, Job } from "./Jobs";
+import { MatrixChart } from "./Matrix";
 import { Numbers } from "./Numbers";
+import { matrix, wantsJob, wantsMatrix } from "./analysis";
 import { Rights, ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
 import { Step, languageOf, timeline } from "./timeline";
 import { Cust, Group, LABEL, amount, city, flagNote, customers, ends, groupOf, kg, known, lane, median, money, name, since, when, why } from "./util";
@@ -20,12 +23,12 @@ import "./desk.css";
 // and lets them say something to it. Nothing here makes the agent wait.
 // It reads the API the sessions view reads and keeps nothing of its own on the server.
 
-type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup" | "eff";
+type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup" | "eff" | "jobs";
 // Three people run this company, and each opens the desk on what they care about.
 type Role = "ops" | "sales" | "carriers";
 type Person = { id: string; name: string; role: Role; title: string; cares: string; photo?: boolean; added?: boolean };
 const PEOPLE: Person[] = [
-  { id: "sam", name: "Sam", role: "ops", title: "Operations", cares: "What the AI Worker flagged", photo: true },
+  { id: "sam", name: "Sam", role: "ops", title: "Operations", cares: "What Giulia flagged", photo: true },
   { id: "jan", name: "Jan", role: "sales", title: "Sales", cares: "Customers and open quotes", photo: true },
   { id: "mattia", name: "Mattia", role: "carriers", title: "Carriers and rates", cares: "Airlines, routes and prices", photo: true },
 ];
@@ -111,8 +114,8 @@ function useTyped(lines: string[] | undefined, on: boolean): string {
   return text;
 }
 const EXAMPLES: Record<Role, string[]> = {
-  ops: ["What should I look at first?", "Which quotes took the longest today?", "What happened with Hartmann's booking?", "Tell the AI Worker for Lumiere that the packing list always counts"],
-  sales: ["Who has not answered our quote yet?", "What do we know about Kessler?", "Which customer books least of what we quote?", "Where did comparing save a customer the most?"],
+  ops: ["What should I look at first?", "Which quotes took the longest today?", "What happened with Hartmann's booking?", "Tell Giulia for Lumiere that the packing list always counts"],
+  sales: ["What drives our margin per shipment?", "Who has not answered our quote yet?", "What do we know about Kessler?", "Which customer books least of what we quote?", "Where did comparing save a customer the most?"],
   carriers: ["Which airline do we book most?", "What is the cheapest way to Hong Kong?", "What if Frankfurt closes?", "Which airline answers us fastest?"],
 };
 
@@ -142,6 +145,7 @@ function AskPage({ role, turns, send, open, go, pickCustomer, run }: { role: Rol
             {!t.a ? <p className="dk-think"><i /><i /><i /></p> : (
               <div className="dk-a">
                 <p>{t.a.text}</p>
+                {t.a.matrix ? <MatrixChart m={t.a.matrix} /> : null}
                 {t.a.facts ? <dl className="dk-kv">{t.a.facts.map((f) => <div key={f[0]}><dt>{f[0]}</dt><dd>{f[1]}</dd></div>)}</dl> : null}
                 {t.a.rows?.length ? <div className="dk-rows">{t.a.rows.map((d) => <Row key={d.id} d={d} open={open} />)}</div> : null}
                 {t.a.act || t.a.customer || t.a.page || t.done ? (
@@ -149,7 +153,7 @@ function AskPage({ role, turns, send, open, go, pickCustomer, run }: { role: Rol
                     {t.a.act && !t.done ? <button className="dk-btn k" onClick={() => run(i)}><Icon n="check" />{t.a.act.label}</button> : null}
                     {t.done ? <span className="dk-done"><Icon n="circleCheck" />{t.done}</span> : null}
                     {t.a.customer ? <button className="dk-btn" onClick={() => pickCustomer(t.a!.customer!)}>Open the customer</button> : null}
-                    {t.a.page ? <button className="dk-btn" onClick={() => go(t.a!.page!)}>{t.a.page === "net" ? "Open the network" : t.a.page === "cust" ? "Open customers" : "Open shipments"}</button> : null}
+                    {t.a.page ? <button className="dk-btn" onClick={() => go(t.a!.page!)}>{t.a.page === "jobs" ? "Open jobs" : t.a.page === "net" ? "Open the network" : t.a.page === "cust" ? "Open customers" : "Open shipments"}</button> : null}
                   </div>
                 ) : null}
                 {t.a.via === "record" ? <p className="dk-fine">The assistant is not reachable. This is the plain lookup.</p> : null}
@@ -216,10 +220,10 @@ function Home({ role, deals, list, seen, open, pick, seenIds, send }: { role: Ro
   }
   return (
     <>
-      <Lead role={role} title={needs.length ? needs.length + (needs.length === 1 ? " shipment is" : " shipments are") + " flagged for a look." : "Nothing is flagged."} sub={deals.length + " requests on the desk, " + quoted.length + " quoted" + (t != null && t >= 1 ? " after " + Math.round(t) + " s on a typical one" : "") + ", " + booked + " booked. The AI Worker handled all of them on its own."} send={send} />
+      <Lead role={role} title={needs.length ? needs.length + (needs.length === 1 ? " shipment is" : " shipments are") + " flagged for a look." : "Nothing is flagged."} sub={deals.length + " requests on the desk, " + quoted.length + " quoted" + (t != null && t >= 1 ? " after " + Math.round(t) + " s on a typical one" : "") + ", " + booked + " booked. Giulia handled all of them on her own."} send={send} />
       <section className="dk-box">
-        <div className="dk-bh"><h2>Flagged by the AI Worker</h2></div>
-        <p className="dk-bs">It decided these itself and left a note. Read it, and say so if you see it differently.</p>
+        <div className="dk-bh"><h2>Flagged by Giulia</h2></div>
+        <p className="dk-bs">She decided these herself and left a note. Read it, and say so if you see it differently.</p>
         {needs.slice(0, 6).map((d) => (
           <button key={d.id} className="dk-it big" onClick={() => open(d.id)}>
             <span className={"dk-sq " + (d.flag === "red" ? "r" : "a")}><Icon n="flag" size={15} /></span>
@@ -228,7 +232,7 @@ function Home({ role, deals, list, seen, open, pick, seenIds, send }: { role: Ro
           </button>
         ))}
         {needs.length > 6 ? <p className="dk-bs">And {needs.length - 6} more under Shipments, Flagged.</p> : null}
-        {!needs.length ? <div className="dk-empty"><b>All clear</b>{all.length ? "You have seen all " + all.length + " flagged shipments." : "A shipment shows up here when the AI Worker meets something unusual."}</div> : null}
+        {!needs.length ? <div className="dk-empty"><b>All clear</b>{all.length ? "You have seen all " + all.length + " flagged shipments." : "A shipment shows up here when Giulia meets something unusual."}</div> : null}
       </section>
       <div className="dk-two even">
         <section className="dk-box"><div className="dk-bh"><h2>Waiting for the customer</h2></div>{openQuotes.slice(0, 5).map(quoteRow)}{!openQuotes.length ? <div className="dk-empty"><b>No open quotes</b>Every quote has an answer.</div> : null}</section>
@@ -363,9 +367,9 @@ function CustomerPage({ c, seen, open, back, teach }: { c: Cust; seen: Seen[]; o
         </section>
         <section className="dk-box"><div className="dk-bh"><h2>What we know</h2></div><dl className="dk-kv pad">{facts.map((f) => <div key={f[0]}><dt>{f[0]}</dt><dd>{f[1]}</dd></div>)}</dl></section>
         <section className="dk-box"><div className="dk-bh"><h2>Remembered</h2></div>
-          {notes.length ? <ul className="dk-notes">{notes.map((n) => <li key={n}><Icon n="brain" size={14} />{n}</li>)}</ul> : <p className="dk-bs">Nothing yet. Tell it what to keep in mind for this customer.</p>}
-          {CAN.tell ? <div className="dk-tell in"><Composer line hint="Teach it something" send={add} /></div> : null}
-          {told ? <p className="dk-bs"><span className="dk-done"><Icon n="circleCheck" />Passed on. It keeps it for their next request.</span></p> : null}
+          {notes.length ? <ul className="dk-notes">{notes.map((n) => <li key={n}><Icon n="brain" size={14} />{n}</li>)}</ul> : <p className="dk-bs">Nothing yet. Tell her what to keep in mind for this customer.</p>}
+          {CAN.tell ? <div className="dk-tell in"><Composer line hint="Teach her something" send={add} /></div> : null}
+          {told ? <p className="dk-bs"><span className="dk-done"><Icon n="circleCheck" />Passed on. She keeps it for their next request.</span></p> : null}
         </section>
       </div>
     </>
@@ -504,18 +508,18 @@ function Network({ deals }: { deals: DealRow[] }) {
 
 function Help() {
   const L: [string, string, string][] = [
-    ["mail", "A customer writes", "The AI Worker reads the mail and every attachment, also a scan or a voice message. When something is missing it asks the customer once."],
+    ["mail", "A customer writes", "Giulia reads the mail and every attachment, also a scan or a voice message. When something is missing she asks the customer once."],
     ["tag", "It prices the request", "It asks the airlines that fly the route, reads the rate sheets and the rate portal, and a calculator adds up each offer. The model never does the sums."],
     ["send", "The quote goes out", "One price, all in, written the way the customer wrote. Most quotes leave within a minute."],
     ["plane", "It books and keeps track", "After the customer's yes it books the flight. When they ask where the shipment is, it answers from our own record."],
     ["flag", "It decides the odd cases too", "It never waits for a person. When something is unusual it decides, tells the customer, and flags the shipment with a note so you can read why."],
-    ["search", "You can ask instead of clicking", "The field at the top answers from the record: what is flagged, a customer, a carrier, a price to a city. It can also pass your instruction to the AI Worker."],
+    ["search", "You can ask instead of clicking", "The field at the top answers from the record: what is flagged, a customer, a carrier, a price to a city. It can also pass your instruction to Giulia."],
     ["user", "Your word wins", "Tell it something on any shipment and it follows that from then on. You can also answer the customer yourself."],
   ];
   return (
     <div className="dk-help">
       <h2>How this desk works</h2>
-      <p>This is an air export desk that runs on its own. The AI Worker reads every mail, quotes, books and answers where a shipment is. The desk shows you what it did and what it flagged.</p>
+      <p>This is an air export desk that runs on its own. Giulia reads every mail, quotes, books and answers where a shipment is. The desk shows you what she did and what she flagged.</p>
       <ul>{L.map((l) => <li key={l[1]}><span className="dk-sq q"><Icon n={l[0]} size={15} /></span><span><b>{l[1]}</b>{l[2]}</span></li>)}</ul>
     </div>
   );
@@ -541,7 +545,7 @@ function Timeline({ steps }: { steps: Step[] }) {
           </li>
         );
       })}
-      {!steps.length ? <li className="work"><span className="dk-dot"><Icon n="loader" size={12} /></span><span className="dk-step"><b>Nothing yet</b><small>The first step shows up as soon as the AI Worker starts.</small></span></li> : null}
+      {!steps.length ? <li className="work"><span className="dk-dot"><Icon n="loader" size={12} /></span><span className="dk-step"><b>Nothing yet</b><small>The first step shows up as soon as Giulia starts.</small></span></li> : null}
     </ol>
   );
 }
@@ -554,7 +558,7 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
   const flag = g === "needs" ? (mine?.data.notes ?? []).filter((n) => n.flag === "red" || n.flag === "yellow").map((n) => n.text).pop() ?? flagNote(row) : null;
   const steps = useMemo(() => mine ? timeline(mine) : [], [mine]);
   const [passed, setPassed] = useState("");
-  const tell = (text: string) => { if (!mine || busy) return; setBusy(true); setPassed(""); post("/api/sessions/session-" + mine.data.root + "/message", { text, who: ME }).then(() => { setPassed("Passed on. The AI Worker reads it on its next step."); reload(); }).catch(() => setPassed("That did not go through. Try again.")).finally(() => setBusy(false)); };
+  const tell = (text: string) => { if (!mine || busy) return; setBusy(true); setPassed(""); post("/api/sessions/session-" + mine.data.root + "/message", { text, who: ME }).then(() => { setPassed("Passed on. Giulia reads it on her next step."); reload(); }).catch(() => setPassed("That did not go through. Try again.")).finally(() => setBusy(false)); };
   useEffect(() => { setFull(false); setPassed(""); }, [row.id]);
   const changed = mine?.data.booking?.price_changed;
   return (
@@ -564,10 +568,10 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
         <div className="dk-sb" data-soft>
           {g === "needs" ? (
             <div className={"dk-warn" + (row.flag === "red" ? "" : " soft")}>
-              <b><Icon n="flag" />The AI Worker flagged this</b>
+              <b><Icon n="flag" />Giulia flagged this</b>
               <p>{flag ?? "It left a flag on this shipment. The steps below show what it did."}</p>
               <div className="dk-acts">
-                <span className="dk-quiet">It already acted. Tell it below if you want it done differently.</span>
+                <span className="dk-quiet">She already acted. Tell her below if you want it done differently.</span>
                 <button className="dk-btn" disabled={seen} onClick={markSeen}><Icon n="check" />{seen ? "Seen" : "Mark as seen"}</button>
               </div>
             </div>
@@ -583,7 +587,7 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
           {!mine ? <p style={{ color: "var(--d-muted)" }}>Loading the record.</p> : full ? <div className="dk-mt rec"><DealView deal={mine} onSent={reload} /></div> : (
             <>
               <Timeline steps={steps} />
-              {CAN.tell ? <div className="dk-tell"><Composer line hint="Tell the AI Worker something about this shipment" send={tell} />{passed ? <p className="dk-fine" style={{ textAlign: "left", marginTop: 8 }}>{passed}</p> : null}</div> : <p className="dk-fine" style={{ textAlign: "left" }}>Writing to the AI Worker is switched off for you.</p>}
+              {CAN.tell ? <div className="dk-tell"><Composer line hint="Tell Giulia something about this shipment" send={tell} />{passed ? <p className="dk-fine" style={{ textAlign: "left", marginTop: 8 }}>{passed}</p> : null}</div> : <p className="dk-fine" style={{ textAlign: "left" }}>Writing to Giulia is switched off for you.</p>}
             </>
           )}
         </div>
@@ -596,7 +600,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   deals: DealRow[]; online: boolean; worker: boolean; board: Board | null; selected: string | null; select: (id: string | null) => void; deal: Deal | null; reload: () => void;
 }) {
   const initial = (location.hash.slice(1) || "home") as Page;
-  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff"].includes(initial) ? initial : "home");
+  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff", "jobs"].includes(initial) ? initial : "home");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [who, setWho] = useState(() => { try { return localStorage.getItem("desk_me") ?? "sam"; } catch { return "sam"; } });
   const [menu, setMenu] = useState(false);
@@ -622,6 +626,19 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   const base = people.find((p) => p.id === who) ?? PEOPLE[0];
   const me = { ...base, role: rolesAll[base.id] };
   ME = me.name; CAN = rightsOf(base);
+  // analyses the assistant repeats: made in the chat, kept in this browser, run while the desk is open
+  const [jobs, setJobs] = useState<Job[]>(() => { try { return JSON.parse(localStorage.getItem("desk_jobs") ?? "[]") as Job[]; } catch { return []; } });
+  const saveJobs = (f: (x: Job[]) => Job[]) => setJobs((x) => { const n = f(x); keep("desk_jobs", n); return n; });
+  const runJob = (id: string) => saveJobs((x) => x.map((j) => { if (j.id !== id) return j; const m = matrix(deals); return { ...j, last: Date.now(), result: m.n < 5 ? "Not enough shipments yet." : m.text.replace(/^I compared[^.]*\. /, "") }; }));
+  useEffect(() => {
+    const due = () => { const now = Date.now(); jobs.filter((j) => now - j.last >= (j.every === "day" ? 864e5 : 6048e5)).forEach((j) => runJob(j.id)); };
+    due(); const t = window.setInterval(due, 60000); return () => clearInterval(t);
+  }, [jobs.length, deals.length]);
+  useEffect(() => { // the tab carries our mark, light or dark with the browser
+    const svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><style>.m{fill:#141414;stroke:#141414}@media(prefers-color-scheme:dark){.m{fill:#fff;stroke:#fff}}</style><g class='m'><circle cx='21' cy='42' r='15' stroke='none'/><circle cx='42' cy='23' r='9.5' stroke='none'/><path d='M25 37 40 25' stroke-width='14' stroke-linecap='round' fill='none'/><circle cx='56' cy='10' r='4.6' stroke='none'/></g></svg>";
+    document.querySelectorAll("link[rel~='icon']").forEach((l) => l.remove());
+    const link = document.createElement("link"); link.rel = "icon"; link.type = "image/svg+xml"; link.href = "data:image/svg+xml," + encodeURIComponent(svg); document.head.appendChild(link);
+  }, []);
   useSoftScroll();
   const [open, setOpen] = useState(false);
   const [cust, setCust] = useState<string | null>(null);
@@ -637,16 +654,28 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   const list = useMemo(() => customers(deals), [deals]);
   const { seen } = useKnowledge(deals);
   const picked = cust ? list.find((c) => c.email === cust) ?? null : null;
-  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "AI Worker", eff: "Efficiency" };
+  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "Giulia", eff: "Efficiency", jobs: "Jobs" };
   const hour = new Date().getHours(), greet = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
   const nv = (p: Page, icon: string, label: string, count?: number) => (
     <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => go(p)}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
   );
-  const tell = (a: Act): Promise<string> => post("/api/sessions/" + a.deal.replace(/^deal-/, "session-") + "/message", { text: a.text, who: ME }).then(() => { reload(); return "Passed on to the AI Worker."; });
+  const tell = (a: Act): Promise<string> => post("/api/sessions/" + a.deal.replace(/^deal-/, "session-") + "/message", { text: a.text, who: ME }).then(() => { reload(); return "Passed on to Giulia."; });
   const send = (q: string) => {
     const earlier = turns.filter((t) => t.a).slice(-3).map((t) => ({ q: t.q, a: t.a!.text }));
     setTurns((ts) => [...ts, { q, a: null }]);
     setPage("ask"); setOpen(false); setCust(null);
+    const low = q.toLowerCase();
+    const settle = (a: Answer) => window.setTimeout(() => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }), 900);
+    if (wantsJob(low)) { // the chat makes a routine out of the analysis before it
+      const src = [...turns].reverse().find((t) => t.a?.matrix);
+      if (!src) { settle({ via: "assistant", text: "Ask me for an analysis first. Then say \"make this a job\" and I repeat it for you." }); return; }
+      const daily = /daily|every day|each day|every morning/.test(low), day = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].find((d) => low.includes(d)) ?? "monday";
+      const label = daily ? "Every day at 07:00" : "Every " + day[0].toUpperCase() + day.slice(1) + " at 07:00", m = matrix(deals);
+      saveJobs((x) => [{ id: "j" + Date.now().toString(36), title: src.q.trim().replace(/^./, (c) => c.toUpperCase()), q: src.q, every: daily ? "day" : "week", label, created: Date.now(), last: Date.now(), result: m.text.replace(/^I compared[^.]*\. /, "") }, ...x]);
+      settle({ via: "assistant", text: "Done. I repeat this analysis " + label[0].toLowerCase() + label.slice(1) + " and keep the latest result under Jobs.", page: "jobs" });
+      return;
+    }
+    if (wantsMatrix(low)) { const m = matrix(deals); settle({ via: "assistant", text: m.text, matrix: m }); return; }
     askModel(q, deals, context(deals, seen), earlier).catch(() => ({ ...answer(q, deals), via: "record" as const }))
       .then((a) => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }));
   };
@@ -655,7 +684,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   // the ground says how the desk is doing: green while it runs alone, warmer with notes to read, dusk when something is wrong
   const mood: Mood = !online || !worker || needs.some((d) => d.flag === "red") ? "alert" : needs.length ? "watch" : "calm";
   const red = needs.filter((x) => x.flag === "red").length, answered = deals.filter((x) => x.quote).length;
-  const stateLabel = !online ? "No connection" : !worker ? "AI Worker is stopped" : mood === "calm" ? "All quiet" : mood === "alert" ? red + " to check" : needs.length + (needs.length === 1 ? " note to read" : " notes to read");
+  const stateLabel = !online ? "No connection" : !worker ? "Giulia is stopped" : mood === "calm" ? "All quiet" : mood === "alert" ? red + " to check" : needs.length + (needs.length === 1 ? " note to read" : " notes to read");
   return (
     <div className="dk-app" data-mood={mood}>
       <Ground mood={mood} />
@@ -667,8 +696,9 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
           {nv("cust", "users", "Customers")}
           {nv("net", "network", "Network")}
           {nv("eff", "chartColumn", "Efficiency")}
+          {jobs.length ? nv("jobs", "repeat", "Jobs") : null}
           {CAN.sessions ? nv("sess", "messagesSquare", "Sessions") : null}
-          <button className={"dk-state " + (online && worker ? mood : "off")} aria-current={page === "setup" ? "page" : undefined} aria-label={"AI Worker: " + stateLabel + ". Open its status and setup"} onClick={() => go("setup")}>
+          <button className={"dk-state " + (online && worker ? mood : "off")} aria-current={page === "setup" ? "page" : undefined} aria-label={"Giulia: " + stateLabel + ". Open her status and setup"} onClick={() => go("setup")}>
             <span className="dk-orb m" />
             <span><b>{stateLabel}</b><small>{answered} of {deals.length} on its own</small></span>
             <Icon n="chevronRight" size={15} />
@@ -700,7 +730,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
               <OperatorStrip deals={deals} onOpen={(id) => select(id)} />
               <main className="grid">
                 <DealList deals={deals} selected={selected} onSelect={(id) => select(id)} />
-                {deal ? <DealView deal={deal} onSent={reload} /> : <section className="deal placeholder"><p>Pick a shipment on the left to read its mails and every step the AI Worker took.</p></section>}
+                {deal ? <DealView deal={deal} onSent={reload} /> : <section className="deal placeholder"><p>Pick a shipment on the left to read its mails and every step Giulia took.</p></section>}
                 <BoardPane board={board} team={TEAM} />
               </main>
             </div>
@@ -712,7 +742,8 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} /></> : null}
               {page === "help" ? <Help /> : null}
               {page === "eff" ? <Numbers deals={deals} board={board} /> : null}
-              {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "The AI Worker is stopped." : mood === "calm" ? "The AI Worker is running on its own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered without a person.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
+              {page === "jobs" ? <Jobs jobs={jobs} deals={deals} run={runJob} remove={(id) => saveJobs((x) => x.filter((j) => j.id !== id))} ask={() => go("ask")} /> : null}
+              {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "Giulia is stopped." : mood === "calm" ? "Giulia is running on her own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered without a person.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
                 people={people} roles={rolesAll} setRole={setRole} rights={Object.fromEntries(people.map((p) => [p.id, rightsOf(p)]))} setRight={setRight} add={addPerson} remove={removePerson} meId={me.id}
                 face={(id) => <Face p={people.find((p) => p.id === id) ?? PEOPLE[0]} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}

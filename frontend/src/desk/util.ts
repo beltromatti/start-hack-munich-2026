@@ -21,7 +21,7 @@ export const kg = (d: DealRow) => d.weight_kg ? Number(d.weight_kg).toLocaleStri
 export const name = (d: DealRow) => who(d.customer);
 export const lane = (d: DealRow) => { const e = ends(d); return e ? city(e[0]) + " to " + city(e[1]) : ""; };
 export const firstSentence = (t: string) => { const m = t.match(/^.*?[.?!](\s|$)/); return (m ? m[0] : t).trim().replace(/\.$/, ""); };
-export const why = (d: DealRow) => flagNote(d) ? firstSentence(flagNote(d)!) : "Flagged by the AI Worker";
+export const why = (d: DealRow) => flagNote(d) ? firstSentence(flagNote(d)!) : "Flagged by Giulia";
 export const median = (xs: number[]) => { const a = xs.slice().sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : null; };
 const ms = (ts: number | string) => typeof ts === "number" ? ts * 1000 : Date.parse(ts);
 /** How long ago, in the words a person says: 40 s, 12 min, 3 h, 4 days. */
