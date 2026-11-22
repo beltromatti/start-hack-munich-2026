@@ -43,7 +43,7 @@
 </svg>
 
 <!-- 1 Night -->
-<section class="st"><div class="ts hero">
+<section class="st" data-o="1"><div class="ts hero">
   <div class="img" style="inset:0;background-image:url(frames/r/hero-paint-1.jpg)"></div>
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h1 class="tt">Who answers<br>at 2 a.m.?</h1>
@@ -51,7 +51,7 @@
 </div><p class="note">The question is 5U's own brief title. The close answers it. Spoken: "Who answers your customers' mails at 2 a.m.?"</p></section>
 
 <!-- 2 Press -->
-<section class="st" hidden><div class="ts g press">
+<section class="st" data-o="2" hidden><div class="ts g press">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">The request is in the inbox. <i>The answer takes days.</i></h2>
   <div class="man"></div>
@@ -81,18 +81,18 @@
 </div><p class="note">Real headlines, sources in pitch/sources/headlines.md. The HBR study is about web leads in general, so no number from it. Say the Freightos studies are from 2015 and 2017.</p></section>
 
 <!-- 3 Swarm -->
-<section class="st" hidden><div class="ts swarm">
+<section class="st" data-o="3" hidden><div class="ts swarm">
   <iframe data-src="../swarm-overkill/index.html" title="The usual answer: a swarm of agents"></iframe>
   <button class="play" type="button">Play the swarm</button>
 </div><p class="note">The usual answer is more agents. Press space to play, 14 seconds. It ends on one agent, one mail, one answer.</p></section>
 
 <!-- 4 Team, and the one we forgot -->
-<section class="st" hidden><div class="ts photo">
+<section class="st" data-o="4" hidden><div class="ts photo">
   <div class="img" role="img" aria-label="Sam, Mattia and Jan in a warehouse at night, Giulia as a hologram beside them" style="background-image:url(frames/r/g-holo-v2-0.jpg)"></div>
 </div><p class="note">After the swarm: "That's not what you want." Then: "We're START Milan: Sam, Mattia, Jan. Oh, we forgot someone. Giulia." Mattia's line follows.</p></section>
 
 <!-- 5 Auer: Giulia reads the attachment -->
-<section class="st" hidden><div class="ts g story">
+<section class="st" data-o="7" hidden><div class="ts g story">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">The mail says non-dangerous. <i>The attachment says Class 8.</i></h2>
   <article class="mc" style="left:4cqw;top:19.5cqw;width:28.6cqw">
@@ -116,7 +116,7 @@
 </div><p class="note">Auer writes "non-dangerous". The attached paper says UN 1760, Class 8, corrosive. Giulia asks for the papers before pricing. 14 seconds after his request, Auer writes "Thank you, good point".</p></section>
 
 <!-- 6 Lindqvist: any language, any unit, inside an old thread -->
-<section class="st" hidden><div class="ts g story">
+<section class="st bk" hidden><div class="ts g story">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Korean, pounds, cubic feet.<br><i>Giulia answers in Korean, in euros.</i></h2>
   <article class="mc" style="left:4cqw;top:18.6cqw;width:42cqw">
@@ -142,8 +142,35 @@
   <span class="cap">Real mails from the scored run, Sunday 05:16. Booked at 05:18.</span>
 </div><p class="note">Lindqvist writes in Korean, in pounds and cubic feet, on top of an old thread about another shipment. Giulia answers in Korean, in euros, with the truck. The customer booked a minute later.</p></section>
 
-<!-- Backup: Giulia decides, code guarantees -->
-<section class="st bk" hidden><div class="ts g duo">
+<!-- 6 AI first: Giulia acts, a person oversees. The three status lines are the Desk's own (Desk.tsx, Ground.tsx on main). -->
+<section class="st" data-o="6" hidden><div class="ts g loop">
+  <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+  <h2 class="tt">AI first: Giulia acts. <i>You oversee.</i></h2>
+  <div class="lane" style="top:16.6cqw">
+    <em>Human in the loop</em>
+    <ol><li><svg class="ic"><use href="#i-mail"/></svg>Mail</li><li>AI drafts</li><li class="wait"><svg class="ic"><use href="#i-clock"/></svg>A person approves</li><li><svg class="ic"><use href="#i-send"/></svg>Quote</li></ol>
+    <p>Every quote waits for a person. <b>At 2 a.m. it waits until morning.</b></p>
+  </div>
+  <div class="lane me" style="top:29.4cqw">
+    <em>AI first, with Giulia</em>
+    <ol><li><svg class="ic"><use href="#i-mail"/></svg>Mail</li><li><span class="dot"></span>Giulia decides</li><li><svg class="ic"><use href="#i-calc"/></svg>Code prices</li><li><svg class="ic"><use href="#i-send"/></svg>Quote</li><li><svg class="ic"><use href="#i-plane"/></svg>Booking</li></ol>
+    <p>No quote waits. <b>You read what Giulia flagged, and step in when you want.</b></p>
+  </div>
+  <p class="proof" style="top:43.4cqw"><b>The scored night ran with no human in the loop.</b> That was the organisers' rule. 166 of 187 quotes accepted, 1st of 15 teams.</p>
+  <div class="amp">
+    <h3>What you see on the Desk</h3>
+    <ul>
+      <li class="gr"><i></i><div><b>Everything runs on its own.</b><span>Answered, priced, booked. Nothing to read.</span></div></li>
+      <li class="am"><i></i><div><b>2 notes are waiting for you.</b><span>Giulia decided, told the customer and wrote down why.</span></div></li>
+      <li class="rd"><i></i><div><b>1 shipment looks wrong.</b><span>Something is risky. You take over that shipment.</span></div></li>
+    </ul>
+    <p><svg class="ic"><use href="#i-msg"/></svg>Your word wins. Tell Giulia once, and Giulia follows it from then on.</p>
+  </div>
+  <span class="cap">The Desk's three states. Board: 5U, Sunday 10:53.</span>
+</div><p class="note">The judges work human in the loop. Our position: the person moves from inside every mail to above the desk. Giulia never waits for a person. In an odd case Giulia decides, tells the customer and leaves a note (amber) or a warning (red). If they attack "who is liable": every price, date and recipient is computed or checked by code, the next slide. If they attack "what when Giulia is wrong": red on the Desk, the person takes over that one shipment, and a sentence from a person overrides Giulia from then on.</p></section>
+
+<!-- 8 Giulia decides, code guarantees -->
+<section class="st" data-o="8" hidden><div class="ts g duo">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Giulia decides. <i>Code guarantees.</i></h2>
   <div class="col l"><h3>Giulia decides</h3><ul>
@@ -159,7 +186,7 @@
     <li><svg class="ic"><use href="#i-shield"/></svg>A customer's thread sees only that customer's shipments.</li>
     <li><svg class="ic"><use href="#i-shield"/></svg>After a restart nothing is lost and nothing is answered twice.</li>
   </ul></div>
-</div><p class="note">One agent with judgement, fenced by code. The four lines on the right are the product's own always-on rules.</p></section>
+</div><p class="note">This is what makes AI first safe, and what is different. Others let the model write the price and put a person behind it as the check. Here the model never does the sums: a calculator in code adds up every offer. The four lines on the right are the product's own always-on rules.</p></section>
 
 <!-- Backup: however it arrives -->
 <section class="st bk" hidden><div class="ts g flow">
@@ -187,16 +214,16 @@
 </div><p class="note">Customers do not fill forms. Giulia reads what they send, in the format they send it.</p></section>
 
 <!-- 7 Product -->
-<section class="st" hidden><div class="ts g prod">
+<section class="st" data-o="5" hidden><div class="ts g prod">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <div class="laptop"><div class="scr"><img src="../shots/desk-home.jpg" alt="The Desk: nothing is flagged, 46 requests on the desk"></div><div class="base"></div></div>
   <div class="phone"><img src="../shots/voice.jpg" alt="The voice app: say what changed"></div>
-  <h2 class="tt">The Desk shows <i>only what needs you.</i></h2>
+  <h2 class="tt">Giulia runs the desk.<br><i>You see what needs you.</i></h2>
   <ul class="feats">
-    <li><i><svg class="ic"><use href="#i-flag"/></svg></i><div><b>Flagged by Giulia</b><span>Three boxes: flagged, waiting for the customer, in progress.</span></div></li>
-    <li><i><svg class="ic"><use href="#i-clock"/></svg></i><div><b>Every shipment tells what happened</b><span>Each mail, quote and booking on one timeline.</span></div></li>
-    <li><i><svg class="ic"><use href="#i-mic"/></svg></i><div><b>Talk to the desk</b><span>Say what changed. Giulia acts after your yes.</span></div></li>
-    <li><i><svg class="ic"><use href="#i-chart"/></svg></i><div><b>Efficiency in plain numbers</b><span>Share answered, typical answer time, model cost per quote.</span></div></li>
+    <li><i><svg class="ic"><use href="#i-mail"/></svg></i><div><b>Reads every request</b><span>Mail, PDF, Excel, scan or voice message, in any language.</span></div></li>
+    <li><i><svg class="ic"><use href="#i-calc"/></svg></i><div><b>Quotes within a minute</b><span>Asks the airlines. A calculator in code adds up the price.</span></div></li>
+    <li><i><svg class="ic"><use href="#i-plane"/></svg></i><div><b>Books and keeps track</b><span>Books after the customer's yes, answers where a shipment is.</span></div></li>
+    <li><i><svg class="ic"><use href="#i-flag"/></svg></i><div><b>Flags what needs you</b><span>On the Desk and on your phone. Say what changed, Giulia follows.</span></div></li>
   </ul>
   <span class="cap">Real screens from the product, example data</span>
 </div><p class="note">This is the running product. The numbers on screen are seeded example data, say so.</p></section>
@@ -219,7 +246,7 @@
 </div><p class="note">These eight lines are copied from the product's own setup page. An owner can read exactly what the agent may do.</p></section>
 
 <!-- 8 Memory -->
-<section class="st" hidden><div class="ts g mem">
+<section class="st" data-o="9" hidden><div class="ts g mem">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Giulia knows <i>every customer.</i></h2>
   <ul class="pts">
@@ -267,7 +294,7 @@
 </div><p class="note">Routing is code. One agent session per mail thread. The agent only calls tools, and the engine behind them computes prices in code. The register is the memory and survives a restart.</p></section>
 
 <!-- 9 Vision -->
-<section class="st" hidden><div class="ts g vis">
+<section class="st" data-o="10" hidden><div class="ts g vis">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Giulia gets better <i>with every customer.</i></h2>
   <ol class="steps">
@@ -284,7 +311,7 @@
 </div><p class="note">Vision. Today is built: notes per customer. Next and Then are the plan: Giulia learns step by step from each yes and no and adapts to each customer. Say "we are building this", never "it runs".</p></section>
 
 <!-- 10 Close -->
-<section class="st" hidden><div class="ts hero">
+<section class="st" data-o="11" hidden><div class="ts hero">
   <div class="img" style="inset:0;background-image:url(frames/r/hero-sea-day-1.jpg)"></div>
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">By morning,<br><i>Giulia has answered.</i></h2>
@@ -301,8 +328,9 @@
 <div class="nav"><button id="p" type="button" aria-label="Previous slide">&larr;</button><span id="n"></span><button id="x" type="button" aria-label="Next slide">&rarr;</button></div>
 <script>
 // Arrow keys, space or enter: next. n: speaker notes. f: fullscreen. #s4 opens slide 4.
-// A slide with class "bk" is backup: it plays after the close, wherever it stands in the file.
-const S=[...document.querySelectorAll('.st:not(.bk)'),...document.querySelectorAll('.st.bk')];let i=0;
+// Spoken slides play in the order of their data-o number, wherever they stand in the file.
+// A slide with class "bk" is backup: it plays after the close.
+const S=[...[...document.querySelectorAll('.st:not(.bk)')].sort((a,b)=>a.dataset.o-b.dataset.o),...document.querySelectorAll('.st.bk')];let i=0;
 const n=document.getElementById('n');
 function go(k){i=Math.max(0,Math.min(S.length-1,k));S.forEach((s,j)=>s.hidden=j!==i);
   n.textContent=(i+1)+' / '+S.length+(S[i].classList.contains('bk')?' backup':'');
