@@ -261,7 +261,8 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   so the agent can quote without another wait just to refresh prices.
   Round 120 exposed headless automation defaults and a discarded profile; the installed desktop Chrome now
   runs directly with a dedicated persistent profile, connected without device overrides. A notification opens
-  this live page in the deal's conversation; the team can observe and the view remains interactive, but solving
+  this live page beside its browser tool steps in the deal's conversation, with controls in a compact menu.
+  Opening or reconnecting the view does not navigate the agent's page. The team can observe and interact, but solving
   the scored work never depends on a person's presence, key entry, answer or pasted result. `ask_person` is no
   longer offered to the agent, and an old session calling it receives the autonomous route immediately.
 - **Suspicion is the model's, protection is the tool's.** Impostors write from lookalike addresses seconds after a

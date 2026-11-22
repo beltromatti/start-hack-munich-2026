@@ -64,8 +64,8 @@ export type Board = {
 export type Health = { ok: boolean; worker: boolean; llm: string; models: { agent: string; effort: string } };
 export type Usage = { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };
 
-export async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path);
+export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const r = await fetch(path, { signal });
   if (!r.ok) throw new Error(`${r.status} ${path}`);
   return r.json();
 }

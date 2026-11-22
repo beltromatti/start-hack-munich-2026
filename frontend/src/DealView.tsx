@@ -10,6 +10,21 @@ type Step =
   | { k: "tool"; name: string; args: Record<string, any>; out: Record<string, any> | null }
   | { k: "journal"; text: string };
 
+type BrowserStep = { k: "browser"; calls: Extract<Step, { k: "tool" }>[] };
+
+// Keep a run of browser actions together. Its live view stays mounted as new tool results arrive.
+function conversation(items: Item[]): (Step | BrowserStep)[] {
+  const grouped: (Step | BrowserStep)[] = [];
+  for (const step of steps(items)) {
+    if (step.k === "tool" && step.name === "browser") {
+      const previous = grouped[grouped.length - 1];
+      if (previous?.k === "browser") previous.calls.push(step);
+      else grouped.push({ k: "browser", calls: [step] });
+    } else grouped.push(step);
+  }
+  return grouped;
+}
+
 const MAIL = /New mail in this thread: id (\d+), from (\S+), at (\S+)\n(?:Their own words are in (\w+)\.\n)?Subject: (.*)\n\n([\s\S]*)$/;
 
 function steps(items: Item[]): Step[] {
@@ -198,6 +213,9 @@ function ToolStep({ s, files = [] }: { s: Extract<Step, { k: "tool" }>; files?: 
     return <div className={`note flag-${args.flag}`}><span className="dot" />{args.text}</div>;
   } else if (name === "no_reply") {
     title = `No reply needed: ${args.reason}`;
+  } else if (name === "browser") {
+    title = ({ open: "Opened the portal", read: "Read the page", look: "Inspected the page", act: "Interacted with the page", save_rate: "Imported the rate", close: "Closed the page" } as Record<string, string>)[args.action] ?? "Used the browser";
+    if (out?.completed?.length) title += ` · ${out.completed.length} actions`;
   }
   return (
     <div className={`step${err ? " failed" : ""}`}>
@@ -212,7 +230,8 @@ function ToolStep({ s, files = [] }: { s: Extract<Step, { k: "tool" }>; files?: 
 
 export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
   const items = deal.session?.items ?? [];
-  const list = useMemo(() => steps(items), [items]);
+  const list = useMemo(() => conversation(items), [items]);
+  const browserIndex = list.reduce((last, s, i) => s.k === "browser" ? i : last, -1);
   const d = deal.data;
   const req = d.request ?? {};
   const st = STATUS[deal.status] ?? { label: deal.status, tone: "neutral" };
@@ -258,8 +277,6 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
         <div className="banner warn-banner"><strong>Booked at another price</strong> · the airline booked {d.booking.price_changed.booked} all-in, against the {d.booking.price_changed.quoted} quoted</div>
       ) : null}
 
-      {d.browser_activity ? <PortalView dealId={deal.id} activity={d.browser_activity} /> : null}
-
       <CarrierMails mails={deal.carrier_mails ?? []} />
 
       {d.booking?.carrier_status ? (
@@ -287,9 +304,18 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
             {s.k === "said" && <div className={`said${s.system ? " system" : ""}`}><strong>{s.who}</strong> {s.text}</div>}
             {s.k === "nudge" && <div className="said system"><strong>System</strong> {s.text}</div>}
             {s.k === "tool" && <ToolStep s={s} files={deal.mails.find((m) => m.id === s.out?.sent)?.attachments ?? []} />}
+            {s.k === "browser" && (i === browserIndex && d.browser_activity
+              ? <PortalView key={deal.id} dealId={deal.id} activity={d.browser_activity}
+                  url={[...s.calls].reverse().find((c) => c.out?.url)?.out?.url}>
+                  {s.calls.map((call, index) => <ToolStep key={index} s={call} />)}
+                </PortalView>
+              : <details className="browser-history"><summary>Browser · {s.calls.length} steps</summary>
+                  {s.calls.map((call, index) => <ToolStep key={index} s={call} />)}
+                </details>)}
             {s.k === "journal" && <div className="journal">{s.text}</div>}
           </li>
         ))}
+        {browserIndex < 0 && d.browser_activity ? <li className="t-browser"><PortalView key={deal.id} dealId={deal.id} activity={d.browser_activity} /></li> : null}
         {deal.session?.status === "running" && <li className="t-live"><span className="pulse" /> working…</li>}
         {!list.length && <li className="muted">No session yet.</li>}
       </ol>

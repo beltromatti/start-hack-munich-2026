@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Board, Deal, DealRow, Health, Usage, get } from "./api";
 import { DealView } from "./DealView";
 import { BoardPane, DealList } from "./Side";
@@ -10,15 +10,21 @@ const TEAM = "start-milan";
 function usePoll<T>(path: string | null, ms: number): [T | null, boolean, () => void] {
   const [data, setData] = useState<T | null>(null);
   const [ok, setOk] = useState(true);
+  const request = useRef<AbortController | null>(null);
   const load = useCallback(() => {
-    if (!path) return;
-    get<T>(path).then((d) => { setData(d); setOk(true); }).catch(() => setOk(false));
+    if (!path || request.current) return;
+    const controller = new AbortController();
+    request.current = controller;
+    get<T>(path, controller.signal).then((d) => {
+      if (!controller.signal.aborted) { setData(d); setOk(true); }
+    }).catch(() => { if (!controller.signal.aborted) setOk(false); })
+      .finally(() => { if (request.current === controller) request.current = null; });
   }, [path]);
   useEffect(() => {
     setData(null);
     load();
     const t = setInterval(load, ms);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); request.current?.abort(); request.current = null; };
   }, [load, ms]);
   return [data, ok, load];
 }
@@ -32,7 +38,7 @@ export default function App() {
   const [deal, , reload] = usePoll<Deal>(selected ? `/api/deals/${selected}` : null, 1500);
 
   useEffect(() => {
-    if (!selected && deals?.length) setSelected(deals[0].id);
+    if (!selected && deals?.length) setSelected((current) => current ?? deals[0].id);
   }, [deals, selected]);
 
   const quoted = deals?.filter((d) => d.quote).length ?? 0;
@@ -69,7 +75,7 @@ export default function App() {
       <OperatorStrip deals={deals ?? []} onOpen={setSelected} />
       <main className="grid">
         <DealList deals={deals ?? []} selected={selected} onSelect={setSelected} />
-        {deal ? <DealView deal={deal} onSent={reload} /> : (
+        {deal ? <DealView key={deal.id} deal={deal} onSent={reload} /> : (
           <section className="deal placeholder">
             <p>Every request becomes a deal with its own agent session: the mails, what the agent did and why, the priced options, the booking. Select one on the left.</p>
           </section>
