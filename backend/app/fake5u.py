@@ -96,6 +96,11 @@ class FakeFiveU:
         self.rates[rid] = r
         return r
 
+    def rate_from_page(self, origin: str, destination: str, airline: str, weight_kg: Any,
+                       volume_cbm: Any = None) -> dict:
+        """The portal page publishes the API's rates (live Sun 02:18: FRA-ORD BX 1076 kg 3378.64 on both)."""
+        return {**FakeFiveU.rate(self, origin, destination, airline, weight_kg, volume_cbm), "source": "page"}
+
     def book(self, rate_id: str, team_reference: str) -> tuple[int, dict]:
         if rate_id not in self.rates:
             return 404, {"detail": "unknown rate_id"}

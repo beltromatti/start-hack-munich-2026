@@ -345,6 +345,7 @@ def test_portal_down_asks_its_airlines_by_mail_also_at_the_break(monkeypatch):
     api = FakeFiveU()
     kit.load(api)
     monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    monkeypatch.setattr(api, "rate_from_page", lambda *a, **k: {"error": True, "status": 503, "detail": "down"})
     monkeypatch.setattr(api, "brackets", lambda *a, **k: None)
     kit.world().brackets.clear()
     f = Sync(api)
@@ -724,6 +725,7 @@ def test_rate_api_down_asks_the_rate_desk_and_names_the_airlines_without_a_price
     run(f)
     deal_id = f"deal-{rfq['id']}"
     monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    monkeypatch.setattr(api, "rate_from_page", lambda *a, **k: {"error": True, "status": 503, "detail": "down"})
     store.update(deal_id, lambda r: ("pricing", r["data"]))
     out = f.collect_offers(deal_id, _shipment(330, 1.5, []), "cheapest", 0)
     assert [m["subject"] for m in to(api, kit.RATEDESK)] == ["Rate request FRA-ORD 330 kg"]
@@ -793,6 +795,7 @@ def test_an_airline_the_portal_failed_for_is_asked_again_while_we_wait(monkeypat
     deal_id = f"deal-{rfq['id']}"
     real = api.rate
     monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    monkeypatch.setattr(api, "rate_from_page", lambda *a, **k: {"error": True, "status": 503, "detail": "down"})
     store.update(deal_id, lambda r: ("pricing", r["data"]))
     out = f.collect_offers(deal_id, _shipment(330, 1.5, []), "cheapest", 0)
     assert out["no_price_from"]["airlines"] == ["Borealis Freight Airways"]
@@ -805,3 +808,45 @@ def test_an_airline_the_portal_failed_for_is_asked_again_while_we_wait(monkeypat
     out = f.collect_offers(deal_id, None, "cheapest", 0)
     assert "no_price_from" not in out and kit.RATEDESK not in out["still_waiting_for"]  # the rate desk owes us nothing
     assert any(o["airline"] == "Borealis Freight Airways" for o in out["options"])
+
+
+PAGE = """<section id="result"><table data-table><tbody>
+<tr><th>rate_id</th><td id="rate_id" class="px-3">R-_yGrvGMAOgB_1LDf</td></tr>
+<tr><th>Airline</th><td id="airline" class="px-3">Borealis Freight Airways (BX)</td></tr>
+<tr><th>Lane</th><td id="lane">FRA-ORD</td></tr>
+<tr><th>Chargeable weight (kg)</th><td id="chargeable_weight_kg">1076</td></tr>
+<tr><th>Total</th><td id="total">3378.64</td></tr>
+<tr><th>Currency</th><td id="currency">EUR</td></tr>
+<tr><th>Transit days</th><td id="transit_days">1</td></tr>
+<tr><th>Valid until</th><td id="valid_until">2026-11-22T01:33:14.830845+00:00</td></tr>
+</tbody></table></section>"""
+
+
+def test_the_portal_page_is_read_like_the_rate_api():
+    """The page's answer on Sun 02:18 (FRA-ORD BX 1076 kg, the same 3378.64 as the API), and the hidden digits the
+    page used at 00:52."""
+    from app.fiveu import portal_page_url, read_rate_page
+    r = read_rate_page(PAGE)
+    assert r["rate_id"] == "R-_yGrvGMAOgB_1LDf" and r["airline"] == "Borealis Freight Airways"
+    assert r["airline_code"] == "BX" and r["total"] == "3378.64" and r["transit_days"] == 1
+    hidden = '<style>.q7{display:none}</style>' + PAGE.replace("3378.64", '33<span class="q7">9</span>78.64')
+    assert read_rate_page(hidden)["total"] == "3378.64"
+    assert read_rate_page("<p>Origin and destination must be 3-letter airport codes.</p>") is None
+    assert portal_page_url("https://api.start-hack.5u.ai") == "https://start-hack.5u.ai/portal/ui"
+
+
+def test_a_dead_rate_api_is_priced_from_the_portal_page(monkeypatch):
+    """Rounds 95-100: the API failed for the lane's fastest airline. The page still publishes its rate: it is an option
+    like any portal rate, with a rate_id that books, and nobody else is asked."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    deal_id = f"deal-{rfq['id']}"
+    monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    store.update(deal_id, lambda r: ("pricing", r["data"]))
+    out = f.collect_offers(deal_id, _shipment(330, 1.5, []), "cheapest", 0)
+    assert "no_price_from" not in out and to(api, kit.RATEDESK) == []
+    opt = next(o for o in store.get(deal_id)["data"]["options"].values() if o["air"]["carrier"] == "Borealis Freight Airways")
+    assert opt["air"]["rate_id"] in api.rates

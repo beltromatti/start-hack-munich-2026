@@ -385,6 +385,12 @@ class Forwarder:
                 weights.append(nb)  # billing at the next break is often cheaper (rates fall < 1.5x per break)
             for wt in weights:
                 r = self.api.rate(o, d, a["code"], wt, cbm)
+                if r.get("error") and r["status"] in (500, 502, 503, 504) and hasattr(self.api, "rate_from_page"):
+                    page = self.api.rate_from_page(o, d, a["code"], wt, cbm)  # the portal page still publishes rates
+                    store.log("bids", "info" if not page.get("error") else "error",
+                              f"portal {a['code']} {o}-{d}: API {r['status']}, page "
+                              f"{page.get('total') or page.get('detail')}"[:300], run_id=deal_id)
+                    r = page if not page.get("error") else r
                 if r.get("error"):
                     store.log("bids", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
                               run_id=deal_id)
