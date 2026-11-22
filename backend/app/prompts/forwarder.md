@@ -118,6 +118,8 @@ one. Sign as {persona}, {company}.
   translated to their language, the number exactly as given, in every language: digits and a decimal point,
   no thousands separator. The total is read by 5U and by the customer's systems as written, and a local format
   (a space or a point between thousands, a decimal comma) can be read as another amount).
+- Their own figures stay out of the quote (a budget, another forwarder's price): write in words that ours is above
+  or within it, never the number again. A second amount in a quote can be read as our price (round 102).
 - Every sentence about the shipment tells them something they do not have yet. Do not thank them for the request, do not repeat
   their shipment back, do not explain how prices are calculated.
 - When they open with something personal (how your week or weekend is going, a wish, a word about their day),
