@@ -898,6 +898,15 @@ def _goods(s: dict) -> tuple[int | None, Decimal | None, Decimal | None]:
         v = language.volume_cbm(lot.get("volume") or {}, dims, n)
         cbm += v or 0
         pieces += n or 0
+    totals = s.get("totals") or {}  # one weight or volume for all the lots together: counted once, never per lot
+    if (totals.get("weight") or {}).get("value") is not None:
+        w = language.weight_kg({**totals["weight"], "per_piece": False}, None)
+        if w is not None:
+            kg, unknown = w, False
+    if (totals.get("volume") or {}).get("value") is not None:
+        v = language.volume_cbm({**totals["volume"], "per_piece": False}, [], None)
+        if v is not None:
+            cbm = v
     return pieces or None, (None if unknown or not kg else kg), (cbm or None)
 
 

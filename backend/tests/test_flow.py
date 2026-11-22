@@ -1085,3 +1085,23 @@ def test_an_airline_off_the_portal_for_this_lane_is_asked_by_mail_without_holdin
     asked_mail = set(d["asked"].values())
     assert {c.email for c in off} <= asked_mail  # asked
     assert not ({c.email for c in off} & set(waiting_for({**d, "replied": []})))  # but not awaited
+
+
+def test_one_weight_for_all_lots_is_counted_once():
+    """Sam's probe: '2 different pallets, 480 kg in total' was asked back, or counted on each lot (960 kg, +78 %).
+    A weight or volume for all lots together goes in totals and counts once."""
+    from app.forwarder import normalise
+    q = lambda v, u, pp=False: {"value": v, "unit": u, "per_piece": pp}
+    none = q(None, None)
+    s = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+         "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+         "lots": [{"pieces": 1, "weight": none, "volume": none,
+                   "dimensions": {"length": 120, "width": 80, "height": 100, "unit": "cm"}},
+                  {"pieces": 1, "weight": none, "volume": none,
+                   "dimensions": {"length": 120, "width": 100, "height": 80, "unit": "cm"}}],
+         "totals": {"weight": q(480, "kg"), "volume": none}}
+    r = normalise(s, kit.world())
+    assert not r["missing"] and r["weight_kg"] == "480" and r["volume_cbm"] == "1.92" and r["pieces"] == 2
+    r = normalise({**s, "totals": None, "lots": [{"pieces": 8, "weight": q(22, "kg", True),
+                                                   "volume": q(0.25, "cbm", True), "dimensions": None}]}, kit.world())
+    assert r["weight_kg"] == "176" and r["volume_cbm"] == "2"

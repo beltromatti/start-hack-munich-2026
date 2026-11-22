@@ -45,13 +45,21 @@ SHIPMENT = obj({
         "Copy numbers and units as written; our code adds the lots up and converts units"),
         "items": obj({
             "pieces": I,
-            "weight": {**QUANTITY, "description": "gross weight as written (never net): value, unit (kg, lb, t), "
-                                                  "per_piece true if it is the weight of one piece"},
-            "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per piece or for the lot; "
+            "weight": {**QUANTITY, "description": "gross weight of this lot as written (never net): value, unit (kg, "
+                                                  "lb, t), per_piece true if it is the weight of one piece ('each', "
+                                                  "'à', 'je'). Null values when only a weight for all lots together "
+                                                  "is given (that goes in totals)"},
+            "volume": {**QUANTITY, "description": "as written: value, unit (cbm, cft, l), per_piece true when it is "
+                                                  "one piece's ('8 cartons à 22 kg and 0.25 cbm': 0.25 per piece); "
                                                   "null values if not given"},
             "dimensions": nullable(obj({"length": N, "width": N, "height": N, "unit": S},
-                                       "size of ONE piece of this lot, as written")),
+                                       "size of ONE piece of this lot, as written. A Euro pallet is 120 x 80 cm and "
+                                       "an industrial pallet 120 x 100 cm: with the height they give, that is its size")),
         })},
+    "totals": nullable(obj({"weight": QUANTITY, "volume": QUANTITY},
+                           "a weight or volume the customer gives for ALL the lots together ('2 different pallets, "
+                           "480 kg in total'): here, once, and the lots' own weight or volume null. Null when every "
+                           "lot has its own")),
     "cargo": obj({"commodity": S, "ready_date": S, "notes": S}),
     "insurance": nullable(obj({
         "goods_value": {**N, "description": "the value of the goods as written"},
