@@ -43,7 +43,7 @@ page = page.replace('<link rel="stylesheet" href="deck.css">', '<link rel="style
 assert "stage.css" in page, "the room deck's stylesheet link moved"
 page = page.replace("stage/despair.jpg", "despair.jpg").replace("stage/sings.mp4", "sings.mp4")
 page = page.rstrip() + "\n" + script + "\n"
-page = page.replace("<title>Giulia Pitch Deck</title>", "<title>Giulia Stage Deck</title>")
+page = page.replace("<title>Giulia Pitch Deck</title>", "<title>Giulia Facepalm Deck</title>")
 (out / "index.html").write_text(page)
 
 css = (HERE / "stage/stage.css").read_text().replace("stage/despair.jpg", "despair.jpg")

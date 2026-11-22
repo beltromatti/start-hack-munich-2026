@@ -14,7 +14,7 @@ Open `pitch/deck/index.html` in a browser. There is no build step.
 | `f` | full screen |
 | `#s4` in the address | jump to slide 4 |
 
-The stage deck for the big pitch is generated, never edited: `python3 stage.py <out dir>` takes this deck and adds the slides in `stage/slides.html` (sung opener, the 2 a.m. challenge slide), styled by `stage/stage.css`.
+The stage deck for the big pitch, called the Facepalm Deck (git tag `facepalm-deck`), is generated, never edited: `python3 stage.py <out dir>` takes this deck and adds the slides in `stage/slides.html` (sung opener, the 2 a.m. challenge slide), styled by `stage/stage.css`.
 
 To show it as a claude.ai artifact, run `python3 bundle.py <out dir>`. It writes a flat copy (no `../` paths, no document tags) that is published with its files.
 
