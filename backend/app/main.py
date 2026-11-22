@@ -84,7 +84,7 @@ def deals() -> list[dict]:
                     "quote": (d.get("quote") or {}).get("amount"),
                     "response_seconds": (d.get("quote") or {}).get("response_seconds"),
                     "booking": (d.get("booking") or {}).get("booking_reference"), "flag": d.get("flag"),
-                    "needs_person": d.get("portal_view"),  # the agent asked a person on 5U's portal page
+                    "needs_person": d.get("person_needed"),  # the agent asked the team (ask_person)
                     "cost_usd": store.usage(r["id"])["cost_usd"]})
     return out
 
@@ -229,6 +229,18 @@ def portal_input(deal_id: str, what: str, payload: dict) -> dict:
         return httpx.post(f"http://127.0.0.1:8010/pages/{deal_id}/{what}", json=payload, timeout=10).json()
     except Exception:
         raise HTTPException(503, "the shared browser is not running")
+
+
+@app.post("/api/deals/{deal_id}/person_answer")
+def person_answer(deal_id: str, payload: dict) -> dict:
+    """The person's answer to the agent's ask_person (kind answer)."""
+    text = (payload.get("text") or "").strip()
+    r = store.get(deal_id)
+    if not r or not (r["data"].get("person_needed")) or not text:
+        raise HTTPException(400, "nothing asked, or an empty answer")
+    store.update(deal_id, lambda x: (x["status"], {**x["data"], "person_needed": {**x["data"]["person_needed"], "answer": text}}))
+    store.log("human", "decision", f"answer to the agent: {text[:200]}", run_id=deal_id)
+    return {"ok": True}
 
 
 @app.get("/api/bookings")

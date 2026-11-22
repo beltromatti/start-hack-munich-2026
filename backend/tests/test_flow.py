@@ -1,5 +1,6 @@
 """The forwarder agent against the fake 5U, driven by a scripted model: quote -> accept -> book -> track."""
 import json
+import time
 from app import kit, store
 from app.fake5u import FakeFiveU
 from app.forwarder import Forwarder
@@ -1364,14 +1365,47 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     page = next(o for o in opts if o["airline"] == missing[0])
     assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
     store.kv_set("operator_on", "0")
-    assert "operator mode off" in tools.portal_page(ctx, "ask_person", airline=missing[0])["error"]
+    assert "operator mode off" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
 
 
 def test_an_address_imitating_a_customer_is_named_to_the_agent():
     """Rounds 105-106: 'nordlicht.audio@' and 'weidner.spielwaren@' asked for the offers of 'nordlicht-audio@' and
     'weidner-spielwaren@' to be sent to them. The agent is told the address is not on file and whom it imitates."""
     from app.agent import lookalike
-    store.put("deal-901", "deal", "quoted", {"root": 901, "customer": "weidner-spielwaren@hackloop.mail"})
+    store.put("deal-901", "deal", "quoted", {"root": 901, "customer": "weidner-spielwaren@hackloop.mail",
+                                            "received_at": "2026-11-21T15:00:00+00:00"})
+    store.put("deal-902", "deal", "new", {"root": 902, "customer": "weidner.spielwaren@hackloop.mail",
+                                          "received_at": "2026-11-22T01:39:00+00:00"})
     assert lookalike("weidner.spielwaren@hackloop.mail") == "weidner-spielwaren@hackloop.mail"
+    # round 107: the real customer writes again after the impostor did: she is not the imitation
     assert lookalike("weidner-spielwaren@hackloop.mail") is None
     assert lookalike("someone-else@hackloop.mail") is None
+
+
+def test_the_browser_opens_5u_sites_only_and_ask_person_brings_back_an_answer():
+    """The browser is a general tool with one boundary (5U's sites); ask_person interrupts the team for anything only
+    a person can do (SIEVER's `avvisa`, for us), and returns their answer."""
+    import threading
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("a@a.example", "Quote", "320 kg FRA to ORD")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    assert "5U's sites only" in tools.browser(ctx, "open", "https://evil.example/login")["error"]
+    assert "5U's sites only" in tools.browser(ctx, "open", "http://start-hack.5u.ai/portal/ui")["error"]
+    store.kv_set("operator_on", "1")
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "quote": {"amount": "1 EUR"}}))  # no 2-minute clock
+
+    def person():
+        while not (store.get(ctx.deal_id)["data"].get("person_needed")):
+            time.sleep(0.05)
+        store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "person_needed": {
+            **r["data"]["person_needed"], "answer": "Yes, accept the 40 EUR cancellation fee."}}))
+    threading.Thread(target=person).start()
+    out = tools.ask_person(ctx, "answer", "Accept the airline's 40 EUR cancellation fee?", None, 10)
+    assert out["answer"].startswith("Yes")
+    assert store.get(ctx.deal_id)["data"]["person_needed"] is None
+    store.kv_set("operator_on", "0")

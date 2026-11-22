@@ -5,6 +5,30 @@ import { post } from "./api";
 // the person does only what a person must (the check, the team key, a banner) and sends; the agent reads the result.
 const PAGE = { width: 720, height: 860 };
 
+function Answer({ dealId, note }: { dealId: string; note: string }) {
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+  const send = () => { if (text.trim()) post(`/api/deals/${dealId}/person_answer`, { text }).then(() => setSent(true)); };
+  return (
+    <div className="card portal">
+      <div className="card-head"><span className="tag">The agent asks you</span></div>
+      <div className="portal-question">{note}</div>
+      {sent ? <div className="muted">Sent: the agent goes on with your answer.</div> : (
+        <div className="portal-keys">
+          <input autoFocus placeholder="your answer" value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
+          <button className="primary" onClick={send}>Answer</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// What the agent asked a person for (ask_person): its page live, or a question to answer.
+export function PersonCard({ dealId, need }: { dealId: string; need: { kind: "page" | "answer"; note: string; airline: string | null } }) {
+  return need.kind === "answer" ? <Answer dealId={dealId} note={need.note} /> : <PortalView dealId={dealId} note={need.note} airline={need.airline} />;
+}
+
 export function PortalView({ dealId, note, airline }: { dealId: string; note: string; airline: string | null }) {
   const [tick, setTick] = useState(0);
   const [text, setText] = useState("");

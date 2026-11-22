@@ -232,3 +232,4 @@ button, input, textarea { font: inherit; color: inherit; }
 .portal-keys { display: flex; gap: 6px; flex-wrap: wrap; }
 .portal-keys input { flex: 1; min-width: 220px; padding: 6px 8px; font: inherit; }
 .portal-hint { font-size: 12px; margin-top: 4px; }
+.portal-question { font-size: 15px; margin: 6px 0 8px; }

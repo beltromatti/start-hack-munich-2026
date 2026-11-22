@@ -151,8 +151,15 @@ def lookalike(sender: str) -> str | None:
     import re
     s = (sender or "").lower()
     norm = lambda a: re.sub(r"[^a-z0-9@]", "", a)
-    known = {(r["data"].get("customer") or "").lower() for r in store.records("deal")} - {"", s, "tracking@hackloop.mail"}
-    return next((k for k in sorted(known) if norm(k) == norm(s)), None)
+    first: dict[str, str] = {}  # each address's first deal: the customer on file is the one we knew first
+    for r in store.records("deal"):
+        c, at = (r["data"].get("customer") or "").lower(), r["data"].get("received_at") or ""
+        if c and (c not in first or at < first[c]):
+            first[c] = at
+    mine = first.get(s, "9999")
+    # round 107: the real customer, once an impostor had written, was taken for the imitation of the impostor
+    return next((k for k in sorted(first) if k not in (s, "tracking@hackloop.mail") and norm(k) == norm(s)
+                 and first[k] < mine), None)
 
 
 def _mail_event(fw: Any, m: dict) -> str:

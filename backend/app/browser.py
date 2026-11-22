@@ -1,7 +1,7 @@
 """A browser the agent and a person share, for 5U's portal page (the one place its rates live when the rate API
 answers 503, behind a check meant for people).
 
-One page per deal, in a headless Chrome on the desk's Mac. The agent reads and fills it through the `portal_page`
+One page per deal, in a headless Chrome on the desk's Mac. The agent reads and fills it through the `browser`
 tool (by the labels a person sees, so the page may change its field names every load); the person sees it live in
 the deal's conversation in our UI and does what only a person may do there: the check, the team key, a banner if
 the agent cannot. Runs beside production, so a browser problem never stops the forwarder:
@@ -91,8 +91,12 @@ async def fill(deal: str, body: dict) -> dict:
         if f is None or f["tag"] == "button":
             refused.append({"i": i, "why": "no such field"})
             continue
+        if str(v).strip() == "{team_key}":  # the agent says where the key goes; the person's click types it
+            state.setdefault("key_field", {})[deal] = int(i)
+            done.append(f"{f['label']} (the person's key, on their click)")
+            continue
         if any(w in f["label"].lower() for w in ("key", "password", "token", "secret")) or f["type"] == "password":
-            refused.append({"i": i, "why": "a key or password: the person types it"})
+            refused.append({"i": i, "why": "a key or password: pass {team_key}, the person types it"})
             continue
         await p.evaluate(FILL_JS, [int(i), str(v)])
         done.append(f["label"])
@@ -125,12 +129,15 @@ async def click(deal: str, body: dict) -> dict:
 async def type_(deal: str, body: dict) -> dict:
     """The person types in the live view (into the field they clicked); key: Enter, Tab, Backspace."""
     p = page(deal)
-    if body.get("into") == "key":  # the person's own key, from their browser, on their click: into the key field
-        form = await p.evaluate(FORM_JS)
-        f = next((x for x in form if x["tag"] == "input" and "key" in x["label"].lower()), None)
-        if f is None:
-            return {"error": "no key field on the page"}
-        await p.evaluate(FILL_JS, [f["i"], str(body.get("text") or "")])
+    if body.get("into") == "key":  # the person's own key, on their click, into the field the agent marked
+        idx = state.get("key_field", {}).get(deal)
+        if idx is None:
+            form = await p.evaluate(FORM_JS)
+            f = next((x for x in form if x["tag"] == "input" and "key" in x["label"].lower()), None)
+            idx = f["i"] if f else None
+        if idx is None:
+            return {"error": "no key field marked on the page: click the field, then paste the key below"}
+        await p.evaluate(FILL_JS, [idx, str(body.get("text") or "")])
         return {"ok": True}
     if body.get("key"):
         await p.keyboard.press(body["key"])

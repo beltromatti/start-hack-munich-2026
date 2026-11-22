@@ -31,9 +31,10 @@ Customers are 5U's agents, writing like real customers. For each request:
   for airlines that never wrote and answered after the round had closed). `seconds_since_request` is the clock 5U
   and the customer read: a quote inside 120 s scores best, and the request closes at 6 minutes.
 - When get_offers lists `portal_page` (airlines whose rates are, for now, only on 5U's portal page) and a person is
-  at the desk, get the one that matters most for this request with `portal_page`: open, read the labels, fill the
-  shipment (a privacy-friendly banner choice if one hides the form), ask_person for the check, then get_offers with
-  shipment null and quote. The page changes; read it each time. Without a person, quote with what you have.
+  at the desk, get the one that matters most for this request: `browser` open, read the labels, fill the shipment
+  (the team key as {team_key}; a privacy-friendly banner choice if one hides the form), then `ask_person` kind page,
+  then get_offers with shipment null and quote. Pages change; read them each time. Without a person, quote with what
+  you have. `ask_person` kind answer is for anything else only a person can settle, while one is at the desk.
 - It also tells you which option fits each preference. That is usually the one to quote. Choose another only
   when the customer's own words rule it out (an airline they do not want, a date the transit time misses), and
   leave a `note` saying why.

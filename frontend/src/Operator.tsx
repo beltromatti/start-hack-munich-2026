@@ -38,7 +38,7 @@ export function OperatorStrip({ deals, onOpen }: { deals: DealRow[]; onOpen: (id
       onOpen(d.id);
       try {
         if ("Notification" in window && Notification.permission === "granted") {
-          const n = new Notification("Your turn on 5U's portal", { body: `${d.route ?? ""} ${d.needs_person?.airline ?? ""}: pass the check and send`, requireInteraction: true });
+          const n = new Notification(d.needs_person?.kind === "answer" ? "The agent asks you" : "Your turn on 5U's portal", { body: `${d.route ?? ""}: ${d.needs_person?.note ?? ""}`, requireInteraction: true });
           n.onclick = () => { window.focus(); onOpen(d.id); n.close(); };
         }
       } catch { /* none */ }
@@ -54,8 +54,8 @@ export function OperatorStrip({ deals, onOpen }: { deals: DealRow[]; onOpen: (id
         {"Notification" in window && Notification.permission !== "granted"
           ? <button className="chip" onClick={() => Notification.requestPermission()}>Allow alerts</button> : null}
         <span className="muted op-hint">
-          {waiting.length ? waiting.map((d) => <a key={d.id} href="#" onClick={(e) => { e.preventDefault(); onOpen(d.id); }}>{d.route}: your turn </a>)
-            : op.on ? "at the desk: when 5U's portal needs a person, the deal opens with the page in its conversation" : "off: the agent quotes without asking anyone"}
+          {waiting.length ? waiting.map((d) => <a key={d.id} href="#" onClick={(e) => { e.preventDefault(); onOpen(d.id); }}>{d.route}: {d.needs_person?.kind === "answer" ? "a question for you" : "your turn on the portal"} </a>)
+            : op.on ? "at the desk: when the agent needs a person, its deal opens in front of you" : "off: the agent quotes without asking anyone"}
         </span>
       </div>
     </section>

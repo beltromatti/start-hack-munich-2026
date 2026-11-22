@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Attachment, Deal, Item, Mail, Option, post } from "./api";
-import { PortalView } from "./PortalView";
+import { PersonCard } from "./PortalView";
 import { STATUS, clock, parseJSON, usd, who } from "./format";
 
 type Step =
@@ -258,7 +258,7 @@ export function DealView({ deal, onSent }: { deal: Deal; onSent: () => void }) {
         <div className="banner warn-banner"><strong>Booked at another price</strong> · the airline booked {d.booking.price_changed.booked} all-in, against the {d.booking.price_changed.quoted} quoted</div>
       ) : null}
 
-      {d.portal_view ? <PortalView dealId={deal.id} note={d.portal_view.note} airline={d.portal_view.airline} /> : null}
+      {d.person_needed ? <PersonCard dealId={deal.id} need={d.person_needed} /> : null}
 
       <CarrierMails mails={deal.carrier_mails ?? []} />
 
