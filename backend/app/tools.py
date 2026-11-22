@@ -53,6 +53,19 @@ SHIPMENT = obj({
                                        "size of ONE piece of this lot, as written")),
         })},
     "cargo": obj({"commodity": S, "ready_date": S, "notes": S}),
+    "charges": {"type": "array", "description": (
+        "what the customer wants inside the all-in price beyond freight and pickup, on terms they state themselves "
+        "(cargo insurance: goods value, cover percent, premium rate; a fee they name). Empty when they ask for "
+        "none. Copy the numbers as written: code computes each amount and adds it to every total, also after "
+        "booking. Never work such an amount out yourself"),
+        "items": obj({
+            "label": {**S, "description": "what it is, in the customer's words: cargo insurance"},
+            "value": {**N, "description": "the value the rate applies to (goods value), null for a flat amount"},
+            "cover_percent": {**N, "description": "share of the value covered, as written (110), null if not said"},
+            "rate_percent": {**N, "description": "the rate in percent, as written (0.40)"},
+            "flat_amount": {**N, "description": "a fixed amount the customer states, else null"},
+            "currency": {**S, "description": "currency of value or flat_amount, as written"},
+        })},
 })
 
 

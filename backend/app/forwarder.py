@@ -149,6 +149,9 @@ class Forwarder:
                 for k in ("origin", "destination", "chargeable_kg", "pickup_zone", "volume_cbm"))
             if not same:
                 self._ask_everyone(deal_id, req)
+            else:  # the same goods on new terms (insurance added or dropped): nobody is asked again
+                store.update(deal_id, lambda r: (r["status"], {
+                    **r["data"], "request": {**r["data"]["request"], "charges": req["charges"]}}))
         deal = store.get(deal_id)
         if not deal or not deal["data"].get("request"):
             if deal and deal["data"].get("asked"):  # nothing to price (a tracking thread): wait for the answers
@@ -209,7 +212,11 @@ class Forwarder:
                     else pricing.breaks_to_try(cw)
                 for wt in [cw] + above:
                     asked[str(self.ask_airline(deal_id, c, o, d, wt, cbm, req))] = c.email
+        if failed:  # the rate desk mails the portal's rates when the API does not (round 93: the API was down and
+            # its airlines did not answer our mails, so the lane's best price reached nobody)
+            asked[str(self.ask_ratedesk(deal_id, o, d, kg, cbm, req))] = RATEDESK
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
+                                                       "portal_failed": sorted(failed),
                                                        "offers": r["data"]["offers"] + [x.as_dict() for x in portal]}))
         store.log("bids", "info", f"{o}-{d} {cw} kg: {len(offers) + len(portal)} prices now, asked {len(asked)} by mail",
                   run_id=deal_id)
@@ -224,6 +231,7 @@ class Forwarder:
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
         needs_pickup = bool(req["pickup_zone"])
+        charges = req.get("charges") or []
         table: dict[str, dict] = {}
         rows = []
         variants = pickup_variants(pickups, preference) if needs_pickup else [("", None)]
@@ -232,9 +240,9 @@ class Forwarder:
                 if needs_pickup and p is None:
                     continue
                 oid = f"A{i}{tag}"
-                total = pricing.money(a.total + (p.total if p else 0))
+                total = pricing.money(a.total + (p.total if p else 0) + pricing.charges_total(charges))
                 table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
-                              "total_text": pricing.fmt(total)}
+                              "total_text": pricing.fmt(total), "charges": charges}
                 _, leaves, arrives = pricing.schedule(req.get("ready_date"), float(p.days) * 24 if p else 0, a.days)
                 rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
                              "pickup": {"trucker": p.carrier, "pickup_hours": round(float(p.days) * 24, 1)} if p else None,
@@ -261,10 +269,19 @@ class Forwarder:
                 "pickup_alternatives": [{"trucker": p.carrier, "total": pricing.fmt(p.total),
                                          "pickup_hours": round(float(p.days) * 24, 1)} for p in pickups],
                 "still_waiting_for": waiting,
+                # the customer's own charge lines, already inside every total above (and kept after booking)
+                "charges_in_every_total": [{**c, "amount": pricing.fmt(Decimal(c["amount"]))} for c in charges],
                 # answers that change the picture: a carrier we had a price for says no, or a carrier asks back
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
                                            if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
+        silent = [n for n in d.get("portal_failed", []) if n.lower() not in {a.carrier.lower() for a in air}]
+        if silent:  # half a lane is not the lane: the agent decides whether to wait, knowing who is missing
+            result["no_price_from"] = {
+                "airlines": silent,
+                "why": "they fly this lane, the rate portal did not answer for them and neither they nor the rate "
+                       "desk have replied yet. The fastest or the cheapest may be among them: a quote without them "
+                       "can be far from the best price. get_offers with shipment null waits for them"}
         if d.get("not_asked"):  # the agent can still ask one of them (mail_carrier) when it judges it useful
             result["not_asked"] = [{"carrier": x["carrier"], "email": x["email"], "why": x["why"]}
                                    for x in d["not_asked"]]
@@ -288,6 +305,15 @@ class Forwarder:
         mid = self.mail_carrier(deal_id, c.email, f"Rate request {o}-{d} {kg_text(billed)} kg", body)
         store.kv_set(f"bidweight:{mid}", kg_text(billed))
         return mid
+
+    def ask_ratedesk(self, deal_id: str, o: str, d: str, kg: Decimal, cbm: Decimal | None, req: dict) -> int:
+        # the wording the rate desk answered on Sat 13:52 ("Portal rates FRA-ORD 320.0 kg", one line per airline)
+        body = (f"Hello,\n\nplease quote air freight for this shipment:\nRoute: {o} to {d}\n"
+                f"Cargo: {req.get('pieces') or 1} pieces, general cargo, {kg_text(kg)} kg"
+                + (f", {cbm:.2f} cbm" if cbm else "") + f"\nReady: {req.get('ready_date') or 'now'}\n\n"
+                "Please send your all-in total, currency, transit time and how long the rate is valid.\n\n"
+                f"Thanks,\n{settings.persona}, {settings.company}")
+        return self.mail_carrier(deal_id, RATEDESK, f"Rate request {o}-{d} {kg_text(kg)} kg", body)
 
     def ask_trucker(self, deal_id: str, c: kit.Carrier, req: dict) -> int:
         z = kit.world().zones.get(req["pickup_zone"], {})
@@ -360,7 +386,7 @@ class Forwarder:
                    "route": f"{req['origin']}-{req['destination']}", "transit_days": air["days"],
                    "amount": opt["total_text"], "option": option_id, "booked_at": time.time(),
                    "ready_date": req.get("ready_date"), "pickup": opt.get("pickup"), "weight_kg": req["weight_kg"],
-                   "pieces": req.get("pieces"), "rate_id": air.get("rate_id")}
+                   "pieces": req.get("pieces"), "rate_id": air.get("rate_id"), "charges": opt.get("charges") or []}
         if status in (200, 201):
             booking.update(booking_reference=body.get("booking_reference"), status="booked", via="portal",
                            price=body.get("price"), currency=body.get("currency"), note=body.get("note"))
@@ -371,7 +397,8 @@ class Forwarder:
             except Exception:
                 booked_air = None
             if booked_air is not None and pricing.money(booked_air) != pricing.money(Decimal(str(air["total"]))):
-                now = booked_air + Decimal(str((opt.get("pickup") or {}).get("total") or 0))
+                now = booked_air + Decimal(str((opt.get("pickup") or {}).get("total") or 0)) \
+                    + pricing.charges_total(opt.get("charges"))
                 booking.update(amount=pricing.fmt(now), quoted_amount=opt["total_text"],
                                price_changed={"quoted": opt["total_text"], "booked": pricing.fmt(now)})
         elif air.get("email") or kit.world().carrier_by_name(air["carrier"]):  # by mail with the airline
@@ -512,8 +539,12 @@ class Forwarder:
                     m["sender"], m["subject"], m["body"], rec["id"])) if o is not None]
                 for o in offers:
                     o.source = "ratedesk"
+                # an airline the rate desk priced owes us no answer of its own any more
+                owed = Counter((rec["data"].get("asked") or {}).values())
+                named = [c.email for c in (kit.world().carrier_by_name(o.carrier) for o in offers) if c]
+                priced = [e for e in dict.fromkeys(named) for _ in range(owed[e])]
                 store.update(rec["id"], lambda r: (r["status"], {
-                    **r["data"], "replied": r["data"].get("replied", []) + [RATEDESK],
+                    **r["data"], "replied": r["data"].get("replied", []) + [RATEDESK] + priced,
                     "offers": r["data"].get("offers", []) + [o.as_dict() for o in offers]}))
 
     def on_booking_mail(self, m: dict, rec: dict | None = None) -> None:
@@ -672,7 +703,17 @@ def normalise(s: dict, w: kit.World) -> dict:
     elif kg is None:
         missing.append("total weight")
     cw = pricing.chargeable(kg, cbm) if kg else None
-    return {"origin": origin, "destination": dest, "weight_kg": str(kg) if kg else None,
+    charges = []
+    for c in s.get("charges") or []:  # insurance and other lines the customer wants inside the all-in price
+        label = c.get("label") or "charge"
+        amount, how = pricing.charge(c)
+        if (c.get("currency") or "EUR").strip().upper() not in ("EUR", "€"):
+            missing.append(f"{label}: its value in EUR (stated in {c['currency']}, and we quote in EUR)")
+        elif amount is None:
+            missing.append(f"{label}: the terms to compute it (the value and the rate in percent, or a fixed amount)")
+        else:
+            charges.append({"label": label, "amount": str(amount), "computed_as": how})
+    return {"charges": charges, "origin": origin, "destination": dest, "weight_kg": str(kg) if kg else None,
             "volume_cbm": str(cbm.quantize(Decimal("0.001"))) if cbm else None,
             "chargeable_kg": str(cw) if cw else None, "pieces": pieces, "pickup_zone": zone,
             # the ready date as a date, however the customer wrote it (round 65: "24 November 2026" reached the
@@ -773,10 +814,11 @@ def clean_reference(ref: str | None) -> str | None:
 
 
 def booked_air(b: dict) -> tuple[Decimal, Decimal] | None:
-    """The flight price we booked and the pickup in the booking's all-in total (an airline's mail prices the
-    flight only)."""
+    """The flight price we booked and the rest of the booking's all-in total: the pickup and the customer's own
+    charge lines, insurance among them (an airline's mail prices the flight only. Round 92 lost 267.30 of
+    insurance from the total after booking)."""
     try:
-        pickup = Decimal(str((b.get("pickup") or {}).get("total") or 0))
+        pickup = Decimal(str((b.get("pickup") or {}).get("total") or 0)) + pricing.charges_total(b.get("charges"))
         return Decimal(str(b.get("amount", "")).split()[0]) - pickup, pickup
     except Exception:
         return None
@@ -798,7 +840,8 @@ def price_in_airline_mail(b: dict, body: str, confirmation: bool) -> tuple[dict,
     if booked is None:
         return b, "", False
     air, pickup = booked
-    with_pickup = f" (with the pickup, {pricing.fmt(pickup)})" if pickup else ""
+    rest = "the pickup" + (" and what the customer asked to have included" if b.get("charges") else "")
+    with_pickup = f" (with {rest}, {pricing.fmt(pickup)})" if pickup else ""
     if air in amounts_in(body):
         return b, (f"Their price, {pricing.fmt(air)}, is the flight price we booked: the customer's all-in total "
                    f"stays {b['amount']}{with_pickup}."), False

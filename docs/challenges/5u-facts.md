@@ -203,3 +203,15 @@ attached"); the truckers answered "You find our price offer in the attachment" a
 "Lead time 29 hours from order to collection" or "Our driver can be at the pickup address 13 hours after your
 order". The gateway has no audio model and its chat API takes only text and images. Our question to the customer
 ("cannot price the collection yet") was scored `rejected declined_in_scope`; the quote sent after it did not count.
+
+**Charges the customer wants inside the price (Sun from 00:50 CET, rounds 91 and 92):** "include cargo insurance
+in the all-in price: goods value 22000 EUR, insured at 110 %, premium rate 0.40 %". The key adds
+value x cover x rate (96.80 EUR) to the freight. We quoted the freight alone (927.95) and got `too_low`, as 10 of
+11 teams did. In round 92 (81000 EUR, 110 %, 0.30 % = 267.30) the quote was accepted with the insurance in it.
+
+**The rate API down and its airlines silent (Sun 01:19 CET, round 93, DUS-JFK, fastest):** `/v1/portal/rates`
+answered `503 The rate API is unavailable.` for at least 9 minutes. The two portal airlines of the lane
+(Ultraviolet, Fjordline) did not answer our mails, the only silent airlines in about 290 rate requests that day.
+We quoted the one airline that had answered and got `too_low`. No team was accepted (0 of 13). The rate desk
+(`ratedesk@hackloop.mail`) mails the portal's rates on request (seen Sat 13:52, 61 s, "Portal rates FRA-ORD
+320.0 kg", one line per airline with total, days and rate_id). Whether it answers during an outage is not tested.

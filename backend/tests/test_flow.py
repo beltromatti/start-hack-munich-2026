@@ -665,3 +665,78 @@ def test_a_ready_date_said_relative_to_today_is_the_next_such_day():
     assert _day("Monday") == monday.isoformat() and _day("next Monday") == monday.isoformat()
     assert _day("tomorrow") == (today + timedelta(days=1)).isoformat()
     assert _day("2026-11-24") == "2026-11-24" and _day("whenever") is None
+
+
+def _shipment(kg, cbm, charges):
+    return {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD", "pieces": 2,
+            "weight": {"value": kg, "unit": "kg", "per_piece": False},
+            "volume": {"value": cbm, "unit": "cbm", "per_piece": False}, "dimensions": [],
+            "cargo": {"commodity": None, "ready_date": None, "notes": None}, "charges": charges}
+
+
+def test_insurance_the_customer_asks_for_is_in_every_total_also_after_booking():
+    """Round 91: 'include cargo insurance in the all-in price: goods value 22000 EUR, insured at 110 %, premium rate
+    0.40 %'. We quoted the freight alone, 96.80 short, rejected as too low. Round 92: quoted with the insurance, and
+    the total we named after booking had lost it (3569.18 became 3301.88, 267.30 short)."""
+    from decimal import Decimal
+    from app import pricing
+    from app.forwarder import price_in_airline_mail
+    insurance = {"label": "cargo insurance", "value": 22000, "cover_percent": 110, "rate_percent": 0.40,
+                 "flat_amount": None, "currency": "EUR"}
+    assert pricing.charge(insurance)[0] == Decimal("96.80")
+    assert pricing.charge({**insurance, "value": 81000, "rate_percent": 0.30})[0] == Decimal("267.30")
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    deal_id = f"deal-{rfq['id']}"
+    plain, mails = store.get(deal_id)["data"]["options"], len(api.outbox)
+    out = f.collect_offers(deal_id, _shipment(320.0, 1.5, [insurance]), "cheapest", 0)
+    opts = store.get(deal_id)["data"]["options"]
+    assert opts and all(Decimal(o["total"]) == Decimal(plain[k]["total"]) + Decimal("96.80") for k, o in opts.items())
+    assert out["charges_in_every_total"] == [{"label": "cargo insurance", "amount": "96.80 EUR",
+                                              "computed_as": "22000 EUR x 110 % x 0.4 %"}]
+    assert len(api.outbox) == mails  # the same goods on new terms: no carrier is asked again
+
+    oid, opt = next((k, o) for k, o in opts.items() if o["air"]["source"] == "portal")
+    rate = api.rates[opt["air"]["rate_id"]]
+    rate["total"] = f"{float(rate['total']) * 1.1:.2f}"  # booked 10 % above the rate: the new total keeps the insurance
+    b = f.book_option(deal_id, oid)
+    assert b["amount"] == pricing.fmt(Decimal(rate["total"]) + Decimal("96.80"))
+    _, facts, changed = price_in_airline_mail(b, f"Booking confirmed. Price: {rate['total']} EUR", True)
+    assert not changed and b["amount"] in facts  # the airline names the flight price: the all-in total stays
+
+    asks = f.collect_offers(deal_id, _shipment(320.0, 1.5, [{**insurance, "rate_percent": None}]), "cheapest", 0)
+    assert "cargo insurance" in asks["missing"][0]  # terms incomplete: we ask, no rate is guessed
+
+
+def test_rate_api_down_asks_the_rate_desk_and_names_the_airlines_without_a_price(monkeypatch):
+    """Round 93 (Sun 00:19 UTC, DUS-JFK, fastest): the rate API answered 503, its two airlines never answered our
+    mails, and we quoted the one airline that had replied. 'Too low', as for all 13 teams. The rate desk mails the
+    portal's rates: it is asked too, and until a price is in the agent sees who is missing."""
+    from app import llm
+    from tests.conftest import fake_llm
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    deal_id = f"deal-{rfq['id']}"
+    monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    store.update(deal_id, lambda r: ("pricing", r["data"]))
+    out = f.collect_offers(deal_id, _shipment(330, 1.5, []), "cheapest", 0)
+    assert [m["subject"] for m in to(api, kit.RATEDESK)] == ["Rate request FRA-ORD 330 kg"]
+    assert "330 kg, 1.50 cbm" in to(api, kit.RATEDESK)[0]["body"]
+    assert out["no_price_from"]["airlines"] == ["Borealis Freight Airways"]
+    assert kit.RATEDESK in out["still_waiting_for"]
+
+    llm.use_fake(lambda name, system, user, schema: {"offers": [
+        {**fake_llm(name, system, user, schema)["offers"][0], "carrier": "Borealis Freight Airways"}]})
+    api._deliver(kit.RATEDESK, api.mailbox, "Portal rates FRA-ORD 330.0 kg",
+                 "Hello,\n\nportal rates for FRA-ORD, 330.0 kg, 1.5 cbm:\n\n- Borealis Freight Airways (BX): "
+                 "1171.20 EUR, 1 days, rate_id R-WJbOVh3xQv1cvpvw, valid until 21 Nov 2026 14:07 UTC\n\nRate Desk")
+    f.tick()
+    out = f.collect_offers(deal_id, None, "cheapest", 0)
+    assert "no_price_from" not in out and out["still_waiting_for"] == []
+    assert any(o["airline"] == "Borealis Freight Airways" and o["total"] == "1171.20 EUR" for o in out["options"])

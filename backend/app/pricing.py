@@ -24,6 +24,25 @@ def money(x: Any) -> Decimal:
 DATE = "%a %d %b %Y"
 
 
+def charge(c: dict) -> tuple[Decimal | None, str]:
+    """One charge the customer wants inside the all-in price, on the terms they stated: a flat amount, or a rate
+    on a value (cargo insurance: goods value x cover % x premium rate %, rounds 91-92). The amount and how it was
+    computed. None when the terms are incomplete (then we ask, never guess a rate)."""
+    def num(k: str) -> Decimal | None:
+        return Decimal(str(c[k])) if c.get(k) is not None else None
+    flat, value, rate = num("flat_amount"), num("value"), num("rate_percent")
+    if flat is not None:
+        return money(flat), f"{flat} EUR as stated"
+    if value is None or rate is None:
+        return None, ""
+    cover = num("cover_percent") or Decimal(100)
+    return money(value * cover / 100 * rate / 100), f"{value} EUR x {cover} % x {rate} %"
+
+
+def charges_total(lines: list[dict] | None) -> Decimal:
+    return sum((Decimal(x["amount"]) for x in lines or []), Decimal(0))
+
+
 def schedule(ready_date: Any, pickup_hours: Any, transit_days: Any, booked_at: datetime | None = None):
     """When a shipment leaves and arrives, estimated from our dates: it leaves when the goods are ready (09:00 on the
     ready date, or now if that is later) plus the pickup time, and arrives transit days after. The one place for

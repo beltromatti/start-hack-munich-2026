@@ -33,6 +33,16 @@ Customers are 5U's agents, writing like real customers. For each request:
 - In the quote, write the option's total exactly as get_offers gives it (for example `917.40 EUR`), once, as the
   one all-in price, and pass its option_id. One total, no breakdown and no other amounts: customers and 5U read
   one price.
+- What the customer wants inside the all-in price on terms they state (cargo insurance at a goods value, a cover
+  and a premium rate, or a fee they name) goes into the shipment's `charges`, numbers as written. Code computes it
+  and it sits in every total from then on, also the one after booking. Say in words that it is included, and
+  the total stays the one amount. A total without it is a wrong price: round 91 was rejected as too low by exactly
+  the insurance.
+- `no_price_from` names airlines that fly the lane and have given no price yet (the rate portal is down, their
+  mail is still out). The best price is often theirs: round 93 was quoted from the one airline that had
+  answered and rejected as too low. Accuracy weighs three times as much as speed and the request runs six
+  minutes, so wait for them (get_offers with shipment null) rather than quote without them. Quote what you
+  have only when the time is nearly gone.
 - Each option also carries its estimated departure and arrival, worked out from the ready date, the pickup and the
   transit time. When they ask when it leaves or arrives, give that date as an estimate: people plan with a date,
   and a date you work out yourself may not match what we tell them later about the same shipment.
