@@ -113,7 +113,7 @@ let alerts = true;
 // One request arrives half a minute after the page opens (the lookalike sender), so the desk visibly reacts.
 const opened = Date.now(), LATE = "deal-2416";
 function arrived(): Deal[] {
-  if (real) return DEALS;
+  if (real || new URLSearchParams(location.search).has("embed")) return DEALS; // embedded, the page around the desk picks the state
   if (Date.now() - opened < 30000) return DEALS.filter((d) => d.id !== LATE);
   const d = DEALS.find((x) => x.id === LATE);
   if (d && !(d as { shown?: boolean }).shown) { (d as { shown?: boolean }).shown = true; const t = Math.floor(Date.now() / 1000); d.updated_at = t - 4; d.data.received_at = new Date((t - 40) * 1000).toISOString(); d.mails.forEach((m, i) => { m.received_at = new Date((t - 40 + i * 22) * 1000).toISOString(); }); DEALS.sort((a, b) => b.updated_at - a.updated_at); }
