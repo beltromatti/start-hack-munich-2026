@@ -2,14 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { get, post } from "./api";
 
 // When 5U's rate API answers 503 for some airlines, their prices are still on 5U's portal page, which asks people
-// to pass a check. A person on the team reads them there by hand: this strip gives every field of that form ready
-// to copy, reads the pasted result in code, and the agent quotes as soon as the prices are in (it waits for a
-// person only while operator mode is on, up to wait_seconds after the customer's mail).
+// to pass a check. A person reads them there by hand: one compact card per request, the form's values to copy, and
+// one paste box that reads airline, total, days and rate_id in code and adds the price at once.
 const PORTAL = "https://start-hack.5u.ai/portal/ui";
 
 type Missing = { name: string; code: string | null; break_above: string | null };
 type Needed = {
-  deal: string; subject: string; customer: string; received_at: string; preference: string | null;
+  deal: string; subject: string; received_at: string; preference: string | null;
   origin: string; destination: string; gross_kg: string; volume_cbm: string | null; chargeable_kg: string;
   airlines: Missing[];
 };
@@ -19,70 +18,69 @@ type Read = { total: string | null; days: string | null; rate_id: string | null;
 function alarm(text: string) {
   try {
     const ctx = new AudioContext();
-    [0, 0.3, 0.6].forEach((t) => {
+    [0, 0.25, 0.5].forEach((t) => {
       const o = ctx.createOscillator();
       o.frequency.value = 880;
       o.connect(ctx.destination);
       o.start(ctx.currentTime + t);
-      o.stop(ctx.currentTime + t + 0.18);
+      o.stop(ctx.currentTime + t + 0.15);
     });
   } catch { /* no audio */ }
   try {
     if ("Notification" in window && Notification.permission === "granted") new Notification("Portal price needed", { body: text });
-  } catch { /* no notifications */ }
+  } catch { /* none */ }
 }
 
-function Copy({ label, value }: { label: string; value: string }) {
+function Chip({ label, value, big, active, onPick }: { label?: string; value: string; big?: boolean; active?: boolean; onPick?: () => void }) {
   const [done, setDone] = useState(false);
   return (
-    <button className="op-copy" title={`Copy ${label}`} onClick={() => {
-      navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1200); });
-    }}>
-      <span className="op-label">{label}</span><span className="mono">{value}</span><span className="op-ok">{done ? "copied" : "copy"}</span>
+    <button className={`chip${big ? " big" : ""}${done ? " done" : ""}${active ? " active" : ""}`} title="Click to copy"
+      onClick={() => { onPick?.(); navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 900); }); }}>
+      {label ? <small>{label}</small> : null}<b>{value}</b>
     </button>
   );
 }
 
-function Airline({ n, a, weight, note }: { n: Needed; a: Missing; weight: string; note?: string }) {
-  const [pasted, setPasted] = useState("");
-  const [read, setRead] = useState<Read | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  async function check(text: string) {
-    setPasted(text);
-    setMsg(null);
-    if (!text.trim()) { setRead(null); return; }
-    const r = await post<{ read: Read }>(`/api/deals/${n.deal}/portal_rate`, { airline: a.name, pasted: text, dry: true });
-    setRead(r.read);
-  }
-  async function add() {
+function Card({ n, left }: { n: Needed; left: number }) {
+  const [log, setLog] = useState<string[]>([]);
+  const [text, setText] = useState("");
+  const [current, setCurrent] = useState<string | null>(n.airlines.length === 1 ? n.airlines[0].name : null);
+  const kg = String(Number(n.gross_kg)).replace(/\.0+$/, "");
+  async function paste(t: string) {
+    setText(t);
+    if (!t.trim()) return;
+    const low = t.toLowerCase();
+    const a = n.airlines.find((x) => (x.code && new RegExp(`\\b${x.code}\\b`).test(t)) || low.includes(x.name.toLowerCase()))
+      ?? n.airlines.find((x) => x.name === current);
+    const r = (await post<{ read: Read }>(`/api/deals/${n.deal}/portal_rate`, { airline: a?.name ?? "", pasted: t, dry: true })).read;
+    if (!a || !r.total || !r.days || r.totals_seen.length > 1) {
+      setLog((l) => [`✗ not added: ${!a ? "which airline? click its code first, then paste" : !r.total ? "no total in EUR" : !r.days ? "no transit days" : "several amounts, paste only the result box"}`, ...l]);
+      return;
+    }
     try {
-      await post(`/api/deals/${n.deal}/portal_rate`, { airline: a.name, pasted, weight_kg: weight, who: "Mattia" });
-      setMsg("Added. The agent quotes as soon as the missing prices are in.");
-    } catch (e) { setMsg(String(e)); }
+      await post(`/api/deals/${n.deal}/portal_rate`, { airline: a.name, pasted: t, weight_kg: kg, who: "Mattia" });
+      setLog((l) => [`✓ ${a.code ?? a.name} ${r.total} EUR · ${r.days} d · ${r.rate_id ?? "no rate_id"}`, ...l]);
+      setText("");
+    } catch (e) { setLog((l) => [`✗ ${String(e)}`, ...l]); }
   }
   return (
-    <div className="op-air-box">
-      <div className="op-step"><strong>{a.name}</strong>{note ? <span className="muted"> · {note}</span> : null}</div>
-      <div className="op-fields">
-        <Copy label="Origin" value={n.origin} />
-        <Copy label="Destination" value={n.destination} />
-        <Copy label="Weight kg" value={weight} />
-        {n.volume_cbm ? <Copy label="Volume cbm" value={n.volume_cbm} /> : null}
-        <Copy label="Airline" value={a.code ?? a.name} />
-        <span className="muted op-key">Team key: your own (from .env or the browser's autofill)</span>
+    <div className="op-card">
+      <div className="op-line">
+        <b className="op-lane">{n.origin} → {n.destination}</b>
+        <span className="op-pref">{n.preference ?? "any"}</span>
+        <span className={`op-left${left < 25 ? " late" : ""}`}>{left}s</span>
       </div>
-      <textarea className="op-paste" rows={2} placeholder="Paste the page's result here (the 'Your rate' box): total, transit, rate_id are read for you"
-        value={pasted} onChange={(e) => check(e.target.value)} />
-      {read ? (
-        <div className="op-read">
-          <span>Total <strong className="mono">{read.total ?? "?"}{read.total ? " EUR" : ""}</strong></span>
-          <span>Days <strong className="mono">{read.days ?? "?"}</strong></span>
-          <span>Rate <strong className="mono">{read.rate_id ?? "?"}</strong></span>
-          {read.totals_seen.length > 1 ? <span className="late">several amounts: {read.totals_seen.join(", ")}; paste only the result box</span> : null}
-          <button className="primary" disabled={!read.total || !read.days} onClick={add}>Add price</button>
-        </div>
-      ) : null}
-      {msg ? <div className="muted">{msg}</div> : null}
+      <div className="op-line">
+        <Chip big label="Origin" value={n.origin} />
+        <Chip big label="Destination" value={n.destination} />
+        <Chip big label="Weight kg" value={kg} />
+        {n.volume_cbm ? <Chip big label="Volume cbm" value={String(Number(n.volume_cbm))} /> : null}
+        <span className="op-sep">Airline:</span>
+        {n.airlines.map((a) => <Chip key={a.name} value={a.code ?? a.name} active={current === a.name} onPick={() => setCurrent(a.name)} />)}
+      </div>
+      <textarea className="op-paste" rows={2} value={text} placeholder="Paste the portal's result here: it is added at once"
+        onChange={(e) => paste(e.target.value)} />
+      {log.length ? <div className="op-log">{log.slice(0, 4).map((x, i) => <div key={i} className={x.startsWith("✓") ? "ok" : "late"}>{x}</div>)}</div> : null}
     </div>
   );
 }
@@ -98,53 +96,31 @@ export function OperatorStrip() {
     const t = setInterval(() => { load(); setNow(Date.now()); }, 1000);
     return () => clearInterval(t);
   }, []);
+  const live = (op?.needed ?? [])
+    .map((n) => ({ n, left: (op?.wait_seconds ?? 95) - Math.round((now - Date.parse(n.received_at)) / 1000) }))
+    .filter((x) => x.left > 0);
   useEffect(() => {
-    for (const n of op?.needed ?? []) {
+    for (const { n } of live) {
       if (!seen.current.has(n.deal)) {
         seen.current.add(n.deal);
         if (op?.on) alarm(`${n.origin}-${n.destination} ${n.gross_kg} kg: ${n.airlines.map((a) => a.code ?? a.name).join(", ")}`);
       }
     }
-    document.title = op?.needed.length ? `(!) Portal price needed · ${title.current}` : title.current;
-  }, [op]);
+    document.title = live.length ? `(!) Portal price · ${title.current}` : title.current;
+  });
   if (!op) return null;
   const toggle = () => post<Op>("/api/operator", { on: !op.on }).then(setOp);
-  const allow = () => { try { Notification.requestPermission(); } catch { /* none */ } };
   return (
-    <section className={`operator${op.needed.length ? " needed" : ""}`}>
-      <div className="op-head">
-        <button className={op.on ? "primary" : ""} onClick={toggle}>{op.on ? "Operator mode on" : "Operator mode off"}</button>
-        <span className="muted">
-          {op.on ? `When 5U's rate API fails, the agent waits up to ${op.wait_seconds} s after the mail for the prices you read on 5U's portal page.`
-            : "Turn on while you are at the desk: missing portal prices then wait for you (and an alarm rings)."}
-        </span>
-        <a className="op-link" href={PORTAL} target="_blank" rel="noreferrer">Open 5U's portal page</a>
-        {"Notification" in window && Notification.permission !== "granted" ? <button onClick={allow}>Allow alerts</button> : null}
+    <section className={`operator${live.length ? " needed" : ""}`}>
+      <div className="op-line">
+        <button className={`op-toggle${op.on ? " on" : ""}`} onClick={toggle}>{op.on ? "Operator ON" : "Operator OFF"}</button>
+        <a className="op-link" href={PORTAL} target="_blank" rel="noreferrer">5U portal ↗</a>
+        {"Notification" in window && Notification.permission !== "granted"
+          ? <button className="chip" onClick={() => Notification.requestPermission()}>Allow alerts</button> : null}
+        <span className="muted op-hint">{op.on ? (live.length ? "copy → portal → pass the check → paste the result below" : "waiting: an alarm rings when a price is needed")
+          : "turn on when you are at the desk"}</span>
       </div>
-      {op.needed.map((n) => {
-        const left = Math.max(0, op.wait_seconds - Math.round((now - Date.parse(n.received_at)) / 1000));
-        const w = Number(n.gross_kg).toFixed(2).replace(/\.00$/, "");
-        return (
-          <div key={n.deal} className="op-deal">
-            <div className="op-title">
-              <strong>{n.origin} → {n.destination}</strong>
-              <span>{n.preference ?? "no preference"}</span>
-              <span className="muted">{n.subject}</span>
-              <span className={`op-left${left < 25 ? " late" : ""}`}>{left > 0 ? `${left} s left` : "time is up: the agent quotes without it"}</span>
-            </div>
-            <ol className="muted op-howto">
-              <li>Open 5U's portal page, fill the form with the values below (click to copy), pass the check.</li>
-              <li>Copy the result box and paste it under the airline: check total, days and rate, then Add price.</li>
-            </ol>
-            {n.airlines.map((a) => (
-              <div key={a.name}>
-                <Airline n={n} a={a} weight={w} />
-                {a.break_above ? <Airline n={n} a={a} weight={a.break_above} note={`at the break above (${a.break_above} kg), often cheaper: only if there is time`} /> : null}
-              </div>
-            ))}
-          </div>
-        );
-      })}
+      {live.map(({ n, left }) => <Card key={n.deal} n={n} left={left} />)}
     </section>
   );
 }
