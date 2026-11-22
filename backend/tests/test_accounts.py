@@ -84,3 +84,17 @@ def test_this_machine_reads_freely_but_the_tunnel_does_not():
         assert here.get("/api/deals", headers=h).status_code == 401
         assert here.get("/api/me", headers=h).status_code == 401
     assert TestClient(app, client=("192.168.1.20", 50000)).get("/api/deals").status_code == 401
+
+
+def test_a_kept_chart_belongs_to_its_person_and_is_computed_again():
+    accounts.add("mattia", "a long secret 123", "Mattia")
+    accounts.add("sam", "another long secret", "Sam")
+    a, b = TestClient(app), TestClient(app)
+    a.post("/api/login", json={"username": "mattia", "password": "a long secret 123"})
+    b.post("/api/login", json={"username": "sam", "password": "another long secret"})
+    pid = a.post("/api/pins", json={"spec": {"measure": "shipments", "group_by": "status", "kind": "bar"}}).json()["id"]
+    assert [p["id"] for p in a.get("/api/pins").json()] == [pid] and a.get("/api/pins").json()[0]["kind"] == "bar"
+    assert b.get("/api/pins").json() == [] and b.post(f"/api/pins/{pid}/remove").status_code == 404
+    assert a.post("/api/pins", json={"spec": {"measure": "nonsense", "group_by": "status"}}).status_code == 400
+    a.post(f"/api/pins/{pid}/remove")
+    assert a.get("/api/pins").json() == []

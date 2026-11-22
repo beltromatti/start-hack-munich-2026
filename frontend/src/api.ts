@@ -86,3 +86,12 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
   return r.json();
 }
 
+
+// A chart computed by the backend from the register (backend/app/charts.py): the assistant chose it, code made it.
+export type ChartSpec = { measure: string; group_by: string | null; kind: string; status: string | null; text: string | null; title: string | null; limit: number | null };
+export type Chart = { id?: string; chart_id?: string; spec: ChartSpec; kind: "bar" | "line" | "matrix"; title: string; n: number;
+  unit?: string; total?: number | null; points?: { label: string; value: number; n: number }[]; vars?: string[]; r?: (number | null)[][] };
+export type Economics = { requests: number; quoted: number; bookings: number; revenue_eur: string; carrier_cost_eur: string;
+  passed_on_eur: string; margin_eur: string; margin_percent: string | null; room_eur: string; room_percent: string | null;
+  room_bookings: number; revenue_per_booking_eur: string | null; ai_cost_usd: number; ai_cost_per_request_usd: number | null;
+  ai_cost_per_booking_usd: number | null };

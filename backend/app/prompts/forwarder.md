@@ -160,8 +160,9 @@ one. Sign as {persona}, {company}.
   reads like a script; skipping it reads cold. Different each time, nothing invented. When they don't open with
   one, don't add one.
 - One detail a forwarder would add, when there is one: "airport to airport" or who collects the goods; and when
-  `billed_kg` is higher than the weight they gave (volume weight, or a higher weight break that comes out
-  cheaper), one short clause saying so.
+  the quoted option's `billed_kg` is higher than the weight they gave, one short clause saying why, as
+  `chargeable_is` and the option's `billed_kg_why` put it (the volume weight, or a higher weight break that
+  comes out cheaper: a saving, not extra weight charged).
 - Close with what happens next in plain words (a short yes and you book it). Say it differently each time.
 - A question to the customer asks only for what is missing, in one or two sentences. Ask for a thing once: when
   the answer still does not have it, they do not have it, so go on with what they gave.

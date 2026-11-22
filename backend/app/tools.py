@@ -323,7 +323,13 @@ def _quote_amounts(ctx: Ctx, option_id: str | None, body: str) -> str | None:
     if not opt:
         return None  # no option to check against (recorded as such by _record_quote)
     found = MONEY.findall(re.sub(r"(?<=\d)[ \u00a0\u202f](?=\d{3}(?!\d))", "", body))  # 6 270,02 is one amount
-    if body.count(opt["total_text"]) == 1 and len(found) == 1:
+    # Two shipments in one mail ("a separate all-in price for each", rounds 89, 185, 196) are two option sets (A, B):
+    # one total per set is the quote the customer asked for, not a second option of the same shipment.
+    own = (option_id or "").rstrip("0123456789")
+    other = {o.get("total_text"): k.rstrip("0123456789") for k, o in (d.get("options") or {}).items()
+             if k.rstrip("0123456789") != own}
+    sets = [other.get(a) for a in found if a != opt["total_text"]]
+    if body.count(opt["total_text"]) == 1 and None not in sets and len(set(sets)) == len(sets) == len(found) - 1:
         return None
     return (f"a quote carries exactly one amount of money, the total of option {option_id} written as "
             f"{opt['total_text']}, once. This text has {len(found)}: {found[:4]}. One mail, one option, one total; "

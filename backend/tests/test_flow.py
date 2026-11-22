@@ -254,6 +254,29 @@ def test_a_quote_with_two_amounts_is_sent_and_flagged():
     assert any("quote mail amounts" in e["summary"] for e in store.events() if e["kind"] == "error")
 
 
+def test_two_shipments_quoted_with_one_total_each_are_not_flagged():
+    """Round 196: 'a separate all-in price for each shipment, in the same reply' is one total per option set."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("jonas@kessler.example", "Quote", "Two shipments from Ingolstadt: BKK 1190 kg and SIN 145 kg")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    a1 = {"air": {"carrier": "Polaris Air Logistics"}, "pickup": None, "total": "3584.90", "total_text": "3584.90 EUR"}
+    a2 = {"air": {"carrier": "Nova Atlas Cargo"}, "pickup": None, "total": "3799.10", "total_text": "3799.10 EUR"}
+    b1 = {"air": {"carrier": "Kestrel Airways"}, "pickup": None, "total": "881.61", "total_text": "881.61 EUR"}
+    store.put(ctx.deal_id, "deal", "pricing", {"root": rfq["id"], "received_at": None,
+                                                "options": {"A1": a1, "A2": a2, "B1": b1}})
+    each = "Dear Mr Kessler,\n\nTotal to BKK: 3584.90 EUR all-in\nTotal to SIN: 881.61 EUR all-in\n\nGiulia"
+    tools.send_mail(ctx, "quote", each, "A1", None)
+    assert not any("quote mail amounts" in e["summary"] for e in store.events() if e["kind"] == "error")
+    both = "Dear Mr Kessler,\n\nCheapest: 3584.90 EUR all-in\nFaster: 3799.10 EUR all-in\n\nGiulia"
+    tools.send_mail(ctx, "quote", both, "A1", None)
+    assert any("quote mail amounts" in e["summary"] for e in store.events() if e["kind"] == "error")
+
+
 def test_a_december_tariff_does_not_reprice_november():
     from app import kit
     kit.load(FakeFiveU())
@@ -839,6 +862,28 @@ def test_an_option_id_names_one_option_for_the_life_of_the_deal():
     assert opts[a["option"]]["total_text"] == a["total"]  # the first quote's option is still the one it was
     again = tools.get_offers(ctx, None, "cheapest", 0)  # waiting again does not start a new set
     assert all(o["option"].startswith("B") for o in again["options"])
+
+
+def test_an_option_billed_at_a_higher_break_says_why():
+    """Round 197: 904 kg billed at the 1000 kg break was told as 'the chargeable weight is 1,000 kg, above the gross
+    weight you provided'. The option says by code that the break is cheaper than the chargeable weight."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("ana@ana.example", "Quote", "290 kg FRA to ORD, cheapest")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(290, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}]}
+    opts = tools.get_offers(ctx, ship, "cheapest", 5)["options"]
+    above = [o for o in opts if o["billed_kg"] and o["billed_kg"] > 290]
+    assert above and all(o["billed_kg_why"] == f"the {o['billed_kg']:g} kg weight break: its lower rate costs less "
+                                               f"than billing the 290 kg chargeable weight" for o in above)
+    assert all("billed_kg_why" not in o for o in opts if not o["billed_kg"] or o["billed_kg"] <= 290)
 
 
 def test_two_shipments_of_one_deal_are_two_bookings():

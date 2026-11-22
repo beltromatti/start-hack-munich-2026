@@ -1,5 +1,6 @@
-import { useState } from "react";
-import type { DealRow } from "../api";
+import { useEffect, useState } from "react";
+import { Chart, DealRow, Economics, get, post } from "../api";
+import { ChartView } from "./Chart";
 import { amount, lane, median, money } from "./util";
 
 // How the desk is doing, counted from the same deals the other pages read: how much it answered on its own,
@@ -11,11 +12,11 @@ const short = (key: string) => new Date(key + "T12:00:00").toLocaleDateString("e
 const secs = (s: number | null) => s == null ? "–" : s < 100 ? Math.round(s) + " s" : (s / 60).toFixed(1) + " min";
 const isBooked = (d: DealRow) => !!d.booking || d.status === "booked";
 
-type Bar = { label: string; value: number; tip: string };
+export type Bar = { label: string; value: number; tip: string };
 
 // One series, so no legend: the title names it. Thin bars from the baseline with rounded tops, a quiet axis,
 // the highest bar labelled, and the exact value of any bar on hover or focus.
-function Bars({ data, name }: { data: Bar[]; name: string }) {
+export function Bars({ data, name }: { data: Bar[]; name: string }) {
   const [on, setOn] = useState(-1);
   const W = 560, H = 190, top = 22, base = H - 26, max = Math.max(1, ...data.map((d) => d.value));
   const slot = W / data.length, w = Math.min(26, slot - 4), peak = data.findIndex((d) => d.value === max);
@@ -41,13 +42,55 @@ function Bars({ data, name }: { data: Bar[]; name: string }) {
   );
 }
 
+// The money, from economics.py: what customers pay, what the carriers charge, what is passed on, what we keep.
+function Money() {
+  const [e, setE] = useState<Economics | null>(null);
+  useEffect(() => { const load = () => get<Economics>("/api/economics").then(setE).catch(() => undefined); load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+  if (!e || !e.bookings) return null;
+  const eur = (x: string | null) => x == null ? "–" : money(x);
+  const zero = Number(e.margin_eur) === 0;
+  return (
+    <section className="dk-econ">
+      <section className="dk-lead">
+        <h2>{money(e.revenue_eur)} booked, {eur(e.margin_eur)} margin{e.margin_percent != null ? " (" + e.margin_percent + " %)" : ""}.</h2>
+        <p>{zero ? "Giulia quotes what the carriers charge, so every booking passes their price through: today the margin is zero by design, because the challenge rewards the best price. " : ""}Computed per booking from the register, with the room a margin could take below.</p>
+      </section>
+      <div className="dk-flow" role="table" aria-label="Where the money of the bookings goes">
+        <div><small>Customers pay</small><b>{money(e.revenue_eur)}</b><small>{e.bookings} bookings</small></div>
+        <div><small>Carriers charge</small><b>{money(e.carrier_cost_eur)}</b><small>airlines and truckers</small></div>
+        <div><small>Passed on</small><b>{money(e.passed_on_eur)}</b><small>insurance and the customer's own charges</small></div>
+        <div><small>We keep</small><b>{eur(e.margin_eur)}</b><small>{e.margin_percent != null ? e.margin_percent + " % of revenue" : ""}</small></div>
+      </div>
+      <div className="dk-kpis">
+        <section className="dk-box dk-kpi"><small>Room to the next option</small><b>{money(e.room_eur)}</b><span>{e.room_percent} % of revenue on {e.room_bookings} of {e.bookings} bookings: a margin up to here keeps every quote below the customer's next priced option</span></section>
+        <section className="dk-box dk-kpi"><small>Revenue per booking</small><b>{eur(e.revenue_per_booking_eur)}</b><span>{e.quoted} quotes from {e.requests} requests</span></section>
+        <section className="dk-box dk-kpi"><small>AI cost per booking</small><b>{e.ai_cost_per_booking_usd != null ? "$" + e.ai_cost_per_booking_usd.toFixed(4) : "–"}</b><span>${e.ai_cost_usd.toFixed(2)} for all {e.requests} requests, ${(e.ai_cost_per_request_usd ?? 0).toFixed(4)} each</span></section>
+      </div>
+    </section>
+  );
+}
+
+// The charts a person kept from the chat: each one is the same question asked again on fresh data.
+function Kept() {
+  const [pins, setPins] = useState<Chart[] | null>(null);
+  const load = () => get<Chart[]>("/api/pins").then(setPins).catch(() => setPins([]));
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+  if (pins === null) return null;
+  return (
+    <section className="dk-box">
+      <div className="dk-bh"><h2>Your charts</h2></div>
+      {pins.length ? <div style={{ padding: "0 14px 6px" }}>{pins.map((c) => <ChartView key={c.id} c={c} drop={() => post("/api/pins/" + c.id + "/remove", {}).then(load)} />)}</div>
+        : <div className="dk-empty"><b>Ask for any chart</b>In Ask, say what you want to see, such as revenue by airline or requests per hour, then keep it here. It stays up to date.</div>}
+    </section>
+  );
+}
+
 export function Numbers({ deals }: { deals: DealRow[] }) {
   const total = deals.length, quoted = deals.filter((d) => d.quote), booked = deals.filter(isBooked);
   const times = quoted.map((d) => d.response_seconds).filter((x): x is number => x != null && x >= 1);
   const med = median(times), fast = times.filter((x) => x <= 120).length;
   const weight = booked.reduce((s, d) => s + (Number(d.weight_kg) || 0), 0);
   const value = booked.reduce((s, d) => s + (amount(d.quote) ?? 0), 0), priced = booked.filter((d) => amount(d.quote) != null).length;
-  const cost = deals.reduce((s, d) => s + (d.cost_usd || 0), 0);
   const flaggedN = deals.filter((d) => d.flag === "red" || d.flag === "yellow").length;
   const pct = (a: number, b: number) => b ? Math.round((a / b) * 100) + " %" : "–";
   // the last 14 days, by the day of a shipment's last step (the list carries no arrival time)
@@ -67,7 +110,6 @@ export function Numbers({ deals }: { deals: DealRow[] }) {
     ["Booked", String(booked.length), pct(booked.length, quoted.length) + " of the quotes became a booking"],
     ["Freight booked", weight ? Math.round(weight).toLocaleString("en-US") + " kg" : "–", !booked.length ? "No booking yet" : priced === booked.length ? money(value) + " in booked quotes" : priced ? money(value) + " in the " + priced + " bookings with a recorded price" : booked.length + " bookings"],
   ];
-  if (cost > 0 && quoted.length) tiles.push(["Model cost per quote", "$" + (cost / quoted.length).toFixed(4), "$" + cost.toFixed(2) + " for all " + total + " requests"]);
   return (
     <>
       <section className="dk-lead">
@@ -75,6 +117,8 @@ export function Numbers({ deals }: { deals: DealRow[] }) {
         <p>Counted from the shipments on this desk. {flaggedN ? flaggedN + (flaggedN === 1 ? " of them carries" : " of them carry") + " a note from Giulia." : "None of them carries a note from Giulia."}</p>
       </section>
       <div className="dk-kpis">{tiles.map(([label, big, sub]) => <section key={label} className="dk-box dk-kpi"><small>{label}</small><b>{big}</b><span>{sub}</span></section>)}</div>
+      <Money />
+      <Kept />
       <div className="dk-two even">
         <section className="dk-box"><div className="dk-bh"><h2>Shipments per day</h2></div><p className="dk-bs">The last 14 days, by the day of a shipment's last step.</p><Bars data={days} name="Shipments per day" /></section>
         <section className="dk-box"><div className="dk-bh"><h2>Time from request to quote</h2></div><p className="dk-bs">How many quotes left in each span of time.</p><Bars data={speed} name="Time from request to quote" /></section>

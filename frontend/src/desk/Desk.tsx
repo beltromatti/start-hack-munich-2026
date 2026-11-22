@@ -11,9 +11,8 @@ import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
 import { CustomerMap, NodeMap, airlineHubs, airlineInsights, insights, open as openWith } from "./CustomerMap";
-import { MatrixChart } from "./Matrix";
+import { ChartView } from "./Chart";
 import { Numbers } from "./Numbers";
-import { matrix, wantsMatrix } from "./analysis";
 import { ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
 import { Step, languageOf, timeline } from "./timeline";
 import { Cust, Group, LABEL, amount, city, flagNote, customers, ends, groupOf, kg, known, lane, median, money, name, since, when, why } from "./util";
@@ -138,7 +137,7 @@ function AskPage({ role, turns, send, open, go, pickCustomer, run }: { role: Rol
             {!t.a ? <p className="dk-think"><i /><i /><i /></p> : (
               <div className="dk-a">
                 <p>{t.a.text}</p>
-                {t.a.matrix ? <MatrixChart m={t.a.matrix} /> : null}
+                {t.a.charts?.map((c, k) => <ChartView key={k} c={c} keep />)}
                 {t.a.facts ? <dl className="dk-kv">{t.a.facts.map((f) => <div key={f[0]}><dt>{f[0]}</dt><dd>{f[1]}</dd></div>)}</dl> : null}
                 {t.a.rows?.length ? <div className="dk-rows">{t.a.rows.map((d) => <Row key={d.id} d={d} open={open} />)}</div> : null}
                 {t.a.act || t.a.customer || t.a.page || t.done ? (
@@ -684,9 +683,6 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
     const earlier = turns.filter((t) => t.a).slice(-3).map((t) => ({ q: t.q, a: t.a!.text }));
     setTurns((ts) => [...ts, { q, a: null }]);
     setPage("ask"); setOpen(false); setCust(null);
-    const low = q.toLowerCase();
-    const settle = (a: Answer) => window.setTimeout(() => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }), 900);
-    if (wantsMatrix(low)) { const m = matrix(deals); settle({ via: "assistant", text: m.text, matrix: m }); return; }
     askModel(q, deals, context(deals, seen), earlier).catch(() => ({ ...answer(q, deals), via: "record" as const }))
       .then((a) => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }));
   };

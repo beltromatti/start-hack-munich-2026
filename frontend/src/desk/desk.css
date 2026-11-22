@@ -338,3 +338,19 @@ button.dk-aiw { width: 100%; text-align: left; border-radius: var(--r-ctl); padd
 .challenge .board { flex: 1; border-left: 0; max-width: 980px; width: 100%; margin: 0 auto; overflow: auto; }
 .dk-sess .grid { grid-template-columns: 340px minmax(0, 1fr); }
 .dk-menu-me { display: flex; gap: 11px; align-items: center; padding: 10px 10px 12px; border-bottom: 1px solid var(--d-line); margin-bottom: 4px; } .dk-menu-me b { display: block; font-weight: 600; font-size: 14px; } .dk-menu-me small { display: block; color: var(--d-muted); font-size: 12.5px; line-height: 1.35; }
+/* charts the assistant made, in the chat and kept on Efficiency */
+.dk-ch { border: 1px solid var(--d-line); border-radius: var(--r-tile); padding: 14px 16px 12px; margin: 10px 0; background: #fff; display: grid; gap: 8px; min-width: 0; }
+.dk-ch-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .dk-ch-h b { font-weight: 600; font-size: 14.5px; margin-right: auto; }
+.dk-ch-tools { display: inline-flex; gap: 6px; align-items: center; } .dk-ch-tools small { color: var(--d-green); font-weight: 600; font-size: 12.5px; }
+.dk-ch-n { color: var(--d-muted); font-size: 12px; }
+.dk-hb { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dk-hb li { display: grid; grid-template-columns: minmax(90px, 32%) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.dk-hb li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--d-ink2); }
+.dk-hb li i { height: 10px; border-radius: 6px; background: var(--d-ink); opacity: .82; display: block; }
+.dk-hb li b { font-weight: 600; font-size: 12.5px; }
+.dk-econ { display: grid; gap: 12px; }
+.dk-econ .dk-kpi b { letter-spacing: -.02em; }
+.dk-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--d-line); border-radius: var(--r-tile); overflow: hidden; }
+.dk-flow div { padding: 12px 14px; border-right: 1px solid var(--d-line); display: grid; gap: 2px; } .dk-flow div:last-child { border-right: 0; }
+.dk-flow small { color: var(--d-muted); font-size: 12px; } .dk-flow b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .dk-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dk-flow div:nth-child(2) { border-right: 0; } .dk-flow div:nth-child(-n+2) { border-bottom: 1px solid var(--d-line); } }

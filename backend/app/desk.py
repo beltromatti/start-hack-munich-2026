@@ -11,12 +11,12 @@ import json
 import time
 from decimal import Decimal
 
-from . import llm, pricing, store
+from . import charts, economics, llm, pricing, store
 from .config import KIT
 
 SCHEMA = {
     "type": "object", "additionalProperties": False,
-    "required": ["answer", "facts", "shipment_ids", "customer", "page", "action", "refused"],
+    "required": ["answer", "facts", "shipment_ids", "customer", "page", "action", "charts", "refused"],
     "properties": {
         "answer": {"type": "string"},
         "facts": {"type": "array", "items": {"type": "object", "additionalProperties": False,
@@ -28,6 +28,7 @@ SCHEMA = {
         "action": {"type": "object", "additionalProperties": False, "required": ["kind", "shipment_id", "text"],
                    "properties": {"kind": {"type": "string", "enum": ["none", "tell"]},
                                   "shipment_id": {"type": ["string", "null"]}, "text": {"type": ["string", "null"]}}},
+        "charts": {"type": "array", "items": {"type": "string"}},
         "refused": {"type": "boolean"},
     },
 }
@@ -58,6 +59,18 @@ TOOLS = [
         "a quote: airport to airport, before pickup. A price you tell a person comes from here, never from your own "
         "arithmetic.", {"origin": S, "destination": S, "weight_kg": {"type": ["number", "null"]},
                         "volume_cbm": {"type": ["number", "null"]}}),
+    _fn("economics", "The desk's economics from the register, computed by code: revenue booked, what the carriers "
+        "charge, what is passed on (insurance, the customer's charges), our margin, the room to the next option (the "
+        "margin we could take while every booked quote stays below the customer's next priced option), and the AI "
+        "cost per request and per booking.", {}),
+    _fn("chart", "A chart for the person, computed by code from the register: one measure by a group (kind bar, or "
+        "line over day or hour), or kind matrix for how the shipment figures move together (Pearson r). Filter by "
+        "status and by words as find_shipments does. Returns a chart_id and its figures; put the id in charts to show "
+        "it, and say in words what it shows.", {
+            "measure": {"type": "string", "enum": sorted(charts.MEASURES)},
+            "group_by": {"type": ["string", "null"], "enum": charts.GROUPS + [None]},
+            "kind": {"type": "string", "enum": ["bar", "line", "matrix"]},
+            "status": S, "text": S, "title": S, "limit": N}),
     _fn("desk_page", "What the desk page itself shows and computed from the same register: per customer and per "
         "carrier what it learned, such as reply times and notes. Empty when the page sent nothing.", {}),
 ]
@@ -131,7 +144,16 @@ def _sheets(origin: str | None, destination: str | None, kg=None, cbm=None) -> l
     return out
 
 
-def run(name: str, args: dict, page: dict) -> object:
+def run(name: str, args: dict, page: dict, made: dict | None = None) -> object:
+    if name == "economics":
+        return economics.economics()
+    if name == "chart":
+        c = charts.chart(args.get("measure") or "shipments", args.get("group_by"), args.get("kind") or "bar",
+                         args.get("status"), args.get("text"), args.get("title"), args.get("limit"))
+        if made is not None and not c.get("error"):
+            c["chart_id"] = f"c{len(made) + 1}"
+            made[c["chart_id"]] = c
+        return c
     if name == "find_shipments":
         return _find(args.get("text"), args.get("status"), args.get("limit"))
     if name == "read_shipment":
@@ -145,7 +167,7 @@ def run(name: str, args: dict, page: dict) -> object:
     return {"error": f"no tool {name}"}
 
 
-def checked(out: dict) -> dict:
+def checked(out: dict, made: dict | None = None) -> dict:
     """What the page may show of the model's answer: only shipments and customers that exist in the register."""
     deals = {r["id"]: r["data"].get("customer") for r in store.records("deal", limit=5000)}
     refused = bool(out.get("refused"))
@@ -161,6 +183,7 @@ def checked(out: dict) -> dict:
         "customer": str(out["customer"]) if not refused and out.get("customer") in set(deals.values()) else None,
         "page": out.get("page") if not refused and out.get("page") in ("ship", "cust", "net") else None,
         "act": act,
+        "charts": [] if refused else [(made or {})[i] for i in out.get("charts") or [] if i in (made or {})],
     }
 
 
@@ -178,16 +201,17 @@ def answer(question: str, desk: dict | None = None, earlier: list | None = None)
     items: list[dict] = [{"role": "user", "content": (
         (f"EARLIER IN THIS CONVERSATION (for what 'it' or 'they' refers to):\n{before}\n" if before else "")
         + f"QUESTION FROM THE PERSON AT THE DESK:\n{question}")}]
+    made: dict = {}  # the charts computed in this answer: the page shows only these, never figures the model wrote
     for _ in range(SPINNING):
         out = llm.respond_direct(llm.prompt("desk"), items, TOOLS, schema=SCHEMA, name="desk_answer")
         items += out
         calls = [i for i in out if i.get("type") == "function_call"]
         if not calls:
             text = "".join(c.get("text", "") for i in out if i.get("type") == "message" for c in i.get("content") or [])
-            return checked(json.loads(text or "{}"))
+            return checked(json.loads(text or "{}"), made)
         for c in calls:
             try:
-                result = run(c["name"], json.loads(c.get("arguments") or "{}"), desk or {})
+                result = run(c["name"], json.loads(c.get("arguments") or "{}"), desk or {}, made)
             except Exception as e:  # a tool that fails tells the model why, as the forwarder's tools do
                 result = {"error": repr(e)[:300]}
             items.append({"type": "function_call_output", "call_id": c["call_id"],

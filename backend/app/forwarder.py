@@ -360,6 +360,14 @@ class Forwarder:
                              "estimated_arrival": arrives.strftime(pricing.DATE),
                              "total": pricing.fmt(total), "source": a.source, "bookable_reference": a.rate_id,
                              "billed_kg": float(a.billed_kg) if a.billed_kg is not None else None,
+                             # why a billed weight is above the chargeable one, said by code: round 197 told a customer
+                             # "the chargeable weight is 1,000 kg, above the gross weight you provided" (904 kg billed
+                             # at the cheaper 1000 kg break), round 185 named another option's break as the quote's
+                             **({"billed_kg_why": f"the {kg_text(Decimal(a.billed_kg))} kg weight break: its lower rate "
+                                                  f"costs less than billing the {kg_text(Decimal(req['chargeable_kg']))} "
+                                                  f"kg chargeable weight"}
+                                if a.billed_kg is not None and Decimal(a.billed_kg) > Decimal(req["chargeable_kg"])
+                                + Decimal("0.01") else {}),
                              "carrier_note": (a.extra or {}).get("note"),
                              **({"time_not_stated": [x.carrier for x in (a, p) if x and (x.extra or {}).get("time_unknown")]}
                                 if any(x and (x.extra or {}).get("time_unknown") for x in (a, p)) else {})})
