@@ -58,7 +58,7 @@ def unit(u: str | None) -> str:
     return re.sub(r"[\s.^]", "", u)
 
 
-_LB, _CFT = Decimal("0.45359237"), Decimal("0.0283168")
+_LB, _CFT = Decimal("0.45359237"), Decimal("0.028316846592")  # exact: 1 lb, (0.3048 m)^3 (round 116)
 WEIGHT = {**dict.fromkeys(("kg", "kgs", "kilo", "kilos", "kilogram", "kilograms", "kilogramme", "kilogrammes",
                            "kilogramm", "chilogrammi", "kilogramos"), 1),
           **dict.fromkeys(("t", "to", "ton", "tons", "tonne", "tonnes", "tonnen", "mt", "metricton", "metrictons",

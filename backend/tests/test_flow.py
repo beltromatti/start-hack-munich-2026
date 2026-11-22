@@ -624,6 +624,8 @@ def test_units_are_read_however_written_and_never_guessed():
     assert language.weight_kg({"value": 2, "unit": "Metric Tons"}, 1) == 2000
     assert language.weight_kg({"value": 100, "unit": "LBS."}, 1) == Decimal("45.359237")
     assert round(language.volume_cbm({"value": 45, "unit": "cubic feet"}, [], 1), 3) == Decimal("1.274")
+    # round 116: 279.70 cubic feet is 7.920222 cbm exactly ((0.3048 m)^3), not 7.920209 from a truncated factor
+    assert round(language.volume_cbm({"value": Decimal("279.70"), "unit": "cubic feet"}, [], 1), 6) == Decimal("7.920222")
     assert language.volume_cbm({}, [{"length": 48, "width": 40, "height": 50, "unit": "Inches", "count": 1}], 1) > 1
     kit.load(FakeFiveU())
     s = {"origin_airport": "FRA", "destination_airport": "ORD",
