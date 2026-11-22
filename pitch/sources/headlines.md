@@ -15,6 +15,15 @@ Check each link once more before the pitch. Quote only the words below.
 | 8 | STAT Times | 4 May 2026 | Air cargo rates surge 30% in April, but easing is expected soon | headline only | |
 | 9 | CBS News | 4 May 2010 | Online Sales Leads: How Long are They Hot? | "After about 30 minutes, the lead is almost completely dead." | Geoffrey James, summarising the HBR study |
 
+## On the slide since 22.11.2026, 12:05
+
+Jan: "freightwaves news is shit should we not take headlines like strait of hormuz or generally showing complexity of logistics". The two clippings are now world news, title and date checked on the page on 22.11.2026. The pain numbers below them still come from rows 1 and 3.
+
+| Masthead | Date | Headline | Link |
+|---|---|---|---|
+| Reuters | 13 March 2026 | Air freight rates soar as Middle East conflict blocks trade routes | https://uk.finance.yahoo.com/news/air-freight-rates-soar-middle-040444434.html (Reuters wire, carried by Yahoo Finance) |
+| The Loadstar | 9 March 2026 | Air cargo turns to trucks as Middle East disruption sends rates soaring | https://theloadstar.com/air-cargo-turns-to-trucks-as-middle-east-disruption-sends-rates-soaring/ |
+
 ## Not usable
 
 - "Tame unruly email inboxes": no such article found.
