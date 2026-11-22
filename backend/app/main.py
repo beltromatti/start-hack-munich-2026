@@ -287,6 +287,41 @@ def ask(payload: dict) -> dict:
         raise HTTPException(503, str(e)[:200])
 
 
+@app.get("/api/voice")
+def voice_status() -> dict:
+    """Whether the voice desk speaks and hears with ElevenLabs here (else the page uses the browser's own voice)."""
+    from . import voice
+    return voice.status()
+
+
+@app.post("/api/voice/speak")
+def voice_speak(payload: dict):
+    """The desk's answer as audio (app/voice.py), streamed. 503 without a key: the browser speaks instead."""
+    from fastapi.responses import StreamingResponse
+    from . import voice
+    try:
+        return StreamingResponse(voice.speak(payload.get("text") or ""), media_type="audio/mpeg")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, str(e)[:200])
+
+
+@app.post("/api/voice/hear")
+async def voice_hear(request: Request) -> dict:
+    """A recording (the raw body, its type in Content-Type) as words. 503 without a key: the browser listens."""
+    from . import voice
+    audio = await request.body()
+    kind = request.headers.get("content-type", "audio/webm").split(";")[0]
+    ext = {"audio/mp4": "m4a", "audio/aac": "aac", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/ogg": "ogg"}.get(kind, "webm")
+    try:
+        return voice.hear(audio, "speech." + ext, kind)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, str(e)[:200])
+
+
 # The sessions UI, built (frontend/dist): served by the same process on a server (Docker), so one port is enough.
 _dist = Path(os.getenv("FRONTEND_DIST", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
 if _dist.is_dir():

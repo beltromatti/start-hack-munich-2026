@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Board, Deal, DealRow, Health, get } from "./api";
 import { Desk } from "./desk/Desk";
+import { Voice } from "./voice/Voice";
+
+const VOICE = new URLSearchParams(window.location.search).has("voice");
 
 function usePoll<T>(path: string | null, ms: number): [T | null, boolean, () => void] {
   const [data, setData] = useState<T | null>(null);
@@ -31,5 +34,7 @@ export default function App() {
   const [board] = usePoll<Board>("/api/board", 10000);
   const [selected, setSelected] = useState<string | null>(null);
   const [deal, , reload] = usePoll<Deal>(selected ? `/api/deals/${selected}` : null, 1500);
+  // /?voice: the voice desk, the app an operator adds to the phone's home screen (src/voice)
+  if (VOICE) return <Voice deals={deals ?? []} />;
   return <Desk deals={deals ?? []} online={online} worker={!!health?.worker} board={board} selected={selected} select={setSelected} deal={deal} reload={reload} />;
 }
