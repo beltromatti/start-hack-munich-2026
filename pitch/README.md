@@ -14,6 +14,8 @@ Open `pitch/deck/index.html` in a browser. There is no build step.
 | `f` | full screen |
 | `#s4` in the address | jump to slide 4 |
 
+To show it as a claude.ai artifact, run `python3 bundle.py <out dir>`. It writes a flat copy (no `../` paths, no document tags) that is published with its files.
+
 ## Change it
 
 | File | What |
