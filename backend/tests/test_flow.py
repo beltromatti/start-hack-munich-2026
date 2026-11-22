@@ -868,7 +868,9 @@ def test_two_shipments_of_one_deal_are_two_bookings():
     ship = lambda kg: {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
                        "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
                        "lots": [{"pieces": 1, "weight": q(kg, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}]}
-    a = tools.get_offers(ctx, ship(320), "fastest", 5)["options"][0]["option"]
+    first_offers = tools.get_offers(ctx, ship(320), "fastest", 5)
+    assert first_offers["shipment"]["chargeable_is"] == "the gross weight"  # 320 kg > 1 cbm x 167 (round 157)
+    a = first_offers["options"][0]["option"]
     b = tools.get_offers(ctx, ship(900), "fastest", 5)["options"][0]["option"]
     first = tools.book(ctx, a)
     assert first["weight_kg"] == "320" and first["team_reference"] == f"SM-{rfq['id']}"
