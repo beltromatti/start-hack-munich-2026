@@ -877,6 +877,10 @@ def test_two_shipments_of_one_deal_are_two_bookings():
     found = tools.crm(ctx, "ORD")["matches"][0]
     assert {x["weight_kg"] for x in found["all_bookings"]} == {"320", "900"}
     assert tools.book(ctx, a)["team_reference"] == f"SM-{rfq['id']}"  # booking an option again keeps its own
+    # round 113: tracking asks for the first; its shipment is the one booked, not the last one priced
+    rec = store.get(ctx.deal_id)
+    assert tools._summary(rec, store.get(f"booking-{rfq['id']}"))["shipment"]["weight_kg"] == "320"
+    assert tools._summary(rec, store.get(f"booking-{rfq['id']}-2"))["shipment"]["weight_kg"] == "900"
 
 
 def test_the_agent_writes_to_one_carrier_at_most_twice_in_ten_minutes():

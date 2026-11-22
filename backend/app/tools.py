@@ -586,6 +586,9 @@ def _last_inbound(root: int) -> dict | None:
 def _summary(rec: dict, b: dict | None) -> dict:
     d = rec["data"]
     bd = (b or {}).get("data") or d.get("booking")
+    # the shipment of this booking, not the deal's last pricing (round 113: RUH booked, DXB priced after it; the
+    # tracking answer told the customer our record said DXB and 1239 kg)
+    booked = ((d.get("options") or {}).get((bd or {}).get("option") or "") or {}).get("request")
     return {"deal_id": rec["id"], "status": rec["status"], "customer": d.get("customer"), "subject": d.get("subject"),
             # what changed after the booking lives in the notes (round 88: the customer cancelled; the airline's
             # quote desk cannot): a tracking answer must see it next to the airline's word
@@ -595,7 +598,7 @@ def _summary(rec: dict, b: dict | None) -> dict:
                               for k in ("booking_reference", "team_reference", "airline", "route", "weight_kg",
                                         "ready_date", "status")} for x in d.get("bookings") or []]
             if len(d.get("bookings") or []) > 1 else None,
-            "shipment": d.get("request"), "quote": {k: (d.get("quote") or {}).get(k) for k in ("amount", "option")}
+            "shipment": booked or d.get("request"), "quote": {k: (d.get("quote") or {}).get(k) for k in ("amount", "option")}
             if d.get("quote") else None,
             "booking": ({**{k: bd.get(k) for k in ("booking_reference", "team_reference", "rate_id", "airline", "route",
                                                    "transit_days", "status", "via", "pickup", "amount",
