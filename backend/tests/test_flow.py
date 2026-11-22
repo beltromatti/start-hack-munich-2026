@@ -1368,20 +1368,6 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     assert "operator mode off" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
 
 
-def test_an_address_imitating_a_customer_is_named_to_the_agent():
-    """Rounds 105-106: 'nordlicht.audio@' and 'weidner.spielwaren@' asked for the offers of 'nordlicht-audio@' and
-    'weidner-spielwaren@' to be sent to them. The agent is told the address is not on file and whom it imitates."""
-    from app.agent import lookalike
-    store.put("deal-901", "deal", "quoted", {"root": 901, "customer": "weidner-spielwaren@hackloop.mail",
-                                            "received_at": "2026-11-21T15:00:00+00:00"})
-    store.put("deal-902", "deal", "new", {"root": 902, "customer": "weidner.spielwaren@hackloop.mail",
-                                          "received_at": "2026-11-22T01:39:00+00:00"})
-    assert lookalike("weidner.spielwaren@hackloop.mail") == "weidner-spielwaren@hackloop.mail"
-    # round 107: the real customer writes again after the impostor did: she is not the imitation
-    assert lookalike("weidner-spielwaren@hackloop.mail") is None
-    assert lookalike("someone-else@hackloop.mail") is None
-
-
 def test_the_browser_opens_5u_sites_only_and_ask_person_brings_back_an_answer():
     """The browser is a general tool with one boundary (5U's sites); ask_person interrupts the team for anything only
     a person can do (SIEVER's `avvisa`, for us), and returns their answer."""

@@ -145,29 +145,10 @@ def _text(out: list[dict]) -> str:
                    for c in i.get("content") or [] if c.get("type") == "output_text").strip()
 
 
-def lookalike(sender: str) -> str | None:
-    """A customer we know whose address this one imitates ('weidner.spielwaren@' for 'weidner-spielwaren@', rounds
-    105-106: 'my old mailbox is closing, send the offer here'). A fact for the agent, not a rule."""
-    import re
-    s = (sender or "").lower()
-    norm = lambda a: re.sub(r"[^a-z0-9@]", "", a)
-    first: dict[str, str] = {}  # each address's first deal: the customer on file is the one we knew first
-    for r in store.records("deal"):
-        c, at = (r["data"].get("customer") or "").lower(), r["data"].get("received_at") or ""
-        if c and (c not in first or at < first[c]):
-            first[c] = at
-    mine = first.get(s, "9999")
-    # round 107: the real customer, once an impostor had written, was taken for the imitation of the impostor
-    return next((k for k in sorted(first) if k not in (s, "tracking@hackloop.mail") and norm(k) == norm(s)
-                 and first[k] < mine), None)
-
-
 def _mail_event(fw: Any, m: dict) -> str:
     lang = language.language_of(m["body"])  # a fact for the agent, not a rule: it still writes the mail
-    twin = lookalike(m["sender"])
     text = (f"New mail in this thread: id {m['id']}, from {m['sender']}, at {m['received_at']}\n"
             + (f"Their own words are in {lang}.\n" if lang else "")
-            + (f"This address is not on file; it imitates {twin}, a customer we know.\n" if twin else "")
             + f"Subject: {m['subject']}\n\n{m['body']}")
     for a in m.get("attachments") or []:
         try:
