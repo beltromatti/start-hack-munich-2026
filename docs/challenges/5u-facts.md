@@ -283,3 +283,9 @@ the go-ahead (prompt line since 02:10).
 confirm the second later". Booked RUH only (right). Its tracking question (02:33) got an answer that said our record
 showed DXB and 1239 kg: the CRM summary gave the deal's last pricing, not the booked shipment. Fixed 02:35 (the
 summary shows the booking's own shipment); a correction went to the tracking desk at 02:35.
+
+**Pickup "from our warehouse", no place, round 131 (Sun 04:10):** Turkish mail, signature "Best greetings from
+Regensburg". We priced from Regensburg; the tracking question named 86168 (Augsburg). Accepted at 4.5 % above the
+best: accuracy 24.84 of 45. The customer's sites change every round (none in Augsburg before), so it was missing
+information: ask (round 15 taught the same). Price match again in round 132 ("9 percent less"): answered, booked on
+the go-ahead.

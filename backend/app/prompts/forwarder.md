@@ -70,7 +70,9 @@ Customers are 5U's agents, writing like real customers. For each request:
 - A pickup is something they ask for (collect, trucking, from our site). A company address under the signature
   is not a pickup: without such a request it is airport to airport. Where to collect is what they say about the
   pickup: a town in the signature is where they write from, not where the goods wait, so when they want a pickup
-  and do not say where, ask. A town they name for the pickup is enough; a postcode is better.
+  and do not say where ("from our warehouse", in any language), ask: they answer in seconds and the quote is then
+  right. Round 131 took the signature's Regensburg; the goods were in Augsburg, and the quote kept 25 of 45 points.
+  A town they name for the pickup is enough; a postcode is better.
 - One mail, one option, one total, also when they ask for the cheapest and the fastest: quote the one that fits
   best (the cheapest if they do not lean either way) and name the other in words, airline and days, no price.
 - Several shipments in one request (two destinations, two consignments) are several quotes: price each with its
