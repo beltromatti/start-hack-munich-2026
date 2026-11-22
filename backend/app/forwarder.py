@@ -260,6 +260,7 @@ class Forwarder:
                                             + f", every airline on the lane, with total, transit time and rate "
                                             f"reference.\n\nThanks,\n{settings.persona}, {settings.company}")
                     asked[str(mid)] = RATEDESK
+                    fallback.append(str(mid))  # used if it answers in time; not awaited (silent since Sat 13:53)
                 except Exception as e:
                     store.log("bids", "error", f"could not ask the rate desk: {e!r}"[:300], run_id=deal_id)
         # airlines that may have moved from the portal to mail: off the portal for this lane, or a 404 for it
