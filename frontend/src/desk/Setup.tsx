@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Icon } from "./icons";
 
-// How the desk is put together: who sees what, what the AI Worker may do on its own, and the guarantees that
-// are never switched off. The switches are a draft of the controls: they are kept in this browser and the
+// How the desk is put together, in the three levels forwarders run such a system on: rules for the whole
+// company (what the AI Worker may do on its own, and the guarantees that are never switched off), wishes per
+// customer (the notes kept with that customer), and a view per person (which changes nothing the agent does). The switches are a draft of the controls: they are kept in this browser and the
 // agent does not read them yet. The rows and their guarantees describe what the agent does today.
 export type Role = "ops" | "sales" | "carriers";
 export const ROLE_NAME: Record<Role, string> = { ops: "Operations", sales: "Sales", carriers: "Carriers and rates" };
@@ -23,7 +24,7 @@ const ALWAYS = ["Every price and date a customer reads is computed by code, neve
 const load = <T,>(k: string, d: T): T => { try { return { ...d, ...JSON.parse(localStorage.getItem(k) ?? "{}") }; } catch { return d; } };
 const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* this browser keeps nothing */ } };
 
-export function Setup({ people, roles, setRole, face }: { people: { id: string; name: string }[]; roles: Record<string, Role>; setRole: (id: string, r: Role) => void; face: (id: string) => JSX.Element }) {
+export function Setup({ people, roles, setRole, face, notes, openCustomers }: { people: { id: string; name: string }[]; roles: Record<string, Role>; setRole: (id: string, r: Role) => void; face: (id: string) => JSX.Element; notes: { count: number; customers: number }; openCustomers: () => void }) {
   const [modes, setModes] = useState<Record<string, Mode>>(() => load("desk_modes", Object.fromEntries(DOES.map((d) => [d.id, "own" as Mode]))));
   const set = (id: string, m: Mode) => { const n = { ...modes, [id]: m }; setModes(n); save("desk_modes", n); };
   const off = DOES.filter((d) => modes[d.id] === "off").length, flag = DOES.filter((d) => modes[d.id] === "flag").length;
@@ -31,18 +32,9 @@ export function Setup({ people, roles, setRole, face }: { people: { id: string; 
     <>
       <section className="dk-lead">
         <h2>{off || flag ? "The AI Worker does " + (DOES.length - off) + " of " + DOES.length + " things, " + flag + " with a note to you." : "The AI Worker does all " + DOES.length + " things on its own."}</h2>
-        <p>Pick what it may do, what it should tell you about, and who sees what. <b>This is a draft of the controls:</b> the choices are kept in this browser and the agent does not read them yet.</p>
+        <p>Three levels: rules for the whole company, wishes per customer, and a view per person. <b>The switches are a draft:</b> they are kept in this browser and the agent does not read them yet.</p>
       </section>
-      <section className="dk-box">
-        <div className="dk-bh"><h2>Who sees what</h2></div>
-        {people.map((p) => (
-          <div key={p.id} className="dk-set">
-            {face(p.id)}
-            <span style={{ minWidth: 0 }}><b>{p.name}</b><small>{ROLE_SEES[roles[p.id]]}</small></span>
-            <span className="dk-seg" role="group" aria-label={"What " + p.name + " sees first"}>{(Object.keys(ROLE_NAME) as Role[]).map((r) => <button key={r} aria-pressed={roles[p.id] === r} onClick={() => setRole(p.id, r)}>{ROLE_NAME[r]}</button>)}</span>
-          </div>
-        ))}
-      </section>
+      <p className="dk-layer">For the whole company</p>
       <section className="dk-box">
         <div className="dk-bh"><h2>What the AI Worker may do</h2></div>
         {DOES.map((d) => (
@@ -57,6 +49,26 @@ export function Setup({ people, roles, setRole, face }: { people: { id: string; 
         <div className="dk-bh"><h2>Always on</h2></div>
         <p className="dk-bs">These are built into the system under the agent. They hold today and cannot be switched off.</p>
         {ALWAYS.map((a) => <div key={a} className="dk-set fixed"><span className="dk-sq g"><Icon n="check" size={15} /></span><span><b>{a}</b></span></div>)}
+      </section>
+      <p className="dk-layer">For one customer</p>
+      <section className="dk-box">
+        <div className="dk-set">
+          <span className="dk-sq q"><Icon n="brain" size={15} /></span>
+          <span style={{ minWidth: 0 }}><b>{notes.count ? notes.count + (notes.count === 1 ? " note" : " notes") + " on " + notes.customers + (notes.customers === 1 ? " customer" : " customers") : "No notes yet"}</b><small>What one customer wants differently is kept with that customer and used on their next request. You add to it on the customer's page.</small></span>
+          <button className="dk-btn" onClick={openCustomers}>Open customers</button>
+        </div>
+      </section>
+      <p className="dk-layer">For each person</p>
+      <section className="dk-box">
+        <div className="dk-bh"><h2>Who sees what</h2></div>
+        <p className="dk-bs">This changes a person's own start page. It never changes what the AI Worker does.</p>
+        {people.map((p) => (
+          <div key={p.id} className="dk-set">
+            {face(p.id)}
+            <span style={{ minWidth: 0 }}><b>{p.name}</b><small>{ROLE_SEES[roles[p.id]]}</small></span>
+            <span className="dk-seg" role="group" aria-label={"What " + p.name + " sees first"}>{(Object.keys(ROLE_NAME) as Role[]).map((r) => <button key={r} aria-pressed={roles[p.id] === r} onClick={() => setRole(p.id, r)}>{ROLE_NAME[r]}</button>)}</span>
+          </div>
+        ))}
       </section>
     </>
   );

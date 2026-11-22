@@ -597,6 +597,13 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   const [turns, setTurns] = useState<Turn[]>([]);
   const [who, setWho] = useState(() => { try { return localStorage.getItem("desk_me") ?? "sam"; } catch { return "sam"; } });
   const [menu, setMenu] = useState(false);
+  useEffect(() => { // the account menu closes on a click anywhere else, and on Escape
+    if (!menu) return;
+    const out = (e: Event) => { if (!(e.target as HTMLElement).closest?.(".dk-acct")) setMenu(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(false); };
+    document.addEventListener("pointerdown", out); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", out); document.removeEventListener("keydown", key); };
+  }, [menu]);
   const [roles, setRoles] = useState<Record<string, Role>>(() => { const d = Object.fromEntries(PEOPLE.map((p) => [p.id, p.role])); try { return { ...d, ...JSON.parse(localStorage.getItem("desk_roles") ?? "{}") }; } catch { return d; } });
   const setRole = (id: string, r: Role) => setRoles((x) => { const n = { ...x, [id]: r }; try { localStorage.setItem("desk_roles", JSON.stringify(n)); } catch { /* this browser keeps nothing */ } return n; });
   const base = PEOPLE.find((p) => p.id === who) ?? PEOPLE[0];
@@ -688,7 +695,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
               {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} /> : <Customers deals={deals} pick={setCust} />) : null}
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} /></> : null}
               {page === "help" ? <Help /> : null}
-              {page === "setup" ? <Setup people={PEOPLE} roles={roles} setRole={setRole} face={(id) => <Face p={PEOPLE.find((p) => p.id === id)!} />} /> : null}
+              {page === "setup" ? <Setup people={PEOPLE} roles={roles} setRole={setRole} face={(id) => <Face p={PEOPLE.find((p) => p.id === id)!} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}
             </div>
           )}
