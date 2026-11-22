@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Icon } from "./icons";
 
-// How the desk is put together, in the three levels forwarders run such a system on: rules for the whole
-// company (what the AI Worker may do on its own, and the guarantees that are never switched off), wishes per
-// customer (the notes kept with that customer), and a view per person (which changes nothing the agent does). The switches are a draft of the controls: they are kept in this browser and the
-// agent does not read them yet. The rows and their guarantees describe what the agent does today.
+// The hub behind the status card: how the AI Worker is doing, and how the desk is set up, in the three levels
+// forwarders run such a system on. Rules for the whole company (what the AI Worker may do on its own, and the
+// guarantees that are never switched off), wishes per customer (the notes kept with that customer), and people
+// with their rights. The switches and the people are a draft of the controls: kept in this browser, there is no
+// sign-in, and the agent does not read them. The rights do apply inside this desk.
 export type Role = "ops" | "sales" | "carriers";
 export const ROLE_NAME: Record<Role, string> = { ops: "Operations", sales: "Sales", carriers: "Carriers and rates" };
 export const ROLE_SEES: Record<Role, string> = { ops: "What the AI Worker flagged, and everything in progress", sales: "Quotes without a yes, customers to watch", carriers: "Shipments with one airline, where comparing pays" };
@@ -24,16 +25,43 @@ const ALWAYS = ["Every price and date a customer reads is computed by code, neve
 const load = <T,>(k: string, d: T): T => { try { return { ...d, ...JSON.parse(localStorage.getItem(k) ?? "{}") }; } catch { return d; } };
 const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* this browser keeps nothing */ } };
 
-export function Setup({ people, roles, setRole, face, notes, openCustomers }: { people: { id: string; name: string }[]; roles: Record<string, Role>; setRole: (id: string, r: Role) => void; face: (id: string) => JSX.Element; notes: { count: number; customers: number }; openCustomers: () => void }) {
+export type Rights = { tell: boolean; sessions: boolean; setup: boolean };
+const RIGHTS: [keyof Rights, string][] = [["tell", "Write to the AI Worker"], ["sessions", "Open Sessions"], ["setup", "Change this page"]];
+type Status = { mood: "calm" | "watch" | "alert" | "off"; title: string; sub: string; flagged: number; openFlagged: () => void };
+type P = { id: string; name: string; added?: boolean };
+
+function Add({ add }: { add: (name: string, role: Role) => void }) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<Role>("ops");
+  const go = () => { const n = name.trim().slice(0, 30); if (!n) return; add(n, role); setName(""); };
+  return (
+    <div className="dk-set dk-addp">
+      <span className="dk-sq q"><Icon n="users" size={15} /></span>
+      <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") go(); }} placeholder="Name of a new person" aria-label="Name of a new person" maxLength={30} />
+      <span className="dk-ctl">
+        <span className="dk-seg" role="group" aria-label="What the new person sees first">{(Object.keys(ROLE_NAME) as Role[]).map((r) => <button key={r} aria-pressed={role === r} onClick={() => setRole(r)}>{ROLE_NAME[r]}</button>)}</span>
+        <button className="dk-btn k" disabled={!name.trim()} onClick={go}>Add</button>
+      </span>
+    </div>
+  );
+}
+
+export function Setup({ status, people, roles, setRole, rights, setRight, add, remove, meId, face, notes, openCustomers }: {
+  status: Status; people: P[]; roles: Record<string, Role>; setRole: (id: string, r: Role) => void; rights: Record<string, Rights>; setRight: (id: string, k: keyof Rights, v: boolean) => void;
+  add: (name: string, role: Role) => void; remove: (id: string) => void; meId: string; face: (id: string) => JSX.Element; notes: { count: number; customers: number }; openCustomers: () => void;
+}) {
   const [modes, setModes] = useState<Record<string, Mode>>(() => load("desk_modes", Object.fromEntries(DOES.map((d) => [d.id, "own" as Mode]))));
-  const set = (id: string, m: Mode) => { const n = { ...modes, [id]: m }; setModes(n); save("desk_modes", n); };
+  const may = rights[meId]?.setup ?? false;
+  const set = (id: string, m: Mode) => { if (!may) return; const n = { ...modes, [id]: m }; setModes(n); save("desk_modes", n); };
   const off = DOES.filter((d) => modes[d.id] === "off").length, flag = DOES.filter((d) => modes[d.id] === "flag").length;
   return (
     <>
-      <section className="dk-lead">
-        <h2>{off || flag ? "The AI Worker does " + (DOES.length - off) + " of " + DOES.length + " things, " + flag + " with a note to you." : "The AI Worker does all " + DOES.length + " things on its own."}</h2>
-        <p>Three levels: rules for the whole company, wishes per customer, and a view per person. <b>The switches are a draft:</b> they are kept in this browser and the agent does not read them yet.</p>
+      <section className="dk-hub">
+        <span className="dk-orb l" />
+        <div><h2>{status.title}</h2><p>{status.sub} {off || flag ? "It does " + (DOES.length - off) + " of " + DOES.length + " things, " + flag + " of them with a note to you." : "It does all " + DOES.length + " things below on its own."}</p></div>
+        {status.flagged ? <button className="dk-btn k" onClick={status.openFlagged}>Read what it flagged</button> : null}
       </section>
+      <p className="dk-bs" style={{ padding: "0 4px" }}><b>A draft of the controls.</b> The switches and people are kept in this browser, there is no sign-in yet, and the agent does not read the switches.{may ? "" : " You can read this page. Changing it is switched off for you."}</p>
       <p className="dk-layer">For the whole company</p>
       <section className="dk-box">
         <div className="dk-bh"><h2>What the AI Worker may do</h2></div>
@@ -41,7 +69,7 @@ export function Setup({ people, roles, setRole, face, notes, openCustomers }: { 
           <div key={d.id} className={"dk-set" + (modes[d.id] === "off" ? " is-off" : "")}>
             <span className="dk-sq q"><Icon n={d.icon} size={15} /></span>
             <span style={{ minWidth: 0 }}><b>{d.what}</b><small>{d.how}</small><small className="dk-fence"><Icon n="shieldAlert" size={13} />{d.fence}</small></span>
-            <span className="dk-seg" role="group" aria-label={d.what}>{MODES.map((m) => <button key={m[0]} aria-pressed={modes[d.id] === m[0]} onClick={() => set(d.id, m[0])}>{m[1]}</button>)}</span>
+            <span className="dk-seg" role="group" aria-label={d.what}>{MODES.map((m) => <button key={m[0]} disabled={!may} aria-pressed={modes[d.id] === m[0]} onClick={() => set(d.id, m[0])}>{m[1]}</button>)}</span>
           </div>
         ))}
       </section>
@@ -58,17 +86,24 @@ export function Setup({ people, roles, setRole, face, notes, openCustomers }: { 
           <button className="dk-btn" onClick={openCustomers}>Open customers</button>
         </div>
       </section>
-      <p className="dk-layer">For each person</p>
+      <p className="dk-layer">People and rights</p>
       <section className="dk-box">
-        <div className="dk-bh"><h2>Who sees what</h2></div>
-        <p className="dk-bs">This changes a person's own start page. It never changes what the AI Worker does.</p>
+        <div className="dk-bh"><h2>Who works at this desk</h2></div>
+        <p className="dk-bs">The role sets a person's start page. The rights set what they can do in this desk. Neither changes what the AI Worker does.</p>
         {people.map((p) => (
-          <div key={p.id} className="dk-set">
+          <div key={p.id} className="dk-set dk-person">
             {face(p.id)}
-            <span style={{ minWidth: 0 }}><b>{p.name}</b><small>{ROLE_SEES[roles[p.id]]}</small></span>
-            <span className="dk-seg" role="group" aria-label={"What " + p.name + " sees first"}>{(Object.keys(ROLE_NAME) as Role[]).map((r) => <button key={r} aria-pressed={roles[p.id] === r} onClick={() => setRole(p.id, r)}>{ROLE_NAME[r]}</button>)}</span>
+            <span style={{ minWidth: 0 }}><b>{p.name}{p.id === meId ? " (you)" : ""}</b><small>{ROLE_SEES[roles[p.id]]}</small></span>
+            <span className="dk-ctl col">
+              <span className="dk-seg" role="group" aria-label={"What " + p.name + " sees first"}>{(Object.keys(ROLE_NAME) as Role[]).map((r) => <button key={r} disabled={!may} aria-pressed={roles[p.id] === r} onClick={() => setRole(p.id, r)}>{ROLE_NAME[r]}</button>)}</span>
+              <span className="dk-togs">
+                {RIGHTS.map(([k, label]) => <button key={k} className="dk-tog" aria-pressed={rights[p.id][k]} disabled={!may || (k === "setup" && p.id === meId)} onClick={() => setRight(p.id, k, !rights[p.id][k])}><Icon n={rights[p.id][k] ? "check" : "x"} size={13} />{label}</button>)}
+                {p.added ? <button className="dk-tog rm" disabled={!may} onClick={() => remove(p.id)}>Remove</button> : null}
+              </span>
+            </span>
           </div>
         ))}
+        {may ? <Add add={add} /> : null}
       </section>
     </>
   );

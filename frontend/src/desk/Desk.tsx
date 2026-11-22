@@ -10,7 +10,8 @@ import { CarrierFacts, Seen, carrierFacts, context, customerExtra, expect, useKn
 import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
-import { ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
+import { Numbers } from "./Numbers";
+import { Rights, ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
 import { Step, languageOf, timeline } from "./timeline";
 import { Cust, Group, LABEL, amount, city, flagNote, customers, ends, groupOf, kg, known, lane, median, money, name, since, when, why } from "./util";
 import "./desk.css";
@@ -19,20 +20,22 @@ import "./desk.css";
 // and lets them say something to it. Nothing here makes the agent wait.
 // It reads the API the sessions view reads and keeps nothing of its own on the server.
 
-type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup";
+type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup" | "eff";
 // Three people run this company, and each opens the desk on what they care about.
 type Role = "ops" | "sales" | "carriers";
-type Person = { id: string; name: string; role: Role; title: string; cares: string };
+type Person = { id: string; name: string; role: Role; title: string; cares: string; photo?: boolean; added?: boolean };
 const PEOPLE: Person[] = [
-  { id: "sam", name: "Sam", role: "ops", title: "Operations", cares: "What the AI Worker flagged" },
-  { id: "jan", name: "Jan", role: "sales", title: "Sales", cares: "Customers and open quotes" },
-  { id: "mattia", name: "Mattia", role: "carriers", title: "Carriers and rates", cares: "Airlines, routes and prices" },
+  { id: "sam", name: "Sam", role: "ops", title: "Operations", cares: "What the AI Worker flagged", photo: true },
+  { id: "jan", name: "Jan", role: "sales", title: "Sales", cares: "Customers and open quotes", photo: true },
+  { id: "mattia", name: "Mattia", role: "carriers", title: "Carriers and rates", cares: "Airlines, routes and prices", photo: true },
 ];
 let ME = "Sam";
+// what the person signed in may do in this desk (set in Desk, read where something is written)
+let CAN: Rights = { tell: true, sessions: true, setup: true };
 
 function Face({ p, size = 36 }: { p: Person; size?: number }) {
   const [missing, setMissing] = useState("");
-  return <span className="dk-face" style={{ width: size, height: size }}>{p.name[0]}{missing !== p.id ? <img key={p.id} src={"/people/" + p.id + ".png"} alt="" onError={() => setMissing(p.id)} /> : null}</span>;
+  return <span className="dk-face" style={{ width: size, height: size }}>{p.name[0]}{p.photo && missing !== p.id ? <img key={p.id} src={"/people/" + p.id + ".png"} alt="" onError={() => setMissing(p.id)} /> : null}</span>;
 }
 
 // A wheel that eases in and out: the page follows the hand a moment later, never abruptly.
@@ -361,7 +364,7 @@ function CustomerPage({ c, seen, open, back, teach }: { c: Cust; seen: Seen[]; o
         <section className="dk-box"><div className="dk-bh"><h2>What we know</h2></div><dl className="dk-kv pad">{facts.map((f) => <div key={f[0]}><dt>{f[0]}</dt><dd>{f[1]}</dd></div>)}</dl></section>
         <section className="dk-box"><div className="dk-bh"><h2>Remembered</h2></div>
           {notes.length ? <ul className="dk-notes">{notes.map((n) => <li key={n}><Icon n="brain" size={14} />{n}</li>)}</ul> : <p className="dk-bs">Nothing yet. Tell it what to keep in mind for this customer.</p>}
-          <div className="dk-tell in"><Composer line hint="Teach it something" send={add} /></div>
+          {CAN.tell ? <div className="dk-tell in"><Composer line hint="Teach it something" send={add} /></div> : null}
           {told ? <p className="dk-bs"><span className="dk-done"><Icon n="circleCheck" />Passed on. It keeps it for their next request.</span></p> : null}
         </section>
       </div>
@@ -580,7 +583,7 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
           {!mine ? <p style={{ color: "var(--d-muted)" }}>Loading the record.</p> : full ? <div className="dk-mt rec"><DealView deal={mine} onSent={reload} /></div> : (
             <>
               <Timeline steps={steps} />
-              <div className="dk-tell"><Composer line hint="Tell the AI Worker something about this shipment" send={tell} />{passed ? <p className="dk-fine" style={{ textAlign: "left", marginTop: 8 }}>{passed}</p> : null}</div>
+              {CAN.tell ? <div className="dk-tell"><Composer line hint="Tell the AI Worker something about this shipment" send={tell} />{passed ? <p className="dk-fine" style={{ textAlign: "left", marginTop: 8 }}>{passed}</p> : null}</div> : <p className="dk-fine" style={{ textAlign: "left" }}>Writing to the AI Worker is switched off for you.</p>}
             </>
           )}
         </div>
@@ -593,7 +596,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   deals: DealRow[]; online: boolean; worker: boolean; board: Board | null; selected: string | null; select: (id: string | null) => void; deal: Deal | null; reload: () => void;
 }) {
   const initial = (location.hash.slice(1) || "home") as Page;
-  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup"].includes(initial) ? initial : "home");
+  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff"].includes(initial) ? initial : "home");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [who, setWho] = useState(() => { try { return localStorage.getItem("desk_me") ?? "sam"; } catch { return "sam"; } });
   const [menu, setMenu] = useState(false);
@@ -606,9 +609,19 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   }, [menu]);
   const [roles, setRoles] = useState<Record<string, Role>>(() => { const d = Object.fromEntries(PEOPLE.map((p) => [p.id, p.role])); try { return { ...d, ...JSON.parse(localStorage.getItem("desk_roles") ?? "{}") }; } catch { return d; } });
   const setRole = (id: string, r: Role) => setRoles((x) => { const n = { ...x, [id]: r }; try { localStorage.setItem("desk_roles", JSON.stringify(n)); } catch { /* this browser keeps nothing */ } return n; });
-  const base = PEOPLE.find((p) => p.id === who) ?? PEOPLE[0];
-  const me = { ...base, role: roles[base.id] ?? base.role };
-  ME = me.name;
+  // people added here and everyone's rights are kept in this browser: a draft, there is no sign-in
+  const keep = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* this browser keeps nothing */ } };
+  const [added, setAdded] = useState<Person[]>(() => { try { return (JSON.parse(localStorage.getItem("desk_people") ?? "[]") as Person[]).filter((p) => p && p.id && p.name).map((p) => ({ ...p, added: true, photo: false })); } catch { return []; } });
+  const [rights, setRights] = useState<Record<string, Partial<Rights>>>(() => { try { return JSON.parse(localStorage.getItem("desk_rights") ?? "{}"); } catch { return {}; } });
+  const people = [...PEOPLE, ...added];
+  const rightsOf = (p: Person): Rights => ({ tell: true, sessions: !p.added, setup: !p.added, ...rights[p.id] });
+  const setRight = (id: string, k: keyof Rights, v: boolean) => setRights((x) => { const n = { ...x, [id]: { ...x[id], [k]: v } }; keep("desk_rights", n); return n; });
+  const addPerson = (name: string, role: Role) => setAdded((x) => { const n = [...x, { id: "p" + Date.now().toString(36), name, role, title: ROLE_NAME[role], cares: "", added: true }]; keep("desk_people", n); return n; });
+  const removePerson = (id: string) => { setAdded((x) => { const n = x.filter((p) => p.id !== id); keep("desk_people", n); return n; }); if (who === id) setWho("sam"); };
+  const rolesAll = Object.fromEntries(people.map((p) => [p.id, roles[p.id] ?? p.role])) as Record<string, Role>;
+  const base = people.find((p) => p.id === who) ?? PEOPLE[0];
+  const me = { ...base, role: rolesAll[base.id] };
+  ME = me.name; CAN = rightsOf(base);
   useSoftScroll();
   const [open, setOpen] = useState(false);
   const [cust, setCust] = useState<string | null>(null);
@@ -617,13 +630,14 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   const [toast, setToast] = useState("");
   const go = (p: Page) => { setPage(p); setOpen(false); if (p !== "cust") setCust(null); try { history.replaceState(null, "", "#" + p); } catch { /* none */ } };
   const show = (id: string) => { select(id); setOpen(true); };
+  useEffect(() => { if (page === "sess" && !CAN.sessions) go("home"); });
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2800); return () => clearTimeout(t); }, [toast]);
   const needs = deals.filter((d) => groupOf(d) === "needs" && !seenIds.has(d.id));
   const row = deals.find((d) => d.id === selected) ?? null;
   const list = useMemo(() => customers(deals), [deals]);
   const { seen } = useKnowledge(deals);
   const picked = cust ? list.find((c) => c.email === cust) ?? null : null;
-  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "Setup" };
+  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "AI Worker", eff: "Efficiency" };
   const hour = new Date().getHours(), greet = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
   const nv = (p: Page, icon: string, label: string, count?: number) => (
     <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => go(p)}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
@@ -636,10 +650,12 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
     askModel(q, deals, context(deals, seen), earlier).catch(() => ({ ...answer(q, deals), via: "record" as const }))
       .then((a) => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }));
   };
-  const runTurn = (i: number) => { const a = turns[i]?.a?.act; if (a) tell(a).then((done) => setTurns((ts) => ts.map((t, k) => k === i ? { ...t, done } : t))); };
+  const runTurn = (i: number) => { const a = turns[i]?.a?.act; if (a && CAN.tell) tell(a).then((done) => setTurns((ts) => ts.map((t, k) => k === i ? { ...t, done } : t))); };
   useEffect(() => { const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPage("ask"); setOpen(false); } }; window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key); }, []);
   // the ground says how the desk is doing: green while it runs alone, warmer with notes to read, dusk when something is wrong
   const mood: Mood = !online || !worker || needs.some((d) => d.flag === "red") ? "alert" : needs.length ? "watch" : "calm";
+  const red = needs.filter((x) => x.flag === "red").length, answered = deals.filter((x) => x.quote).length;
+  const stateLabel = !online ? "No connection" : !worker ? "AI Worker is stopped" : mood === "calm" ? "All quiet" : mood === "alert" ? red + " to check" : needs.length + (needs.length === 1 ? " note to read" : " notes to read");
   return (
     <div className="dk-app" data-mood={mood}>
       <Ground mood={mood} />
@@ -650,11 +666,12 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
           {nv("ship", "package", "Shipments")}
           {nv("cust", "users", "Customers")}
           {nv("net", "network", "Network")}
-          {nv("sess", "messagesSquare", "Sessions")}
-          <button className={"dk-state " + (online && worker ? mood : "off")} onClick={() => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); }}>
+          {nv("eff", "chartColumn", "Efficiency")}
+          {CAN.sessions ? nv("sess", "messagesSquare", "Sessions") : null}
+          <button className={"dk-state " + (online && worker ? mood : "off")} aria-current={page === "setup" ? "page" : undefined} aria-label={"AI Worker: " + stateLabel + ". Open its status and setup"} onClick={() => go("setup")}>
             <span className="dk-orb m" />
-            <span><b>{!online ? "No connection" : !worker ? "AI Worker is stopped" : mood === "calm" ? "All quiet" : mood === "alert" ? needs.filter((x) => x.flag === "red").length + " to check" : needs.length + (needs.length === 1 ? " note to read" : " notes to read")}</b>
-              <small>{deals.filter((x) => x.quote).length} of {deals.length} answered on its own</small></span>
+            <span><b>{stateLabel}</b><small>{answered} of {deals.length} on its own</small></span>
+            <Icon n="chevronRight" size={15} />
           </button>
         </aside>
         <div className="dk-main">
@@ -667,13 +684,12 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
                 <button className="dk-face-b" onClick={() => setMenu(!menu)} aria-label={"Signed in as " + me.name + ". Switch account"} aria-expanded={menu}><Face p={me} /></button>
                 {menu ? (
                   <div className="dk-menu" role="menu">
-                    {PEOPLE.map((p) => (
+                    {people.map((p) => (
                       <button key={p.id} role="menuitem" onClick={() => { setWho(p.id); setMenu(false); try { localStorage.setItem("desk_me", p.id); } catch { /* this browser keeps nothing */ } go("home"); }}>
-                        <Face p={p} /><span><b>{p.name}</b><small>{ROLE_NAME[roles[p.id]]} · {ROLE_SEES[roles[p.id]]}</small></span>{p.id === me.id ? <Icon n="check" size={15} /> : null}
+                        <Face p={p} /><span><b>{p.name}</b><small>{ROLE_NAME[rolesAll[p.id]]} · {ROLE_SEES[rolesAll[p.id]]}</small></span>{p.id === me.id ? <Icon n="check" size={15} /> : null}
                       </button>
                     ))}
-                    <button role="menuitem" className="plain" onClick={() => { setMenu(false); go("setup"); }}><span className="dk-sq q"><Icon n="shieldAlert" size={15} /></span><span><b>Setup</b><small>Who sees what, what the AI Worker may do</small></span></button>
-                    <button role="menuitem" className="plain two" onClick={() => { setMenu(false); go("help"); }}><span className="dk-sq q"><Icon n="circleHelp" size={15} /></span><span><b>How it works</b></span></button>
+                    <button role="menuitem" className="plain" onClick={() => { setMenu(false); go("help"); }}><span className="dk-sq q"><Icon n="circleHelp" size={15} /></span><span><b>How it works</b></span></button>
                   </div>
                 ) : null}
               </div>
@@ -695,7 +711,10 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
               {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} /> : <Customers deals={deals} pick={setCust} />) : null}
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} /></> : null}
               {page === "help" ? <Help /> : null}
-              {page === "setup" ? <Setup people={PEOPLE} roles={roles} setRole={setRole} face={(id) => <Face p={PEOPLE.find((p) => p.id === id)!} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
+              {page === "eff" ? <Numbers deals={deals} board={board} /> : null}
+              {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "The AI Worker is stopped." : mood === "calm" ? "The AI Worker is running on its own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered without a person.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
+                people={people} roles={rolesAll} setRole={setRole} rights={Object.fromEntries(people.map((p) => [p.id, rightsOf(p)]))} setRight={setRight} add={addPerson} remove={removePerson} meId={me.id}
+                face={(id) => <Face p={people.find((p) => p.id === id) ?? PEOPLE[0]} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}
             </div>
           )}

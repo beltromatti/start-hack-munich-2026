@@ -252,6 +252,26 @@ button.dk-aiw { width: 100%; text-align: left; border-radius: var(--r-ctl); padd
 .dk-nd { background: rgba(255,255,255,.7) radial-gradient(rgba(0,0,0,.09) 1px, transparent 1.2px) 0 0 / 18px 18px; border-color: rgba(0,0,0,.06); }
 .dk-np { animation: none; } .dk-np > * { animation: dk-arrive .4s var(--ease) both; }
 @media (prefers-reduced-motion: reduce) { .dk-lk { animation: none; stroke-dashoffset: 0; } }
+/* efficiency: numbers first, two quiet charts, one table */
+.dk-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+.dk-kpi { padding: 18px 20px; display: grid; gap: 4px; align-content: start; } .dk-kpi small { color: var(--d-muted); font-size: 13px; font-weight: 500; } .dk-kpi b { font-size: 34px; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; font-variant-numeric: tabular-nums; } .dk-kpi span { color: var(--d-ink2); font-size: 13.5px; line-height: 1.4; }
+.dk-chart { padding: 4px 18px 12px; } .dk-chart svg { display: block; width: 100%; height: auto; overflow: visible; } .dk-chart .ax { stroke: rgba(0,0,0,.12); stroke-width: 1; }
+.dk-chart .bar { fill: #2b2b2b; transition: opacity .25s, fill .25s; } .dk-chart g { outline: 0; } .dk-chart g.dim .bar { opacity: .28; } .dk-chart g:focus-visible .bar { fill: #000; }
+.dk-chart .lab { fill: var(--d-muted); font-size: 11.5px; } .dk-chart .val { fill: var(--d-ink); font-size: 12.5px; font-weight: 600; }
+.dk-tip { margin: 4px 0 0; min-height: 20px; color: var(--d-muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.dk-nt { width: 100%; border-collapse: collapse; font-size: 14.5px; } .dk-nt th { text-align: left; font-weight: 500; color: var(--d-muted); font-size: 13px; padding: 8px 18px; border-top: 1px solid var(--d-line); } .dk-nt td { padding: 11px 18px; border-top: 1px solid var(--d-line); font-variant-numeric: tabular-nums; } .dk-nt td:first-child { font-weight: 500; } .dk-nt th:not(:first-child), .dk-nt td:not(:first-child) { text-align: right; }
+@media (max-width: 1000px) { .dk-nt th:nth-child(5), .dk-nt td:nth-child(5) { display: none; } }
+/* the hub behind the status card */
+.dk-hub { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 8px 4px 2px; } .dk-hub h2 { font-size: 26px; letter-spacing: -.02em; font-weight: 600; margin: 0 0 4px; } .dk-hub p { color: var(--d-muted); margin: 0; max-width: 72ch; }
+.dk-orb.l { width: 72px; height: 72px; }
+.dk-state { grid-template-columns: 40px minmax(0, 1fr) 15px; } .dk-state > .dk-ic { color: var(--d-muted); transition: transform .45s var(--ease); } .dk-state:hover > .dk-ic { transform: translateX(2px); } .dk-state[aria-current="page"] { background: rgba(255,255,255,.92); }
+.dk-ctl { display: flex; gap: 8px; align-items: center; } .dk-ctl.col { flex-direction: column; align-items: flex-end; }
+.dk-togs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.dk-tog { display: inline-flex; gap: 5px; align-items: center; height: 28px; padding: 0 11px 0 9px; border-radius: var(--r-ctl); border: 1px solid var(--d-line); background: #fff; font-size: 12.5px; font-weight: 500; color: var(--d-ink); transition: background-color .25s, color .25s, transform .45s var(--ease); }
+.dk-tog[aria-pressed="true"] .dk-ic { color: var(--d-green); } .dk-tog[aria-pressed="false"] { background: transparent; color: var(--d-muted); } .dk-tog.rm { padding: 0 11px; color: var(--d-muted); } .dk-tog:hover:not(:disabled) { transform: translateY(-1px); }
+.dk-tog:disabled, .dk-seg button:disabled { opacity: .55; cursor: default; }
+.dk-addp input { height: 38px; min-width: 0; border: 1px solid var(--d-line); border-radius: var(--r-ctl); padding: 0 16px; font: inherit; background: #fff; color: var(--d-ink); outline: 0; transition: border-color .2s, box-shadow .2s; } .dk-addp input:focus { border-color: var(--d-ink); box-shadow: 0 0 0 4px rgba(0,0,0,.06); }
+@media (max-width: 1000px) { .dk-hub { grid-template-columns: 56px minmax(0, 1fr); } .dk-hub .dk-btn { grid-column: 2; justify-self: start; } .dk-ctl.col { grid-column: 2; align-items: flex-start; } .dk-togs { justify-content: flex-start; } .dk-addp .dk-ctl { grid-column: 2; flex-wrap: wrap; } }
 /* setup */
 .dk-layer { font-size: 13px; font-weight: 600; color: var(--d-muted); margin: 10px 4px -8px; }
 .dk-set { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--d-line); transition: opacity .3s; } .dk-set:first-of-type { border-top: 0; }
