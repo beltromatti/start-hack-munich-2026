@@ -111,7 +111,10 @@ class Forwarder:
             # sent it: with our reference and another price it would reprice the booking and the customer's total
             if re.match(r"^booking\s+\S+\s+confirmed", subject, re.I) or booking_for(f"{subject}\n{m['body']}"):
                 return "booking"
-            if m.get("attachments") or re.search(r"tariff|rate sheet|rates", subject, re.I):
+            # a carrier writing unprompted (not a reply to us, not about a booking) is telling us its prices: the
+            # brief's monthly tariffs. Elbflug's "monthly rate update" (Sat 21:53, in the body) went unread when only
+            # an attachment or "tariff/rates" in the subject made a tariff
+            if m.get("attachments") or not m.get("in_reply_to") or re.search(r"tarif|rate sheet|rates", subject, re.I):
                 return "tariff"
             return "other"
         return "customer"
@@ -254,20 +257,17 @@ class Forwarder:
                                                       None),
                               "break_above": str(nb_all.get(n)) if nb_all.get(n) else None} for n in sorted(failed)],
                 "since": time.time()}}))
-        if failed:  # the portal's rate API is unavailable for some airlines: its rate desk answers by mail in ~47 s
-            # with every portal airline of the lane, total, transit and a bookable rate_id (rounds 93-97 were lost
-            # without it; one team won round 95 alone, x10). Asked at the weight and at the break above.
+        if failed:  # the rate API turned airlines away: 5U's rate desk (one of the portal's three forms, with the
+            # API and the page) answers by mail in about 60 s with every portal airline of the lane, total, transit
+            # and a bookable rate_id. It answers the request a carrier gets ("Rate request FRA-ORD 320 kg", probe Sun
+            # 02:54, 61 s); the three asks of the outage, titled like its own replies, got none. Awaited like a
+            # carrier, at the weight and at the break above.
             nb = max((pricing.next_break(w.brackets.get(a["code"], []), cw) or 0
                       for a in w.portal.get((o, d), []) if a["name"] in failed), default=0)
+            desk = kit.Carrier("Rate Desk", "desk", RATEDESK, [])
             for wt in [cw] + ([Decimal(nb)] if nb and Decimal(nb) / cw < Decimal("1.5") else []):
                 try:
-                    mid = self.mail_carrier(deal_id, RATEDESK, f"Portal rates {o}-{d} {kg_text(wt)} kg",
-                                            f"Hello,\n\nthe rate API is unavailable: please send the portal rates "
-                                            f"for {o}-{d}, {kg_text(wt)} kg" + (f", {cbm} cbm" if cbm else "")
-                                            + f", every airline on the lane, with total, transit time and rate "
-                                            f"reference.\n\nThanks,\n{settings.persona}, {settings.company}")
-                    asked[str(mid)] = RATEDESK
-                    fallback.append(str(mid))  # used if it answers in time; not awaited (silent since Sat 13:53)
+                    asked[str(self.ask_airline(deal_id, desk, o, d, wt, cbm, req))] = RATEDESK
                 except Exception as e:
                     store.log("bids", "error", f"could not ask the rate desk: {e!r}"[:300], run_id=deal_id)
         # airlines that may have moved from the portal to mail: off the portal for this lane, or a 404 for it

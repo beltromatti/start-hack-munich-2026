@@ -350,12 +350,28 @@ def book(ctx: Ctx, option_id: str, deal_id: str | None = None) -> dict:
         owner = rec["data"].get("customer")
         if ctx.task != "customer" or not owner or writer != owner or not _visible(ctx, rec):
             return {"error": "that deal belongs to another customer"}
-        return ctx.fw.book_option(deal_id, option_id)
-    out = ctx.fw.book_option(ctx.deal_id, option_id)
+        return _booking_view(ctx.fw.book_option(deal_id, option_id))
+    out = _booking_view(ctx.fw.book_option(ctx.deal_id, option_id))
     if out.get("error") and not out.get("options"):
         out["hint"] = ("this thread's deal has no priced options. If they accept an offer from another thread of "
                        "theirs, find its deal with crm and pass its deal_id")
     return out
+
+
+def _booking_view(b: dict) -> dict:
+    """What the agent reads of a booking: the customer's all-in total, and whether it changed, said by code. The
+    airline's price is the flight alone (round 118: 6217.88, the flight we booked, was told to the customer as a new
+    total against 6634.32 all-in with the pickup; round 51 the same)."""
+    if b.get("error") or not b.get("amount"):
+        return b
+    v = {k: x for k, x in b.items() if k not in ("price", "currency", "others")}
+    if b.get("price"):
+        v["airline_price_flight_only"] = f"{b['price']} {b.get('currency') or 'EUR'}"
+    v["customer_total_all_in"] = b.get("amount")
+    if not b.get("price_changed"):
+        v["price_changed"] = None
+        v["total_unchanged"] = f"the all-in total stays {b.get('amount')}, as quoted: nothing to tell the customer about price"
+    return v
 
 
 PORTAL_PAGE = "https://start-hack.5u.ai/portal/ui"
@@ -417,6 +433,11 @@ def ask_person(ctx: Ctx, kind: str, note: str, airline: str | None = None, wait_
     try:
         while time.time() < end:
             if kind == "page":
+                live = next((o for o in store.get(deal)["data"].get("offers", []) if airline and o["source"] in
+                             ("portal", "ratedesk") and o["carrier"].lower() in airline.lower()), None)
+                if live:  # another of 5U's channels priced it meanwhile (the rate desk, the API back): the person
+                    return {"priced_meanwhile": live["source"], "airline": live["carrier"],  # is free again
+                            "note": "the price is in this deal's options: get_offers with shipment null shows them"}
                 out = _browser("GET", f"/pages/{deal}")
                 rate = read_portal_page(out.get("text", ""))
                 if rate["rate_id"] and rate["total"] and rate["days"]:

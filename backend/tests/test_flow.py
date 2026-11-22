@@ -872,6 +872,8 @@ def test_two_shipments_of_one_deal_are_two_bookings():
     b = tools.get_offers(ctx, ship(900), "fastest", 5)["options"][0]["option"]
     first = tools.book(ctx, a)
     assert first["weight_kg"] == "320" and first["team_reference"] == f"SM-{rfq['id']}"
+    # round 118: the airline's price is the flight alone; the agent reads the all-in total and that it did not change
+    assert "price" not in first and first["customer_total_all_in"] == first["amount"] and first["total_unchanged"]
     second = tools.book(ctx, b)
     assert second["weight_kg"] == "900" and second["team_reference"] == f"SM-{rfq['id']}-2"
     assert store.get(f"booking-{rfq['id']}")["data"]["weight_kg"] == "320"  # the first record is still the first
@@ -1401,6 +1403,55 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     assert 200 <= OPERATOR_WAIT <= 300  # minutes for the person, and the quote still inside the 6-minute close
     store.kv_set("operator_on", "0")
     assert "operator mode off" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
+
+
+def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_airlines_away():
+    """5U's rate desk is one of the portal's three forms (brief). It answered "Rate request FRA-ORD 320 kg" in 61 s with
+    a bookable rate_id (probe Sun 02:54); the outage's asks, titled "Portal rates ...", got nothing. Now it gets the
+    carrier request, is awaited like a carrier, and a person on the page is let go once it has priced the airline."""
+    from app import tools
+    from app.forwarder import waiting_for
+    from app.kit import RATEDESK
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+    rfq = api.customer("k@k.example", "Quote", "320 kg FRA to ORD")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+            "lots": [{"pieces": 4, "weight": q(320, "kg"), "volume": q(1.5, "cbm"), "dimensions": None}],
+            "insurance": None, "extra_charges": []}
+    tools.get_offers(ctx, ship, "fastest", 0)
+    desk = [m for m in api.outbox if m["to"] == RATEDESK]
+    assert desk and desk[0]["subject"] == "Rate request FRA-ORD 320 kg" and "Total weight: 320 kg" in desk[0]["body"]
+    d = store.get(ctx.deal_id)["data"]
+    assert RATEDESK in waiting_for(d)  # awaited like a carrier, not a fallback
+    missing = d["portal_missing"]["airlines"][0]["name"]
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "offers": r["data"]["offers"] + [
+        {"kind": "air", "carrier": missing, "total": "1171.20", "days": "1", "source": "ratedesk",
+         "rate_id": "R-desk1", "billed_kg": "320"}]}))
+    store.kv_set("operator_on", "1")
+    out = tools.ask_person(ctx, "page", "pass the check", missing, 30)
+    assert out["priced_meanwhile"] == "ratedesk"  # the person is free again at once
+    store.kv_set("operator_on", "0")
+
+
+def test_a_carrier_writing_unprompted_is_read_as_its_tariff():
+    """Elbflug's "monthly rate update" (Sat 21:53, the tariff in the body, no attachment) went to "other" and was never
+    ingested. The brief: airlines send monthly tariffs, ingestion is automatic."""
+    from app.forwarder import Forwarder
+    api = FakeFiveU()
+    kit.load(api)
+    f = Forwarder(api)
+    mail = lambda subject, reply: {"id": 1, "sender": "elbflug-air-freight@hackloop.mail", "subject": subject,
+                                   "body": "Valid from 21/11/2026 to 31/12/2026. Rates per kg...", "in_reply_to": reply,
+                                   "root": 1, "attachments": []}
+    assert f.classify(mail("Elbflug Air Freight: monthly rate update", None)) == "tariff"
+    assert f.classify(mail("Re: Rate request FRA-ORD 320 kg", 99)) == "other"  # a reply of theirs is not a tariff
 
 
 def test_the_browser_opens_5u_sites_only_and_ask_person_brings_back_an_answer():
