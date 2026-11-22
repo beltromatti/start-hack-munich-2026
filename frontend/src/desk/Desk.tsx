@@ -11,10 +11,9 @@ import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
 import { CustomerMap, NodeMap, airlineHubs, airlineInsights, insights, open as openWith } from "./CustomerMap";
-import { Jobs, Job } from "./Jobs";
 import { MatrixChart } from "./Matrix";
 import { Numbers } from "./Numbers";
-import { matrix, wantsJob, wantsMatrix } from "./analysis";
+import { matrix, wantsMatrix } from "./analysis";
 import { ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
 import { Step, languageOf, timeline } from "./timeline";
 import { Cust, Group, LABEL, amount, city, flagNote, customers, ends, groupOf, kg, known, lane, median, money, name, since, when, why } from "./util";
@@ -24,7 +23,7 @@ import "./desk.css";
 // and lets them say something to it. Nothing here makes the agent wait.
 // It reads the API the sessions view reads and keeps nothing of its own on the server.
 
-type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup" | "eff" | "jobs";
+type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup" | "eff";
 // Each person opens the desk on what their role cares about; the role is kept with their account.
 type Role = "ops" | "sales" | "carriers";
 type Person = { id: string; name: string; role: Role };
@@ -147,7 +146,7 @@ function AskPage({ role, turns, send, open, go, pickCustomer, run }: { role: Rol
                     {t.a.act && !t.done ? <button className="dk-btn k" onClick={() => run(i)}><Icon n="check" />{t.a.act.label}</button> : null}
                     {t.done ? <span className="dk-done"><Icon n="circleCheck" />{t.done}</span> : null}
                     {t.a.customer ? <button className="dk-btn" onClick={() => pickCustomer(t.a!.customer!)}>Open the customer</button> : null}
-                    {t.a.page ? <button className="dk-btn" onClick={() => go(t.a!.page!)}>{t.a.page === "jobs" ? "Open jobs" : t.a.page === "net" ? "Open the network" : t.a.page === "cust" ? "Open customers" : "Open shipments"}</button> : null}
+                    {t.a.page ? <button className="dk-btn" onClick={() => go(t.a!.page!)}>{t.a.page === "net" ? "Open the network" : t.a.page === "cust" ? "Open customers" : "Open shipments"}</button> : null}
                   </div>
                 ) : null}
                 {t.a.via === "record" ? <p className="dk-fine">The assistant is not reachable. This is the plain lookup.</p> : null}
@@ -643,7 +642,7 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
   }, []);
   const deals = useMemo(() => forcedDeals(given, forced), [given, forced]);
   const initial = (location.hash.slice(1) || "home") as Page;
-  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff", "jobs"].includes(initial) ? initial : "home");
+  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff"].includes(initial) ? initial : "home");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [menu, setMenu] = useState(false);
   useEffect(() => { // the account menu closes on a click anywhere else, and on Escape
@@ -656,15 +655,6 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
   // the account signed in (null on a laptop without accounts: the desk is open, as before)
   const me: Person = account ? { id: account.username, name: account.name, role: account.role } : { id: "you", name: "there", role: "ops" };
   ME = me.name.split(" ")[0];
-  const keep = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* this browser keeps nothing */ } };
-  // analyses the assistant repeats: made in the chat, kept in this browser, run while the desk is open
-  const [jobs, setJobs] = useState<Job[]>(() => { try { return JSON.parse(localStorage.getItem("desk_jobs") ?? "[]") as Job[]; } catch { return []; } });
-  const saveJobs = (f: (x: Job[]) => Job[]) => setJobs((x) => { const n = f(x); keep("desk_jobs", n); return n; });
-  const runJob = (id: string) => saveJobs((x) => x.map((j) => { if (j.id !== id) return j; const m = matrix(deals); return { ...j, last: Date.now(), result: m.n < 5 ? "Not enough shipments yet." : m.text.replace(/^I compared[^.]*\. /, "") }; }));
-  useEffect(() => {
-    const due = () => { const now = Date.now(); jobs.filter((j) => now - j.last >= (j.every === "day" ? 864e5 : 6048e5)).forEach((j) => runJob(j.id)); };
-    due(); const t = window.setInterval(due, 60000); return () => clearInterval(t);
-  }, [jobs.length, deals.length]);
   useEffect(() => { // the tab carries our mark, light or dark with the browser
     const svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><style>.m{fill:#141414;stroke:#141414}@media(prefers-color-scheme:dark){.m{fill:#fff;stroke:#fff}}</style><g class='m'><circle cx='21' cy='42' r='15' stroke='none'/><circle cx='42' cy='23' r='9.5' stroke='none'/><path d='M25 37 40 25' stroke-width='14' stroke-linecap='round' fill='none'/><circle cx='56' cy='10' r='4.6' stroke='none'/></g></svg>";
     document.querySelectorAll("link[rel~='icon']").forEach((l) => l.remove());
@@ -684,7 +674,7 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
   const list = useMemo(() => customers(deals), [deals]);
   const { seen } = useKnowledge(deals);
   const picked = cust ? list.find((c) => c.email === cust) ?? null : null;
-  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "Giulia", eff: "Efficiency", jobs: "Jobs" };
+  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "Giulia", eff: "Efficiency" };
   const hour = new Date().getHours(), greet = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
   const nv = (p: Page, icon: string, label: string, count?: number) => (
     <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => { go(p); setCust(null); }}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
@@ -696,15 +686,6 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
     setPage("ask"); setOpen(false); setCust(null);
     const low = q.toLowerCase();
     const settle = (a: Answer) => window.setTimeout(() => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }), 900);
-    if (wantsJob(low)) { // the chat makes a routine out of the analysis before it
-      const src = [...turns].reverse().find((t) => t.a?.matrix);
-      if (!src) { settle({ via: "assistant", text: "Ask me for an analysis first. Then say \"make this a job\" and I repeat it for you." }); return; }
-      const daily = /daily|every day|each day|every morning/.test(low), day = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].find((d) => low.includes(d)) ?? "monday";
-      const label = daily ? "Every day at 07:00" : "Every " + day[0].toUpperCase() + day.slice(1) + " at 07:00", m = matrix(deals);
-      saveJobs((x) => [{ id: "j" + Date.now().toString(36), title: src.q.trim().replace(/^./, (c) => c.toUpperCase()), q: src.q, every: daily ? "day" : "week", label, created: Date.now(), last: Date.now(), result: m.text.replace(/^I compared[^.]*\. /, "") }, ...x]);
-      settle({ via: "assistant", text: "Done. I repeat this analysis " + label[0].toLowerCase() + label.slice(1) + " and keep the latest result under Jobs.", page: "jobs" });
-      return;
-    }
     if (wantsMatrix(low)) { const m = matrix(deals); settle({ via: "assistant", text: m.text, matrix: m }); return; }
     askModel(q, deals, context(deals, seen), earlier).catch(() => ({ ...answer(q, deals), via: "record" as const }))
       .then((a) => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }));
@@ -726,7 +707,6 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
           {nv("cust", "users", "Customers")}
           {nv("net", "network", "Network")}
           {nv("eff", "chartColumn", "Efficiency")}
-          {jobs.length ? nv("jobs", "repeat", "Jobs") : null}
           {nv("sess", "messagesSquare", "Sessions")}
           <button className={"dk-state " + (online && worker ? mood : "off")} aria-current={page === "setup" ? "page" : undefined} aria-label={"Giulia: " + stateLabel + ". Open her status and setup"} onClick={() => go("setup")}>
             <span className="dk-orb m" />
@@ -768,7 +748,6 @@ export function Desk({ account, signOut, deals: given, online, worker, selected,
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} deals={deals} seen={seen} /></> : null}
               {page === "help" ? <Help /> : null}
               {page === "eff" ? <Numbers deals={deals} /> : null}
-              {page === "jobs" ? <Jobs jobs={jobs} deals={deals} run={runJob} remove={(id) => saveJobs((x) => x.filter((j) => j.id !== id))} ask={() => go("ask")} /> : null}
               {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "Giulia is stopped." : mood === "calm" ? "Giulia is running on her own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
                 meId={me.id} face={(p) => <Face p={p} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}

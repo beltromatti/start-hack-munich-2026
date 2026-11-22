@@ -61,4 +61,3 @@ export function matrix(deals: DealRow[]): Matrix {
 }
 
 export const wantsMatrix = (low: string) => /correlat|matrix|what (drives|affects|influences|moves)|effect of|impact of|how do .* relate/.test(low) || (/margin/.test(low) && /graph|chart|why|depend|variable|driv|affect/.test(low));
-export const wantsJob = (low: string) => /(make|turn|save|set) .*(job|routine)|(every|each) (day|week|morning|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|regularly|weekly|daily/.test(low);

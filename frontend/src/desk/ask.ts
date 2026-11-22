@@ -6,7 +6,7 @@ import { Cust, amount, city, customers, ends, groupOf, kg, lane, median, money, 
 // The ask bar. It answers from the desk's own record, in code: no model call, no cost, the same answer every time.
 // Three things it can do for you go through the API the desk already has, each after one click on the button.
 export type Act = { label: string; kind: "tell"; deal: string; text: string };
-export type Answer = { via?: "assistant" | "record"; text: string; rows?: DealRow[]; facts?: [string, string][]; customer?: string; act?: Act; page?: "ship" | "cust" | "net" | "jobs"; matrix?: Matrix };
+export type Answer = { via?: "assistant" | "record"; text: string; rows?: DealRow[]; facts?: [string, string][]; customer?: string; act?: Act; page?: "ship" | "cust" | "net"; matrix?: Matrix };
 export const TRY = ["What should I look at?", "Give me the overview", "Which airline do we book most?", "Which quotes are still open?", "Cheapest way to Hong Kong"];
 
 const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? one : many);

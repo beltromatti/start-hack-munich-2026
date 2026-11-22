@@ -88,6 +88,27 @@ resumes it with everything before it.
   customer from the UI; the agent follows and does not undo it. That is the sessions UI 5U asked for, and how the
   team corrects the system without touching code.
 
+### 2.1 The desk: the same register, for the people who run it
+
+- **The product is the desk** (`frontend/`): what Giulia flagged, shipments, customers, network, efficiency, and every
+  session live, with the composer to step in. It reads the API the sessions view reads and keeps nothing of its own on
+  the server. The challenge leaderboard is on `/leaderboard/challenge`, for the team only: a forwarder's people care
+  about their shipments, not about our rank.
+- **Sign-in is real:** accounts in the register (`accounts.py`: a salted hash, a signed cookie, a brake on guessing);
+  the first account closes the desk. This machine itself reads freely (the monitor and scripts on localhost); what
+  comes through the Cloudflare tunnel carries Cloudflare's headers and must sign in. What a person tells Giulia is
+  recorded under their account. Sam's draft switches for "what Giulia may do" and per-person rights were removed: the
+  agent never read them, and a control that controls nothing misleads the person who sets it. The desk shows what
+  Giulia does as what her tools guarantee.
+- **The desk's assistant is the forwarder's pattern, small** (`desk.py`): the model decides what to read with
+  read-only tools over the register (shipments with their count and quote total summed by code, one shipment with
+  its mails, customers, rate sheets priced by `pricing.py`) and when it knows enough; the system checks that every
+  shipment and customer it names exists, and its one action, a message to a shipment's session, happens on a
+  person's click. It replaced one call over the page's data with a token cap: the page could only send what it had
+  thought of, and a total the model adds up is a price no tool computed. Our own OpenAI key, never the gateway.
+- **The public address is a Cloudflare Tunnel** (`deploy/tunnel.sh`): the Mac dials out, no port opens, and
+  production stays where 5U's API is reachable (decision 17).
+
 ## 3. The register: state, not callbacks
 
 SQLite (`store.py`): mails, records (deal, booking, session, tariff, board), events, kv. Work comes from state: poll
@@ -365,6 +386,8 @@ Then:
 23. A cause is read in 5U's own words and our data before it is built on. "They waited, the API came back" (a
     teammate's reading of rounds 93-100) ran for twenty minutes as a 4-minute API wait; the brief named the page,
     and our own retries had failed up to 89 s.
+24. The desk is the product: real accounts, the leaderboard only for the team, its assistant an agent over the
+    register with read-only tools. Nothing on the desk changes what Giulia does except a person's word in a session.
 
 ## 13. Open, and known limits
 
