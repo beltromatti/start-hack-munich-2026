@@ -10,6 +10,7 @@ import { CarrierFacts, Seen, carrierFacts, context, customerExtra, expect, useKn
 import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
+import { ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
 import { Step, languageOf, timeline } from "./timeline";
 import { Cust, Group, LABEL, amount, city, flagNote, customers, ends, groupOf, kg, known, lane, median, money, name, since, when, why } from "./util";
 import "./desk.css";
@@ -18,7 +19,7 @@ import "./desk.css";
 // and lets them say something to it. Nothing here makes the agent wait.
 // It reads the API the sessions view reads and keeps nothing of its own on the server.
 
-type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask";
+type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup";
 // Three people run this company, and each opens the desk on what they care about.
 type Role = "ops" | "sales" | "carriers";
 type Person = { id: string; name: string; role: Role; title: string; cares: string };
@@ -433,7 +434,9 @@ function Carriers({ learned }: { learned: CarrierFacts[] }) {
 }
 
 function Network({ deals }: { deals: DealRow[] }) {
-  const [sel, setSel] = useState("");
+  const [pin, setPin] = useState("");
+  const [hov, setHov] = useState("");
+  const sel = hov || pin;
   const [closed, setClosed] = useState("");
   const regOf = (d: string) => Object.keys(REGION).find((r) => REGION[r].includes(d)) ?? "Other";
   const tri = useMemo(() => LANES.flatMap((l) => l[2].map((a) => ({ o: l[0], d: l[1], al: a[0], p: a[1], r: regOf(l[1]) }))), []);
@@ -448,7 +451,7 @@ function Network({ deals }: { deals: DealRow[] }) {
   const node = (id: string, x: number, y: number, h: number, a: string, b: string, right: string, dot?: "h" | "d") => {
     const on = sel === id, dim = !!sel && !on && !hit.some((t) => id === "a:" + t.o || id === "l:" + t.al || id === "r:" + t.r);
     return (
-      <g key={id} className={"dk-nc" + (on ? " on" : dim ? " dim" : "")} onClick={() => { setSel(on ? "" : id); setClosed(""); }}>
+      <g key={id} className={"dk-nc" + (on ? " on" : dim ? " dim" : "") + (pin === id ? " pin" : "")} onClick={() => { setPin(pin === id ? "" : id); setClosed(""); }} onMouseEnter={() => setHov(id)} onMouseLeave={() => setHov("")}>
         <rect x={x} y={y} width={cw} height={h} rx={11} />
         <text x={x + 14} y={y + (b ? h / 2 - 3 : h / 2 + 4.5)}>{a}</text>
         {b ? <text className="s" x={x + 14} y={y + h / 2 + 14}>{b}</text> : null}
@@ -458,7 +461,7 @@ function Network({ deals }: { deals: DealRow[] }) {
     );
   };
   let panel: JSX.Element;
-  if (!sel) panel = (<><h3>How your freight moves</h3><p>Six German airports, ten airlines, six regions. A thicker line means more routes. Click a box to follow it.</p>
+  if (!sel) panel = (<><h3>How your freight moves</h3><p>Six German airports, ten airlines, six regions. A thicker line means more routes. Point at a box to follow it.</p>
     <div className="dk-f3"><div><b>{LANES.length}</b><span>routes</span></div><div><b>{LANES.filter((l) => l[2].length === 1).length}</b><span>with one airline</span></div><div><b>1.8x</b><span>widest price gap</span></div></div></>);
   else if (sel[0] === "a") {
     const o = sel.slice(2), ls = LANES.filter((l) => l[0] === o), lost = lostIf(o), mine = live(o);
@@ -482,15 +485,15 @@ function Network({ deals }: { deals: DealRow[] }) {
         <header><span>German airports</span><span>Airlines</span><span>Regions</span></header>
         <svg viewBox={"0 0 900 " + (H + 10)} role="img" aria-label="Airports, airlines and regions">
           {ORIGINS.flatMap((o, i) => als.map((al, j) => { const n = cnt((t) => t.o === o && t.al === al); if (!n) return null; const on = !!sel && hit.some((t) => t.o === o && t.al === al);
-            return <path key={o + al} className={"dk-lk" + (sel ? (on ? " on" : " dim") : "")} d={curve(X[0] + cw, ya(i) + 29, X[1], yl(j) + 20)} strokeWidth={on ? Math.min(3.4, 1 + n * 0.3) : Math.min(6, 1 + n * 0.5)} />; }))}
+            return <path key={o + al} pathLength={1} className={"dk-lk" + (sel ? (on ? " on" : " dim") : "")} d={curve(X[0] + cw, ya(i) + 29, X[1], yl(j) + 20)} strokeWidth={on ? Math.min(3.4, 1 + n * 0.3) : Math.min(6, 1 + n * 0.5)} />; }))}
           {als.flatMap((al, j) => regs.map((r, k) => { const n = cnt((t) => t.al === al && t.r === r); if (!n) return null; const m = hit.filter((t) => t.al === al && t.r === r).length, on = !!sel && m > 0;
-            return <path key={al + r} className={"dk-lk" + (sel ? (on ? " on" + (sel[0] === "a" ? " h2" : "") : " dim") : "")} d={curve(X[1] + cw, yl(j) + 20, X[2], yr(k) + 29)} strokeWidth={on ? Math.min(3.4, 0.9 + m * 0.35) : Math.min(6, 1 + n * 0.5)} />; }))}
+            return <path key={al + r} pathLength={1} className={"dk-lk" + (sel ? (on ? " on" + (sel[0] === "a" ? " h2" : "") : " dim") : "")} d={curve(X[1] + cw, yl(j) + 20, X[2], yr(k) + 29)} strokeWidth={on ? Math.min(3.4, 0.9 + m * 0.35) : Math.min(6, 1 + n * 0.5)} />; }))}
           {ORIGINS.map((o, i) => { const mine = live(o); return node("a:" + o, X[0], ya(i), 58, city(o) + " " + o, mine.length ? mine.length + (mine.length === 1 ? " open shipment" : " open shipments") : "no open shipment", LANES.filter((l) => l[0] === o).length + " routes", mine.length ? (mine.some((d) => groupOf(d) === "needs") ? "h" : "d") : undefined); })}
           {als.map((al, j) => node("l:" + al, X[1], yl(j), 40, al, "", cnt((t) => t.al === al) + " routes"))}
           {regs.map((r, k) => node("r:" + r, X[2], yr(k), 58, r, REGION[r].length + " destinations", cnt((t) => t.r === r) + " offers"))}
         </svg>
       </div>
-      <aside className="dk-np">{panel}{sel ? <button className="dk-link" onClick={() => { setSel(""); setClosed(""); }}>Show everything</button> : null}</aside>
+      <aside className="dk-np">{panel}{pin ? <button className="dk-link" onClick={() => { setPin(""); setClosed(""); }}>Show everything</button> : !sel ? null : <p className="dk-fine" style={{ textAlign: "left" }}>Click to keep it open.</p>}</aside>
     </div>
   );
 }
@@ -590,11 +593,14 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   deals: DealRow[]; online: boolean; worker: boolean; board: Board | null; selected: string | null; select: (id: string | null) => void; deal: Deal | null; reload: () => void;
 }) {
   const initial = (location.hash.slice(1) || "home") as Page;
-  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help"].includes(initial) ? initial : "home");
+  const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup"].includes(initial) ? initial : "home");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [who, setWho] = useState(() => { try { return localStorage.getItem("desk_me") ?? "sam"; } catch { return "sam"; } });
   const [menu, setMenu] = useState(false);
-  const me = PEOPLE.find((p) => p.id === who) ?? PEOPLE[0];
+  const [roles, setRoles] = useState<Record<string, Role>>(() => { const d = Object.fromEntries(PEOPLE.map((p) => [p.id, p.role])); try { return { ...d, ...JSON.parse(localStorage.getItem("desk_roles") ?? "{}") }; } catch { return d; } });
+  const setRole = (id: string, r: Role) => setRoles((x) => { const n = { ...x, [id]: r }; try { localStorage.setItem("desk_roles", JSON.stringify(n)); } catch { /* this browser keeps nothing */ } return n; });
+  const base = PEOPLE.find((p) => p.id === who) ?? PEOPLE[0];
+  const me = { ...base, role: roles[base.id] ?? base.role };
   ME = me.name;
   useSoftScroll();
   const [open, setOpen] = useState(false);
@@ -610,7 +616,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   const list = useMemo(() => customers(deals), [deals]);
   const { seen } = useKnowledge(deals);
   const picked = cust ? list.find((c) => c.email === cust) ?? null : null;
-  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask" };
+  const TITLE: Record<Page, string> = { home: "Desk", ship: "Shipments", cust: picked ? picked.name : "Customers", net: "Network", sess: "Sessions", help: "How it works", ask: "Ask", setup: "Setup" };
   const hour = new Date().getHours(), greet = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
   const nv = (p: Page, icon: string, label: string, count?: number) => (
     <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => go(p)}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
@@ -656,10 +662,11 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
                   <div className="dk-menu" role="menu">
                     {PEOPLE.map((p) => (
                       <button key={p.id} role="menuitem" onClick={() => { setWho(p.id); setMenu(false); try { localStorage.setItem("desk_me", p.id); } catch { /* this browser keeps nothing */ } go("home"); }}>
-                        <Face p={p} /><span><b>{p.name}</b><small>{p.title} · {p.cares}</small></span>{p.id === me.id ? <Icon n="check" size={15} /> : null}
+                        <Face p={p} /><span><b>{p.name}</b><small>{ROLE_NAME[roles[p.id]]} · {ROLE_SEES[roles[p.id]]}</small></span>{p.id === me.id ? <Icon n="check" size={15} /> : null}
                       </button>
                     ))}
-                    <button role="menuitem" className="plain" onClick={() => { setMenu(false); go("help"); }}><span className="dk-sq q"><Icon n="circleHelp" size={15} /></span><span><b>How it works</b></span></button>
+                    <button role="menuitem" className="plain" onClick={() => { setMenu(false); go("setup"); }}><span className="dk-sq q"><Icon n="shieldAlert" size={15} /></span><span><b>Setup</b><small>Who sees what, what the AI Worker may do</small></span></button>
+                    <button role="menuitem" className="plain two" onClick={() => { setMenu(false); go("help"); }}><span className="dk-sq q"><Icon n="circleHelp" size={15} /></span><span><b>How it works</b></span></button>
                   </div>
                 ) : null}
               </div>
@@ -681,6 +688,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
               {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} /> : <Customers deals={deals} pick={setCust} />) : null}
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} /></> : null}
               {page === "help" ? <Help /> : null}
+              {page === "setup" ? <Setup people={PEOPLE} roles={roles} setRole={setRole} face={(id) => <Face p={PEOPLE.find((p) => p.id === id)!} />} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}
             </div>
           )}
