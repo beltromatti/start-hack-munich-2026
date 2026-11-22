@@ -217,6 +217,14 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   offer accepted in a new mail is booked on the deal that holds it (`book` with its `deal_id`, the customer's own
   deals only). A shipment that starts outside Germany (an import) is named out of our service by `get_offers`,
   so the agent says so instead of asking for a German airport (Sam's probe, Sun 00:30).
+- **Where a price lives can move, and some places are for people.** 5U moves airlines between the portal and mail
+  and lets the rate API answer 503 (Sun from 00:19, rounds 93-100 lost; one team won round 95 alone, x10). The
+  engine asks wherever an airline may sell (portal, mail, the rate desk, a remembered portal rate) without holding
+  the quote for whom does not answer. What is left is 5U's portal page, which shows those rates to people who pass
+  its check: the agent opens it with `portal_page` in a browser shared with the team, reads and fills it by its
+  labels (the page changes), and asks a person; the page shows live in the deal's conversation, an alarm opens the
+  deal, and the person does only what is theirs (the check, their team key from their own browser, send). The tool
+  turns the result into a price by code. With nobody at the desk (operator mode off) the agent quotes with what it has.
 - **What the customer adds to the price is priced by code too.** Cargo insurance on their terms (round 91: value,
   share insured, premium rate) is a field of the shipment, and get_offers adds the premium to every total; several
   shipments in one mail are several quotes, each option carrying its own shipment, each booking its own reference
