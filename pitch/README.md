@@ -5,25 +5,31 @@ Nothing outside `pitch/` is touched on this branch.
 
 ## Open it
 
-Open `pitch/deck/index.html` in a browser. Arrow keys move between slides.
+Open `pitch/deck/index.html` in a browser. There is no build step.
+
+| Key | What |
+|---|---|
+| Arrow keys, space, enter | next and previous slide. On the swarm slide space plays the scene first |
+| `n` | speaker notes |
+| `f` | full screen |
+| `#s4` in the address | jump to slide 4 |
 
 ## Change it
 
 | File | What |
 |---|---|
-| `storyboard.html` | The source of every slide (section `#story6`). Edit slides here. |
-| `deck/build.py` | Builds `deck/index.html` from the storyboard. Slide order and speaker notes are in `ORDER`. |
-| `swarm-overkill/index.html` | The swarm slide. Table driven: change `AGENTS`, `TASKS`, `SIDE`, `HEAD`. |
-| `frames/r/` | The pictures the slides use. |
-| `tokens.css` | Colours and fonts. |
-
-Rebuild after a change:
-
-```
-uv run --with beautifulsoup4 python pitch/deck/build.py
-```
+| `deck/index.html` | Every slide, written by hand. One `<section class="st">` per slide, its speaker note in `<p class="note">`. |
+| `deck/deck.css` | The look. Colours and fonts are the Desk's own (paper #eef2e8, ink #141414, green #15884a, Inter, JetBrains Mono). |
+| `swarm-overkill/index.html` | The swarm scene of slide 3. Change the data tables (`NAMES`, `REGIONS`, `SAYS`), open it with `?t=7.6` to hold one moment. |
+| `shots/` | Real screens of the Desk and the voice app, demo build, example data. |
+| `sources/headlines.md` | The press pieces of slide 2 with date, headline and the words that may be quoted. |
+| `deck/frames/` | Pictures the slides use. |
+| `storyboard.html` | The old deck, kept as archive. |
 
 ## Rules
 
-- Product facts on a slide come from the code on `main`. No number without a source.
-- Two people editing `storyboard.html` at once will conflict. Pull before you start, commit small.
+- A product fact on a slide comes from the code on `main`. A number comes from a named source or is labelled example data.
+- The agent is called Giulia on every slide, never "she".
+- Slide 10 is the vision. What is built says "today", the rest is said as the plan.
+- Serif type appears only in the press clippings of slide 2.
+- Pull before you start and commit small.
