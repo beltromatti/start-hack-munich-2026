@@ -122,8 +122,8 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
   for a lane outside them; the agent sees who was skipped (`not_asked`) and can still ask. Unknown is always asked.
   5U moves airlines between portal and mail, so a portal airline off the portal for this lane (or a 404) is asked
   by mail too; when the rate API turns an airline away (503), it is retried for 20 s, 5U's rate desk is asked and
-  awaited like a carrier (it answers the carriers' own request, "Rate request FRA-ORD 320 kg", in about 60 s with a
-  bookable rate_id; the outage's asks, titled like its replies, got nothing), a portal rate we saw tonight on that
+  used if it replies (it answered the ordinary "Rate request FRA-ORD 320 kg" probe in about 60 s, but four
+  requests during the rounds 120–123 outage got no answer), a portal rate we saw tonight on that
   lane and break prices the airline (`portal_memory`), and `get_offers` returns the missing portal airlines at once,
   so the agent can work on the browser page while carriers answer. Notifications let the team watch; their
   presence and the alerts switch do not gate the agent. Asks that may never be answered (mails to portal airlines) are sent but not awaited (round 94
@@ -190,7 +190,8 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **What stays are the limits the model cannot keep itself,** each with its reason: the 2-minute clock (the agent
   sees `seconds_since_request`; browser work must leave time to quote before the 6-minute close; while a page is
   active, get_offers returns a snapshot instead of blocking on mail and expiring its check (mail handlers keep
-  collecting independently); known inputs and submit can run in one batch so a short-lived page check does not
+  collecting independently). When a rate service temporarily goes down, the agent can explicitly ask get_offers
+  to pause this deal for its retry interval and return updated prices. The pause leaves time for the quote; known inputs and submit can run in one batch so a short-lived page check does not
   expire between tool calls; the portal API 20 s); not spamming a
   counterpart (two mails to one carrier per deal in ten minutes: round 88 sent six and lost 20 points); a hung
   gateway costs 45 s a try before OpenAI direct.
@@ -256,7 +257,9 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   `{team_key}` through the backend; handles banners and checks; and submits known fields in one ordered batch.
   A failed or expired check comes back as the current page so the agent can refresh and adapt. No separate
   keyword solver or second decision-making agent sits in front of it. `save_rate` reads the displayed price,
-  days and reference by code, in prose or a labelled result table; checks the currency, lane, expiry and that
+  days and reference by code. When a result lists several rates, the agent can select a reference from a distinct
+  labelled record. A foreign currency or ambiguous association leaves the other priced options available. The tool
+  checks the currency, displayed airline, lane, weight, expiry and that
   the shipment has not changed; inserts the rate idempotently; and returns the freshly computed all-in options
   so the agent can quote without another wait just to refresh prices.
   Round 120 exposed headless automation defaults and a discarded profile; the installed desktop Chrome now
@@ -376,7 +379,7 @@ Then:
   the threads by hand and replay key mails in the sim).
 - **5U's portal page changes:** the browser agent can inspect text or screenshots and recover after expired checks;
   a new challenge type still needs verification in a real round. The rate desk answered within a minute in the
-  02:54 probe; whether it always answers during an outage is unproven.
+  02:54 probe and did not answer four requests during the rounds 120–123 outage.
 - Notes carried to a customer's next thread are every note of their earlier deals, routine ones included: the
   agent judges them, but they are noise next to the one wish that matters.
 - **Untrusted input has no size bound:** a mail body (5U allows 200,000 characters) and its attachments (5 of 10

@@ -41,9 +41,13 @@ Customers are 5U's agents, writing like real customers. For each request:
   no price: abandoning a refreshable check with minutes left can lose the best option. A fresh observation
   after reloading lets you solve the new check; the previous answer no longer applies.
   `save_rate` with the airline reads the result by code into the deal and returns fresh `priced_options`, including
-  pickup and extras: these option IDs and all-in totals are ready to quote, with no extra wait to refresh them. For another airline or weight, get a fresh result, not the previous airline's reference.
-  The missing airline is often the one the request needs; a correct later quote beats a fast wrong one. Watch
-  `seconds_since_request` and leave time to quote before 360 seconds; if a page cannot be used, keep working
+  pickup and extras. If a relevant airline is still missing, open a new quote form and use its current fields.
+  When the rate service is busy or returns 503, get_offers with shipment null and supplier_retry_after_seconds
+  lets its retry interval actually elapse while other bids arrive. Use the advertised delay, or a short backoff
+  when none is given. Several immediate reads are still one observation of the same outage. Check the result
+  of an uncertain submission before sending again. If successive attempts bring no new evidence, or the service cannot price in EUR,
+  choose among the verified options in time. A holding message earns no quote.
+  Watch `seconds_since_request` and leave time to quote before 360 seconds; if a page cannot be used, keep working
   with the other available channels and report the problem in a note, without waiting for a person.
 - It also tells you which option fits each preference. That is usually the one to quote. Choose another only
   when the customer's own words rule it out (an airline they do not want, a date the transit time misses), and

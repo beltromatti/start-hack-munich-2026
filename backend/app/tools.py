@@ -100,7 +100,10 @@ TOOLS = [
        "wait_seconds is how long to wait at most: it returns as soon as everyone answered.",
        {"shipment": nullable(SHIPMENT),
         "preference": {"type": "string", "enum": ["cheapest", "fastest", "unspecified"]},
-        "wait_seconds": {"type": "number"}}),
+        "wait_seconds": {"type": "number"},
+        "supplier_retry_after_seconds": {**N, "description": "Null normally. If a rate service is temporarily "
+            "unavailable, pass its advertised retry interval (or a short backoff) with shipment null. Pause this "
+            "deal, then return fresh prices. No supplier request is sent during the pause."}}),
     fn("send_mail",
        "Send a mail. By default it answers the person who wrote the mail you are handling, in this thread. "
        "kind says what it is; for a quote give option_id, so the CRM records exactly that option and total "
@@ -136,12 +139,12 @@ TOOLS = [
        "Unused action fields are null. Batch the known fields, check answer and submit together: page checks expire "
        "quickly. Read current labels, options and page errors; pages change. save_rate: read the displayed result "
        "by code and add it to this deal for airline (name/code), returning fresh priced_options with all-in totals "
-       "and option IDs ready to quote (no extra get_offers wait just to refresh them). close: finish using "
+       "and option IDs ready to quote. For multiple result rows choose a displayed rate_id. close: finish using "
        "the page. A failed action stops the batch and shows what happened; re-observe before retrying.",
        {"action": {"type": "string", "enum": ["open", "read", "look", "act", "save_rate", "close"]}, "url": S,
         "actions": {"type": ["array", "null"], "items": obj({
             "kind": {"type": "string", "enum": ["fill", "click", "press", "type", "scroll", "wait", "reload"]},
-            "i": I, "value": S, "x": N, "y": N, "ms": I})}, "airline": S}),
+            "i": I, "value": S, "x": N, "y": N, "ms": I})}, "airline": S, "rate_id": S}),
     fn("crm",
        "Search our CRM: deals and bookings by booking or rate reference, our reference (SM-...), customer name or "
        "address, company, route, airline, anything. Returns the matching deals with their shipment, quote, booking, "
@@ -200,10 +203,25 @@ def run(ctx: Ctx, name: str, args: dict) -> dict:
 
 # ---- implementations ---------------------------------------------------------------------------------------
 
-def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: float) -> dict:
+def get_offers(ctx: Ctx, shipment: dict | None, preference: str, wait_seconds: float,
+               supplier_retry_after_seconds: float | None = None) -> dict:
     _ensure_deal(ctx)
     store.update(ctx.deal_id, lambda r: ("pricing" if r["status"] == "new" and shipment is not None else r["status"],
                                          {**r["data"], "preference": preference}))
+    if shipment is None and supplier_retry_after_seconds and supplier_retry_after_seconds > 0:
+        from .forwarder import _since
+        data = store.get(ctx.deal_id)["data"]
+        # Passive backoff for a temporarily closed supplier. Other deals and carrier mail continue.
+        # Leave time for the final model turn and mail if the advertised retry falls after the close.
+        if (data.get("portal_missing") or {}).get("airlines") and data.get("request") and not data.get("quote"):
+            snapshot = ctx.fw.options(ctx.deal_id, preference)
+            if not snapshot.get("portal_page"):
+                return snapshot
+            elapsed = _since(data.get("received_at"))
+            if elapsed is None or supplier_retry_after_seconds > (360 - 20) - max(0, elapsed):
+                return {**snapshot, "retry_deferred": "The retry interval cannot fit safely before the RFQ closes. Use current offers."}
+            time.sleep(supplier_retry_after_seconds)
+            return ctx.fw.options(ctx.deal_id, preference)
     out = ctx.fw.collect_offers(ctx.deal_id, shipment, preference, wait_seconds)
     if out.get("missing"):
         store.update(ctx.deal_id, lambda r: ("waiting_customer", r["data"]))
@@ -387,7 +405,8 @@ def _browser(method: str, path: str, body: dict | None = None) -> dict:
 
 
 def browser(ctx: Ctx, action: str, url: str | None = None, actions: list | None = None,
-            airline: str | None = None, fields: list | None = None, i: int | None = None) -> dict:
+            airline: str | None = None, fields: list | None = None, i: int | None = None,
+            rate_id: str | None = None) -> dict:
     """One browser tool, one agent. The notification observes work; it never waits for a person."""
     from urllib.parse import urlparse
     from .forwarder import read_portal_page, add_portal_page_rate, _since
@@ -419,33 +438,71 @@ def browser(ctx: Ctx, action: str, url: str | None = None, actions: list | None 
         return _browser("DELETE", f"/pages/{deal}")
     else:
         return {"error": f"unknown action {action}"}
+    out["seconds_since_request"] = _since(rec["data"].get("received_at"))
     if "text" in out:
-        out["rate"] = read_portal_page(out["text"])
+        out["rate"] = read_portal_page(out["text"], rate_id if action == "save_rate" else None)
     if action == "save_rate" and not out.get("error"):
         current = store.get(deal)["data"]
         if not request:
             return {**out, "error": "price the shipment with get_offers before importing a page rate"}
-        if not airline:
-            return {"error": "name the airline whose result is on this page", **out}
-        if current.get("browser_request") != current.get("request"):
-            return {"error": "the shipment changed since this page opened: reopen and price the current goods", **out}
+        if request != current.get("request") or current.get("browser_request") != request:
+            return {**out, "error": "the shipment changed since this page opened: reopen and price the current goods"}
+        pref = current.get("preference") or "cheapest"
         rate = out.get("rate") or {}
-        if not all(rate.get(k) for k in ("total", "days", "rate_id")):
-            return {**out, "error": "no complete, unambiguous rate on the page yet; inspect the form or error"}
-        lane = f"{request['origin']}-{request['destination']}"
-        if rate.get("lane") and rate["lane"].replace(" ", "").upper() != lane:
-            return {**out, "error": "the displayed rate is for a different lane; query this shipment"}
-        if rate.get("valid_until") and (_since(rate["valid_until"]) or 0) > 0:
-            return {**out, "error": "the displayed rate has expired; obtain a fresh rate"}
-        added = add_portal_page_rate(deal, rate.get("airline") or airline, rate["total"], rate["days"],
-                                     rate["rate_id"], rate.get("weight_kg"), who="agent")
-        out.update(added)
-        if added.get("ok"):
-            out["priced_options"] = ctx.fw.options(deal, current.get("preference") or "cheapest")
+        problem = _page_rate_problem(rate, airline, request, current.get("portal_missing") or {})
+        if problem:
+            return {**out, "error": problem, "priced_options": ctx.fw.options(deal, pref)}
+        out.update(add_portal_page_rate(deal, rate.get("airline") or airline, rate["total"], rate["days"],
+                                        rate["rate_id"], rate.get("weight_kg"), who="agent", expected_request=request))
+        if out.get("ok"):
+            out["priced_options"] = ctx.fw.options(deal, pref)
+            pending = bool(out["priced_options"].get("portal_page"))
             store.update(deal, lambda r: (r["status"], {**r["data"], "browser_activity": {
-                **r["data"]["browser_activity"], "active": False, "note": "Rate saved by the agent"}}))
-    out["seconds_since_request"] = _since(rec["data"].get("received_at"))
+                **r["data"]["browser_activity"], "active": pending,
+                "note": "Rate saved; other airlines remain" if pending else "Rate saved by the agent"}}))
     return out
+
+
+def _page_rate_problem(rate: dict, airline: str | None, request: dict, missing: dict) -> str | None:
+    from decimal import Decimal, InvalidOperation
+    from .forwarder import _since, page_carrier
+
+    if rate.get("candidates"):
+        return "Several rate records are visible. Choose the matching EUR row and pass its rate_id to save_rate."
+    if rate.get("selection_missing"):
+        return "The selected reference is no longer displayed."
+    if rate.get("ambiguous"):
+        return "The references cannot be tied to separate prices. Use a single rate detail or another priced source."
+    if rate.get("currency") not in (None, "EUR"):
+        return f"The displayed currency is {rate['currency']}. Request EUR if offered, or use another priced option."
+    if not all(rate.get(k) for k in ("total", "days", "rate_id")):
+        return "No complete EUR rate in this result. Check whether the rate service returned an error or a choice."
+    if not airline:
+        return "Name the airline whose result is on this page."
+    if rate.get("multiple") and not all(rate.get(k) for k in ("airline", "lane", "weight_kg")):
+        return "The selected row does not identify its airline, lane and billed weight. Open its individual rate detail."
+    lane = f"{request['origin']}-{request['destination']}"
+    if rate.get("lane") and rate["lane"].replace(" ", "").upper() != lane:
+        return "The displayed rate is for a different lane; query this shipment."
+    observed = page_carrier(rate.get("airline") or airline, request, missing)
+    requested = page_carrier(airline, request, missing)
+    if observed is None or requested is None or observed["name"] != requested["name"]:
+        return "The displayed result belongs to a different or unknown airline. Check the selected rate or open the next quote form."
+    if rate.get("weight_kg"):
+        code = requested.get("code")
+        weight = Decimal(request["chargeable_kg"])
+        try:
+            above = (Decimal(requested["break_above"]) if requested.get("break_above")
+                     else pricing.next_break(kit.world().brackets.get(code, []), weight))
+            if Decimal(rate["weight_kg"]) not in (weight, above):
+                return "The displayed weight is neither the current shipment weight nor its next price break."
+        except InvalidOperation:
+            return "The displayed weight cannot be verified."
+    if rate.get("valid_until"):
+        age = _since(rate["valid_until"])
+        if age is None or age >= 0:
+            return "The displayed rate has expired or its expiry cannot be verified."
+    return None
 
 
 def ask_person(ctx: Ctx, kind: str, note: str, airline: str | None = None, wait_seconds: float = 60) -> dict:

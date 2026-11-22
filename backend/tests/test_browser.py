@@ -157,3 +157,89 @@ def test_portal_table_keeps_currency_days_and_weight_with_their_labels():
     assert read_portal_page(text.replace("EUR", "USD"))["total"] is None
     assert read_portal_page(text + "\nAnother rate R-different123")["rate_id"] is None
     assert read_portal_page("1171.20 EUR, 1 day, R-example1")["total"] == "1171.20"
+
+
+def test_two_airlines_on_one_result_only_import_the_selected_eur_row(monkeypatch):
+    api = FakeFiveU()
+    kit.load(api)
+    lane = ("CGN", "DEL")
+    carriers = kit.world().portal[lane]
+    first, second = carriers[:2]
+    request = {"origin": lane[0], "destination": lane[1], "chargeable_kg": "320", "weight_kg": "320",
+               "volume_cbm": "1", "pieces": 1, "pickup_zone": None, "pickup_postcode": None}
+    store.put("deal-77", "deal", "pricing", {"root": 77, "request": request, "browser_request": request,
+              "offers": [], "portal_missing": {"airlines": carriers, "weight_kg": "320"}})
+    ctx = tools.Ctx(Forwarder(api), "session-77", "deal-77", 77, "customer", None)
+    header = "rate_id\tAirline\tLane\tChargeable weight (kg)\tTotal\tCurrency\tTransit days"
+    rows = [f"R-first123\t{first['name']}\tCGN-DEL\t320\t1.171,20\tEUR\t1",
+            f"R-other123\t{second['name']}\tCGN-DEL\t320\t987.00\tUSD\t3"]
+    monkeypatch.setattr(tools, "_browser", lambda *a: {"text": "\n".join([header, *rows])})
+
+    def save(airline, ref=None):
+        return tools.browser(ctx, "save_rate", airline=airline["code"], rate_id=ref)
+
+    unresolved = save(first)
+    assert len(unresolved["rate"]["candidates"]) == 2 and not unresolved["priced_options"]["options"]
+    assert "different or unknown airline" in save(second, "R-first123")["error"]
+    assert "USD" in save(second, "R-other123")["error"]
+    assert not store.get("deal-77")["data"]["offers"]
+    result = save(first, "R-first123")
+    assert result["offer"]["total"] == "1171.20" and result["offer"]["days"] == "1"
+    assert result["priced_options"]["portal_page"]["airlines"] == [f"{second['name']} ({second['code']})"]
+    assert store.get("deal-77")["data"]["browser_activity"]["active"]
+    assert save(first, "R-first123")["already_saved"]
+    rows[:] = [rows[1].replace("USD", "EUR")]
+    assert "longer displayed" in save(first, "R-first123")["error"]
+    result = save(second, "R-other123")
+    assert {o["bookable_reference"] for o in result["priced_options"]["options"]} == {"R-first123", "R-other123"}
+    assert "portal_page" not in result["priced_options"]
+    assert not store.get("deal-77")["data"]["browser_activity"]["active"]
+    rows[0] = rows[0].replace("987.00", "700.00")
+    assert "different rate details" in save(second, "R-other123")["error"]
+    rows[0] = rows[0].replace("320", "42")
+    assert "weight" in save(second, "R-other123")["error"]
+
+
+def test_separate_cards_keep_amount_currency_and_reference_together():
+    card_a = "rate_id: R-first123\nAirline: Example\nLane: CGN-DEL\nChargeable weight (kg): 100\nTotal: 120\nCurrency: USD\nTransit days: 1"
+    card_b = card_a.replace("R-first123", "R-other123").replace("USD", "EUR").replace("120", "145")
+    assert read_portal_page(card_a + "\n\n" + card_b, "R-first123")["total"] is None
+    assert read_portal_page(card_a + "\n\n" + card_b, "R-other123")["total"] == "145"
+    assert read_portal_page(card_a + "\n" + card_b, "R-other123")["ambiguous"]
+    assert read_portal_page(card_a + "\n\n" + card_a)["ambiguous"]
+    assert read_portal_page(card_a.replace("Currency: USD", "Currency: USD\nCurrency: EUR"))["ambiguous"]
+
+
+def test_rate_service_backoff_sees_incoming_price_and_preserves_time_to_quote(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from app.forwarder import add_portal_page_rate
+
+    api = FakeFiveU()
+    kit.load(api)
+    airline = kit.world().portal["FRA", "ORD"][0]
+    req = {"origin": "FRA", "destination": "ORD", "chargeable_kg": "320", "weight_kg": "320",
+           "volume_cbm": "1", "pieces": 1, "pickup_zone": None, "pickup_postcode": None}
+    now = datetime.now(timezone.utc)
+    store.put("deal-77", "deal", "pricing", {"root": 77, "request": req, "browser_request": req,
+              "offers": [], "received_at": (now - timedelta(seconds=337)).isoformat(),
+              "portal_missing": {"airlines": [airline], "weight_kg": "320"}})
+    ctx = tools.Ctx(Forwarder(api), "session-77", "deal-77", 77, "customer", None)
+    def incoming(seconds):
+        assert seconds == 14
+        add_portal_page_rate(ctx.deal_id, airline["name"], 1696, 1, "R-arrived", 320)
+    sleep = Mock(side_effect=incoming)
+    monkeypatch.setattr(tools.time, "sleep", sleep)
+    lookup = lambda: tools.get_offers(ctx, shipment=None, preference="fastest", wait_seconds=60,
+                                     supplier_retry_after_seconds=14)
+    assert "retry_deferred" in lookup()
+    sleep.assert_not_called()
+    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "received_at": now.isoformat()}))
+    result = lookup()
+    sleep.assert_called_once_with(14)
+    assert "portal_page" not in result and result["options"][0]["total"] == "1696.00 EUR"
+
+
+def test_currency_picker_does_not_overrule_the_currency_of_the_result():
+    text = "Available currencies: EUR USD\nTotal\t246.50\nCurrency\tEUR\nTransit days\t1\nrate_id\tR-currency01"
+    assert read_portal_page(text)["total"] == "246.50"
+    assert read_portal_page("Total USD 246.50, fee 2 EUR, 1 day, R-currency01")["total"] is None

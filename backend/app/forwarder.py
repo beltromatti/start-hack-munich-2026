@@ -398,10 +398,12 @@ class Forwarder:
             result["portal_page"] = {
                 "airlines": [f"{a['name']} ({a.get('code')})" for a in missing_page],
                 "breaks_above": {a["name"]: a.get("break_above") for a in missing_page if a.get("break_above")},
-                "how": "Use browser now for the missing airline(s) that matter: open, observe the current labels "
-                       "and checks, act with batched inputs including {team_key} and submit, then save_rate with "
-                       "the airline. look gives you a screenshot when text is not enough. Work autonomously; "
-                       "notifications only let the team watch. Then get_offers with shipment null for the totals."}
+                "how": "These airlines still lack a live rate. A busy rate service or a 503 is temporary: "
+                       "use get_offers with shipment null and supplier_retry_after_seconds to let the stated delay pass. "
+                       "Check for a reply before resubmitting an uncertain request. "
+                       "If it stays unavailable, use the best supported option before the request closes. "
+                       "browser save_rate returns current all-in priced_options and any airlines still missing. "
+                       "For a new lookup, open the quote form again and use its current fields."}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]
@@ -946,17 +948,67 @@ def remembered_offer(a: dict, o: str, d: str, billed: Decimal, breaks: list | No
                                               f"fresh rate when the portal answers"})
 
 
-def read_portal_page(text: str) -> dict:
-    """Read a rate in prose or a labelled result table. Numbers remain source-backed, never model arithmetic."""
-    t = text or ""
-    references = set(re.findall(r"\bR-[A-Za-z0-9_-]{6,}", t))
+RATE_REF = re.compile(r"\bR-[A-Za-z0-9_-]{6,}")
+
+
+def read_portal_page(text: str, rate_id: str | None = None) -> dict:
+    """Select only a rate whose fields belong to the same source record."""
+    text = text or ""
+    refs = set(RATE_REF.findall(text))
+    records = _portal_result_records(text) if refs else []
+    candidates = [_read_rate(record) for record in records]
+    if len(refs) > 1 or len(candidates) > 1:
+        # Every reference must be accounted for exactly once. Never reconstruct an offer from fragments.
+        ids = [c["rate_id"] for c in candidates]
+        if set(ids) == refs and len(ids) == len(refs):
+            match = next((c for c in candidates if c["rate_id"] == rate_id), None)
+            if match:
+                return {**match, "multiple": True}
+            return {"rate_id": None, "total": None, "days": None, "candidates": candidates}
+        return {"rate_id": None, "total": None, "days": None, "ambiguous": True}
+    result = candidates[0] if candidates else _read_rate(text)
+    if rate_id and rate_id != result["rate_id"]:
+        return {"rate_id": None, "total": None, "days": None, "selection_missing": True}
+    return result
+
+
+def _portal_result_records(text: str) -> list[str]:
+    """Read one record per tabular row, or distinct labelled blocks separated by a blank line."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        headers = [h.strip().lower() for h in line.split("\t")]
+        if "rate_id" not in headers or "airline" not in headers:
+            continue
+        if len(set(headers)) != len(headers):
+            return []
+        records = []
+        for row in lines[i + 1:]:
+            cells = row.split("\t")
+            if len(cells) != len(headers):
+                break
+            if not RATE_REF.fullmatch(cells[headers.index("rate_id")].strip()):
+                break
+            records.append("\n".join(f"{h}\t{v}" for h, v in zip(headers, cells)))
+        return records
+    blocks = [block for block in re.split(r"\n[ \t]*\n", text) if RATE_REF.search(block)]
+    return blocks if len(blocks) > 1 else []
+
+
+def _read_rate(t: str) -> dict:
+    """Read a rate in prose or a labelled result table, retaining currency and ambiguity."""
+    references = set(RATE_REF.findall(t))
     money = {a for tok in re.findall(r"(\d[\d.,' \u00a0]*\d|\d)\s*(?:EUR|€)", t) for a in amounts_in(tok)}
     days = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:days?|Tage?n?|d\b)", t, re.I)
     # Tables render as label TAB value; copied cards may use label: value. Row order is irrelevant.
     rows = {}
     for label, value in re.findall(r"(?m)^[ \t]*([^\n\t:]+?)[\t:][ \t]*([^\n]+)$", t):
-        rows[re.sub(r"\s+", " ", label.strip().lower())] = value.strip()
+        key = re.sub(r"\s+", " ", label.strip().lower())
+        if key in rows and rows[key] != value.strip():
+            return {"rate_id": None, "total": None, "days": None, "ambiguous": True}
+        rows[key] = value.strip()
     currency = rows.get("currency", "").upper() or None
+    if re.search(r"(?:\bUSD|\$)[ \t]*\d|\d[ \t]*USD\b", t, re.I):
+        currency = "USD" if currency in (None, "USD") else "mixed currencies"
     if currency == "EUR":
         for label in ("total", "total (eur)", "total price", "amount"):
             if label in rows and re.fullmatch(r"\d[\d.,' \u00a0]*", rows[label]):
@@ -973,8 +1025,20 @@ def read_portal_page(text: str) -> dict:
             "valid_until": rows.get("valid until")}
 
 
+def page_carrier(label: str, request: dict, missing: dict) -> dict | None:
+    """Resolve the portal's name, code or 'Name (code)' against this deal's lane."""
+    key = label.strip().casefold()
+    lane = (request.get("origin"), request.get("destination"))
+    for entry in [*missing.get("airlines", []), *kit.world().portal.get(lane, [])]:
+        name, code = entry["name"], entry.get("code")
+        if key == name.casefold() or code and key in (code.casefold(), f"{name} ({code})".casefold()):
+            return entry
+    known = kit.world().carrier_by_name(label)
+    return {"name": known.name, "code": None} if known and known.kind == "airline" else None
+
+
 def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate_id: str | None,
-                         weight_kg: Any = None, who: str = "operator") -> dict:
+                         weight_kg: Any = None, who: str = "operator", expected_request: dict | None = None) -> dict:
     """An observed result from 5U's portal page, read by code. It joins the deal's offers like a portal price: the total as the page
     gave it, its rate_id bookable on the portal; every option total is then computed by code as usual."""
     rec = store.get(deal_id)
@@ -982,11 +1046,10 @@ def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate
         return {"error": "no such deal"}
     d = rec["data"]
     pm = d.get("portal_missing") or {}
-    said = airline.strip().lower()  # a name, a code, or both ("Borealis Freight Airways (BX)")
-    a = next((x for x in pm.get("airlines", []) if x["name"].lower() in said
-              or (x.get("code") and re.search(rf"\b{x['code'].lower()}\b", said))), None)
-    known = kit.world().carrier_by_name(re.sub(r"\s*\([A-Z0-9]{2}\)\s*$", "", airline.strip()))
-    name = a["name"] if a else (known.name if known else airline.strip())
+    carrier = page_carrier(airline, d.get("request") or {}, pm)
+    if not carrier:
+        return {"error": "unknown airline: use a carrier in this deal's missing portal airlines or our carrier list"}
+    name = carrier["name"]
     try:
         amount, transit = pricing.money(Decimal(str(total).replace(",", "."))), Decimal(str(days))
         billed = Decimal(str(weight_kg)) if weight_kg not in (None, "") else Decimal(pm.get("weight_kg") or
@@ -995,23 +1058,36 @@ def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate
         return {"error": "total, days and weight must be numbers"}
     if not all(x.is_finite() for x in (amount, transit, billed)) or amount <= 0 or transit < 0 or billed <= 0:
         return {"error": "the page must show a positive price and weight, and nonnegative transit days"}
-    if not (a or known):
-        return {"error": "unknown airline: use a carrier in this deal's missing portal airlines or our carrier list"}
     if not rate_id or not re.fullmatch(r"R-[A-Za-z0-9_-]+", rate_id.strip()):
         return {"error": "the page must show a bookable R- rate reference"}
-    existing = next((o for o in d.get("offers", []) if o.get("source") == "portal_page" and o.get("rate_id") == rate_id.strip()), None)
-    if existing:
-        return {"ok": True, "offer": existing, "already_saved": True}
-    offer = Offer("air", name, amount, transit, "portal_page", (rate_id or "").strip() or None, billed,
-                  extra={"code": (a or {}).get("code"), "weight": str(billed), "note": f"read on 5U's portal page by {who}"})
-    saved = store.update(deal_id, lambda r: None if any(o.get("source") == "portal_page" and o.get("rate_id") == rate_id.strip()
-                                                       for o in r["data"].get("offers", [])) else
-        (r["status"], {**r["data"], "offers": r["data"]["offers"] + [offer.as_dict()],
-                       "portal_missing": {**r["data"].get("portal_missing", {}), "airlines": [
-                           x for x in r["data"].get("portal_missing", {}).get("airlines", []) if x["name"] != name]}}))
-    store.log("browser" if who == "agent" else "human", "info", f"portal page rate for {name}: {amount} EUR, {transit} days, {rate_id}", run_id=deal_id)
-    actual = next(o for o in saved["data"]["offers"] if o.get("source") == "portal_page" and o.get("rate_id") == rate_id.strip())
-    return {"ok": True, "offer": actual}
+    offer = Offer("air", name, amount, transit, "portal_page", rate_id.strip(), billed,
+                  extra={"code": carrier.get("code"), "weight": str(billed), "note": f"read on 5U's portal page by {who}"})
+    result = {}
+
+    def insert(record):
+        data = record["data"]
+        if expected_request is not None and data.get("request") != expected_request:
+            result["error"] = "the shipment changed before saving the page rate"
+            return None
+        existing = next((o for o in data.get("offers", []) if o.get("source") == "portal_page"
+                         and o.get("rate_id") == offer.rate_id), None)
+        if existing:
+            if (existing["carrier"] != name or Decimal(existing["total"]) != amount
+                    or Decimal(existing["days"]) != transit or Decimal(existing["billed_kg"]) != billed):
+                result["error"] = "this reference is already recorded with different rate details"
+            else:
+                result.update(ok=True, offer=existing, already_saved=True)
+            return None
+        result.update(ok=True, offer=offer.as_dict())
+        missing = data.get("portal_missing") or {}
+        return record["status"], {**data, "offers": data["offers"] + [result["offer"]],
+                                  "portal_missing": {**missing, "airlines": [
+                                      x for x in missing.get("airlines", []) if x["name"] != name]}}
+
+    store.update(deal_id, insert)
+    if result.get("ok") and not result.get("already_saved"):
+        store.log("browser" if who == "agent" else "human", "info", f"portal page rate for {name}: {amount} EUR, {transit} days, {rate_id}", run_id=deal_id)
+    return result
 
 
 def waiting_for(d: dict) -> list[str]:
