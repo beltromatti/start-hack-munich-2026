@@ -1365,3 +1365,13 @@ def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
     assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
     store.kv_set("operator_on", "0")
     assert "operator mode off" in tools.portal_page(ctx, "ask_person", airline=missing[0])["error"]
+
+
+def test_an_address_imitating_a_customer_is_named_to_the_agent():
+    """Rounds 105-106: 'nordlicht.audio@' and 'weidner.spielwaren@' asked for the offers of 'nordlicht-audio@' and
+    'weidner-spielwaren@' to be sent to them. The agent is told the address is not on file and whom it imitates."""
+    from app.agent import lookalike
+    store.put("deal-901", "deal", "quoted", {"root": 901, "customer": "weidner-spielwaren@hackloop.mail"})
+    assert lookalike("weidner.spielwaren@hackloop.mail") == "weidner-spielwaren@hackloop.mail"
+    assert lookalike("weidner-spielwaren@hackloop.mail") is None
+    assert lookalike("someone-else@hackloop.mail") is None
