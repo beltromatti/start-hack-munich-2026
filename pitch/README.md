@@ -32,10 +32,11 @@ To show it as a claude.ai artifact, run `python3 bundle.py <out dir>`. It writes
 
 - A product fact on a slide comes from the code on `main`. A number comes from a named source or is labelled example data.
 - The agent is called Giulia on every slide, never "she".
-- Ten slides are spoken, in the order of their `data-o` number, wherever they stand in the file: question, press, swarm, team photo, product, architecture, Auer, memory, vision, close. A `<section class="st bk">` is backup and plays after the close.
-- The position is AI first: Giulia acts, a person oversees. Slide 6 is the architecture and carries it in one picture: one agent, eleven tools, the code zones, the Desk's three states (green, amber, red, from `Desk.tsx` and `Ground.tsx` on `main`) and the result of the scored night. The earlier slides "AI first: Giulia acts" and "Giulia decides. Code guarantees." are backup.
+- Ten slides are spoken, in the order of their `data-o` number, wherever they stand in the file: question, press, swarm, team photo, three principles, product, what we do differently, Auer, vision, close. Each slide has one centred headline and as few words as possible. A `<section class="st bk">` is backup and plays after the close.
+- The position is AI first: Giulia acts, a person oversees. Slide 5 states the approach as three principles on a white ground: one agent per deal, prices come from code, your word wins. Slide 7 states the difference: others ask for approval, Giulia acts. The Desk's three states (green, amber, red, from `Desk.tsx` and `Ground.tsx` on `main`) are named there and on the product slide. The result of the scored night is said at the close. The four-step architecture and the earlier slides "AI first: Giulia acts" and "Giulia decides. Code guarantees." are backup.
 - The Auer slide and the Lindqvist backup slide quote real mails from the scored run word for word (ids 38215, 38231, 38270 and 39221, 39471). Times are CET.
 - The three numbers on the close are from the 5U board, Sunday 10:53. Refresh them and the time from the final board.
-- Slide 10 is the vision. What is built says "today", the rest is said as the plan.
+- Slide 9 is the vision, one loop with four labels. What is built is said as "today", the rest as the plan.
+- The swarm scene of slide 3 plays once (`?once`), holds its last frame, and a key or click then moves the deck on.
 - Serif type appears only in the press clippings of slide 2.
 - Pull before you start and commit small.
