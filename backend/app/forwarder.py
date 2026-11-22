@@ -937,7 +937,7 @@ def remembered_offer(a: dict, o: str, d: str, billed: Decimal, breaks: list | No
 # (93-100) booked the turned-away airline 83-358 s after the request, people on the page. A right quote late beats
 # a fast wrong one (accuracy 45, and x3 to x10 when few teams get it; time 15, zero at 6 minutes); what is left
 # after it is for the agent to write the quote before the request closes at 360 s (round 94, 499 s: out of time).
-OPERATOR_WAIT = 290
+OPERATOR_WAIT = 240  # round 122: 290 left the quote at 355 s, 5 s before the close
 
 
 def read_portal_page(text: str) -> dict:
