@@ -254,3 +254,13 @@ to whole days by 5U.
   premium rate 0.40 %" (96.80 EUR). We had no way to price it: quoted 927.95 without it, saying so. Since 00:08
   the shipment carries `insurance` and get_offers adds the premium to every total by code (checked with the real
   model on the fake 5U: "858.52 EUR all-in, including cargo insurance").
+
+**The rate API goes down (Sun 00:19 onwards, rounds 93-95):** `GET /v1/portal/rates` and `/brackets` answer 503 "The
+rate API is unavailable." (no Retry-After) for every airline; `/ports` still lists 114 lanes, 15 airlines. The
+portal airlines answer no mail meanwhile. 5U told the team things are changing at API level (which carriers take
+mail and which the portal, maybe dynamically); the openapi now says the rate limit per minute can change (read
+`X-RateLimit-Limit`, 429 with `Retry-After`) and "Unavailable: 503 with a message". Round 93: 0 of 13 teams accepted.
+Round 94: we waited for those airlines and quoted at 499 s, after the round closed; round 95 at 162 s, declined.
+Since 00:35: fallback mails to portal airlines are not awaited, the portal is retried for 45 s at most, weight
+breaks survive restarts (saved, or the counted ones), and an airline whose rate we saw tonight on that lane and
+break (281 remembered) is priced from it while the rate API is down, marked `portal_memory`.
