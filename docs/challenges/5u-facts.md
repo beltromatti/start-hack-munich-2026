@@ -278,3 +278,8 @@ you. Another forwarder has quoted us 7 percent less... Would you be able to matc
 said we could not match; the customer then said "go ahead, book now". 5U: accuracy 45, `booked: false`, tracking 0,
 adjustment +10 (by hand). A yes with a question that could change the deal is not a yes yet: answer, then book on
 the go-ahead (prompt line since 02:10).
+
+**Two shipments, one booked, round 113 (Sun 02:21):** RUH and DXB quoted in one reply; "book the first now, we will
+confirm the second later". Booked RUH only (right). Its tracking question (02:33) got an answer that said our record
+showed DXB and 1239 kg: the CRM summary gave the deal's last pricing, not the booked shipment. Fixed 02:35 (the
+summary shows the booking's own shipment); a correction went to the tracking desk at 02:35.
