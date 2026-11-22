@@ -864,6 +864,28 @@ def test_an_option_id_names_one_option_for_the_life_of_the_deal():
     assert all(o["option"].startswith("B") for o in again["options"])
 
 
+def test_an_option_billed_at_a_higher_break_says_why():
+    """Round 197: 904 kg billed at the 1000 kg break was told as 'the chargeable weight is 1,000 kg, above the gross
+    weight you provided'. The option says by code that the break is cheaper than the chargeable weight."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("ana@ana.example", "Quote", "290 kg FRA to ORD, cheapest")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(290, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}]}
+    opts = tools.get_offers(ctx, ship, "cheapest", 5)["options"]
+    above = [o for o in opts if o["billed_kg"] and o["billed_kg"] > 290]
+    assert above and all(o["billed_kg_why"] == f"the {o['billed_kg']:g} kg weight break: its lower rate costs less "
+                                               f"than billing the 290 kg chargeable weight" for o in above)
+    assert all("billed_kg_why" not in o for o in opts if not o["billed_kg"] or o["billed_kg"] <= 290)
+
+
 def test_two_shipments_of_one_deal_are_two_bookings():
     """Round 89: GRU and TLV priced in one thread, GRU booked "now", TLV "later". The booking took the route and
     weight of the last pricing (TLV) and a second booking would have overwritten the first record."""
