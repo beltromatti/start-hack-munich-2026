@@ -1,12 +1,11 @@
-import type { DealRow } from "../api";
-import type { Matrix } from "./analysis";
+import type { DealRow, Chart } from "../api";
 import { CITY, LANES, ORIGINS } from "./network";
 import { Cust, amount, city, customers, ends, groupOf, kg, lane, median, money, name, since, why } from "./util";
 
 // The ask bar. It answers from the desk's own record, in code: no model call, no cost, the same answer every time.
 // Three things it can do for you go through the API the desk already has, each after one click on the button.
 export type Act = { label: string; kind: "tell"; deal: string; text: string };
-export type Answer = { via?: "assistant" | "record"; text: string; rows?: DealRow[]; facts?: [string, string][]; customer?: string; act?: Act; page?: "ship" | "cust" | "net"; matrix?: Matrix };
+export type Answer = { via?: "assistant" | "record"; text: string; rows?: DealRow[]; facts?: [string, string][]; customer?: string; act?: Act; page?: "ship" | "cust" | "net"; charts?: Chart[] };
 export const TRY = ["What should I look at?", "Give me the overview", "Which airline do we book most?", "Which quotes are still open?", "Cheapest way to Hong Kong"];
 
 const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? one : many);
@@ -90,9 +89,9 @@ export async function askModel(question: string, deals: DealRow[], desk: unknown
   const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, desk, earlier }) });
   if (r.status === 429) return { via: "assistant", text: "Too many questions for a minute. Try again shortly." };
   if (!r.ok) throw new Error(String(r.status));
-  const j = await r.json() as { text: string; facts: [string, string][]; rows: string[]; customer: string | null; page: Answer["page"] | null; act: { kind: "tell"; deal: string; text: string } | null };
+  const j = await r.json() as { text: string; facts: [string, string][]; rows: string[]; customer: string | null; page: Answer["page"] | null; act: { kind: "tell"; deal: string; text: string } | null; charts?: Chart[] };
   const list = customers(deals), c = j.customer ? list.find((x) => x.email === j.customer || x.name === j.customer) : undefined;
   const label = j.act ? "Tell Giulia: " + j.act.text : "";
   return { via: "assistant", text: j.text, facts: j.facts?.length ? j.facts : undefined, rows: j.rows.map((id) => deals.find((d) => d.id === id)).filter((d): d is DealRow => !!d),
-    customer: c?.email, page: j.page ?? undefined, act: j.act ? { label, ...j.act } : undefined };
+    customer: c?.email, page: j.page ?? undefined, act: j.act ? { label, ...j.act } : undefined, charts: j.charts?.length ? j.charts : undefined };
 }

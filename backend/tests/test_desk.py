@@ -10,7 +10,7 @@ from app import desk, llm, store
 def reply(**over):
     out = {"answer": "Acme has one shipment.", "facts": [{"label": "Shipments", "value": "1"}], "shipment_ids": ["deal-1"],
            "customer": "ops@acme.example", "page": "cust", "action": {"kind": "none", "shipment_id": None, "text": None},
-           "refused": False}
+           "charts": [], "refused": False}
     return [{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": json.dumps({**out, **over})}]}]
 
 
@@ -87,3 +87,27 @@ def test_a_model_going_round_in_circles_is_stopped(monkeypatch):
     monkeypatch.setattr(llm, "_fake_desk", lambda items, tools: call("customers"))
     with pytest.raises(RuntimeError):
         desk.answer("Who are our customers?")
+
+
+def test_a_chart_shows_only_what_code_computed(monkeypatch):
+    """The assistant picks what to plot; the page gets the figures the chart tool computed, never the model's."""
+    scripted(monkeypatch, call("chart", measure="quoted_eur", group_by="customer", kind="bar", status=None, text=None,
+                               title="Quoted by customer", limit=None), reply(charts=["c1", "c9"]))
+    out = desk.answer("Show me what we quoted per customer")
+    assert len(out["charts"]) == 1, "an id the tool never made is dropped"
+    c = out["charts"][0]
+    assert c["kind"] == "bar" and c["points"][0] == {"label": "Ops", "value": 5655.55, "n": 1}
+    assert c["spec"]["measure"] == "quoted_eur"
+
+
+def test_economics_margin_is_what_is_left_after_carriers_and_what_is_passed_on():
+    from app import economics
+    store.put("deal-3", "deal", "booked", {
+        "root": 3, "customer": "x@y.example", "options": {
+            "A1": {"total": "1207.41", "air": {"total": "1075.41"}, "pickup": None, "insurance": "132.00"},
+            "A2": {"total": "1300.00", "air": {"total": "1300.00"}, "pickup": None}},
+        "booking": {"option": "A1", "amount": "1207.41 EUR", "airline": "X", "status": "confirmed"}})
+    e = economics.economics()
+    assert e["bookings"] == 1 and e["revenue_eur"] == "1207.41" and e["passed_on_eur"] == "132.00"
+    assert e["carrier_cost_eur"] == "1075.41" and e["margin_eur"] == "0.00"
+    assert e["room_eur"] == "92.59", "up to the next option on the same shipment"

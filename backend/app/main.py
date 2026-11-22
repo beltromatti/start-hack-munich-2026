@@ -4,6 +4,7 @@ Run: uv run uvicorn app.main:app --port 8000   (make api / make live)
 """
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -95,6 +96,52 @@ def me(request: Request) -> dict:
     if not accounts.any_() or _here(request):
         return {"account": None, "open": True}
     raise HTTPException(401, "sign in")
+
+
+@app.get("/api/economics")
+def economics_now() -> dict:
+    """Revenue, carrier cost, margin, the room to the next option, AI cost: computed by code (economics.py)."""
+    from . import economics
+    return economics.economics()
+
+
+def _owner(request: Request) -> str:
+    a = getattr(request.state, "account", None) or accounts.who(request.cookies.get(accounts.COOKIE))
+    return a["username"] if a else "desk"
+
+
+@app.get("/api/pins")
+def pins(request: Request) -> list[dict]:
+    """The charts a person keeps on their Efficiency page: each one asked again on fresh data."""
+    from . import charts
+    out = []
+    for r in store.records("pin", "active"):
+        if r["data"]["owner"] == _owner(request):
+            sp = r["data"]["spec"]
+            c = charts.chart(sp.get("measure") or "shipments", sp.get("group_by"), sp.get("kind") or "bar",
+                             sp.get("status"), sp.get("text"), sp.get("title"), sp.get("limit"))
+            out.append({"id": r["id"], **c})
+    return sorted(out, key=lambda x: x["id"])
+
+
+@app.post("/api/pins")
+def pin(payload: dict, request: Request) -> dict:
+    from . import charts
+    sp = {k: (payload.get("spec") or {}).get(k) for k in ("measure", "group_by", "kind", "status", "text", "title", "limit")}
+    if charts.chart(sp.get("measure") or "shipments", sp.get("group_by"), sp.get("kind") or "bar").get("error"):
+        raise HTTPException(400, "not a chart the desk can make")
+    pid = f"pin-{_owner(request)}-{int(time.time() * 1000)}"
+    store.put(pid, "pin", "active", {"owner": _owner(request), "spec": sp})
+    return {"id": pid}
+
+
+@app.post("/api/pins/{pin_id}/remove")
+def unpin(pin_id: str, request: Request) -> dict:
+    r = store.get(pin_id)
+    if not r or r["type"] != "pin" or r["data"]["owner"] != _owner(request):
+        raise HTTPException(404)
+    store.update(pin_id, lambda x: ("removed", x["data"]))
+    return {"ok": True}
 
 
 @app.get("/api/accounts")

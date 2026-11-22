@@ -106,6 +106,11 @@ resumes it with everything before it.
   shipment and customer it names exists, and its one action, a message to a shipment's session, happens on a
   person's click. It replaced one call over the page's data with a token cap: the page could only send what it had
   thought of, and a total the model adds up is a price no tool computed. Our own OpenAI key, never the gateway.
+- **Charts and money follow the same split.** A person asks to see something; the assistant chooses the measure and
+  the grouping (`chart`), code computes every figure (`charts.py`), and a chart can be kept on Efficiency, where it is
+  asked again on fresh data. It replaced a keyword regex that drew one fixed matrix. The money is `economics.py`:
+  per booking, what the customer pays, what the carriers charge, what is passed on, and the margin left, which is
+  zero today because Giulia quotes carrier prices as they are; the room to the next option is the margin we could take.
 - **The public address is a Cloudflare Tunnel** (`deploy/tunnel.sh`): the Mac dials out, no port opens, and
   production stays where 5U's API is reachable (decision 17).
 
