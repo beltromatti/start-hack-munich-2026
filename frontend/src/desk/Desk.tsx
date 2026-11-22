@@ -633,9 +633,22 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
   );
 }
 
-export function Desk({ deals, online, worker, board, selected, select, deal, reload }: {
+// Shown inside another page (?embed), the desk takes the state that page asks for, so its colour and its list match
+// what the page around it is explaining. Only the examples do this; a real register never does.
+const EMBED = new URLSearchParams(location.search).get("embed");
+type Forced = "calm" | "watch" | "alert";
+const forcedDeals = (deals: DealRow[], f: Forced | null) => f === "calm" ? deals.map((d) => ({ ...d, flag: null })) : f === "watch" ? deals.filter((d) => d.flag !== "red") : deals;
+
+export function Desk({ deals: given, online, worker, board, selected, select, deal, reload }: {
   deals: DealRow[]; online: boolean; worker: boolean; board: Board | null; selected: string | null; select: (id: string | null) => void; deal: Deal | null; reload: () => void;
 }) {
+  const [forced, setForced] = useState<Forced | null>(DEMO && EMBED !== null ? (["watch", "alert"].includes(EMBED) ? EMBED as Forced : "calm") : null);
+  useEffect(() => {
+    if (!DEMO || EMBED === null) return;
+    const hear = (e: MessageEvent) => { const s = e.origin === location.origin ? (e.data as { deskState?: string } | null)?.deskState : null; if (s === "calm" || s === "watch" || s === "alert") setForced(s); };
+    window.addEventListener("message", hear); return () => window.removeEventListener("message", hear);
+  }, []);
+  const deals = useMemo(() => forcedDeals(given, forced), [given, forced]);
   const initial = (location.hash.slice(1) || "home") as Page;
   const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff", "jobs"].includes(initial) ? initial : "home");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -679,7 +692,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
   useSoftScroll();
   const [open, setOpen] = useState(false);
   const [cust, setCust] = useState<string | null>(null);
-  const [seenIds, setSeenIds] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem("desk_seen") ?? "[]") as string[]); } catch { return new Set(); } });
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => { if (EMBED !== null) return new Set(); try { return new Set(JSON.parse(localStorage.getItem("desk_seen") ?? "[]") as string[]); } catch { return new Set(); } });
   const markSeen = (id: string) => setSeenIds((s) => { const n = new Set(s).add(id); try { localStorage.setItem("desk_seen", JSON.stringify([...n])); } catch { /* this browser keeps nothing */ } return n; });
   const [toast, setToast] = useState("");
   const go = (p: Page) => { setPage(p); setOpen(false); if (p !== "cust") setCust(null); try { history.replaceState(null, "", "#" + p); } catch { /* none */ } };
