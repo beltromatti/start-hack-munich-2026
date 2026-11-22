@@ -53,6 +53,10 @@ def kind(filename: str, raw: bytes) -> str:
                 return what
         return ".odf" if "content.xml" in names and "mimetype" in names else ".zip"
     if h.startswith(b"\xd0\xcf\x11\xe0"):  # the old Office container: a workbook, or a Word file or an Outlook mail
+        # a Word file or an Outlook mail names its own streams; their text is often two bytes a character, and a
+        # "Booking" in it spells the workbook stream "Book": the stream names decide first
+        if any(s.encode("utf-16-le") in raw for s in ("WordDocument", "__substg")):
+            return ".ole"
         return ".xls" if b"W\x00o\x00r\x00k\x00b\x00o\x00o\x00k" in raw or b"B\x00o\x00o\x00k\x00" in raw else ".ole"
     return ext
 

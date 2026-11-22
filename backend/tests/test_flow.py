@@ -1136,6 +1136,9 @@ def test_a_file_is_read_for_what_it_is_not_for_its_name():
     data = Path(__file__).parent / "data"
     xls, doc = (data / "packing-list.xls").read_bytes(), (data / "request.doc").read_bytes()
     assert docs.kind("list.dat", xls) == ".xls" and "Total gross weight kg\t356" in docs.text("list", xls)
+    booking = "Booking confirmation, 320 kg".encode("utf-16-le")  # a Word file or an Outlook mail that says "Booking"
+    assert docs.kind("a", doc + booking) == ".ole"
+    assert docs.kind("b", doc[:512] + "__substg1.0_1000001F".encode("utf-16-le") + booking) == ".ole"
     word = docs.text("request.doc", doc)
     assert "total gross weight 486 kg, from Stuttgart to São Paulo (GRU)" in word and "Jürgen Weiß" in word
     assert "binary attachment" not in docs.text("anfrage", doc)                      # the same file without an ending
