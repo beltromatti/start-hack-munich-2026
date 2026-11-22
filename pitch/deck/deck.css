@@ -259,3 +259,48 @@ body.notes .note{opacity:1}
 @media (prefers-reduced-motion:reduce){.g::before,.g::after,.vis .lp circle.a{animation:none}.flow svg.ln path{animation:none;stroke-dashoffset:0}}
 
 .hero .tt i{color:inherit;font-weight:400}
+
+/* Simple version, 22.11. 12:00: one centred headline per slide, little text, content centred on the screen */
+.c .tt{left:0;right:0;width:auto;text-align:center}
+.press .clip{width:25cqw}
+.pain span{font-size:2cqw}
+.pain li{text-align:center;padding:1.2cqw 1.4cqw 1.4cqw}
+.story.c .tt{top:8.4cqw;font-size:3.7cqw}
+.story.c .mc{min-height:13cqw}
+.story.c .mc p{font-size:1.65cqw;line-height:1.4}
+.prod.c .tt{top:7.4cqw;font-size:3.2cqw}
+.prod.c .laptop{left:8cqw;top:15.6cqw;width:44cqw}
+.prod.c .phone{left:43cqw;top:24cqw;width:11.6cqw}
+.prod.c .feats{left:65cqw;top:19.4cqw;width:30cqw;gap:2cqw}
+.prod.c .feats li{grid-template-columns:4.4cqw 1fr;align-items:center}
+.prod.c .feats i{width:4.4cqw;height:4.4cqw}
+.prod.c .feats b{font-size:2cqw}
+.mem.c .tt{top:6.6cqw}
+.mem.c .win{left:21cqw;right:auto;top:13.4cqw;width:58cqw}
+.vis.c .tt{top:7.6cqw}
+.vis.c svg.lp{left:29cqw;top:12cqw}
+.vis.c .core{left:50cqw;top:33cqw}
+.vis.c .ln4{width:19cqw}
+.vis.c .ln4 b{font-size:1.65cqw}
+.hero.c .tt{top:9cqw}
+.hero.c .sm{left:0;right:0;top:47cqw;text-align:center}
+.prin{background:#fff}
+.prin .tt{top:9cqw;font-size:4.2cqw}
+.pb{left:7cqw;right:7cqw;top:21cqw;margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:2.4cqw}
+.pb li{padding:2.4cqw 2.4cqw 2.8cqw;border-radius:1.4cqw;background:#fff;box-shadow:0 1.2cqw 3.4cqw rgba(30,40,30,.12),inset 0 0 0 1px var(--line);text-align:center}
+.pb em{display:block;font:600 4.6cqw/1 var(--sans);font-style:normal;letter-spacing:-.04em;color:var(--green)}
+.pb em svg{font-size:3.6cqw}
+.pb b{display:block;margin-top:1.3cqw;font:600 2.3cqw/1.15 var(--sans);letter-spacing:-.025em;text-wrap:balance}
+.pb span{display:block;margin-top:.8cqw;font:400 1.55cqw/1.35 var(--sans);color:var(--ink2);text-wrap:balance}
+.map .nd{top:calc(var(--y)*1cqw - 4cqw);width:18cqw}
+.map .nd i{width:8cqw;height:8cqw;border-radius:1.8cqw}
+.map .nd.av i{border-radius:50%}
+.map .nd i svg{font-size:3.4cqw}
+.map .nd b{margin-top:1cqw;font-size:2cqw}
+.map .tt{left:0;right:0;text-align:center;font-size:3.8cqw;top:9cqw}
+.pb{top:24cqw}
+.prin .tt{top:11cqw}
+.story.c .tt{top:10cqw}
+.story.c .mc{margin-top:3cqw;min-height:14cqw}
+.prod.c .feats{left:62cqw;width:34cqw}
+.prod.c .feats b{white-space:nowrap}
