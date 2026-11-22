@@ -1,0 +1,761 @@
+<title>Giulia Pitch Storyboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@600&family=Outfit:wght@400;500;600&family=Fraunces:opsz,wght@9..144,300&family=Inter:wght@400;500;600&family=Mrs+Saint+Delafield&display=swap"><!-- slop-ok: font URL syntax -->
+<style>
+/* Layout: a director's board. Left the frame, right the brief. One strip of the whole film on top, the build below. */
+:root{
+  --ground:#f4f3ef; --card:#ffffff; --ink:#17181a; --ink-2:#3a3d42; --muted:#6f737a; --line:#d9d6ce;
+  --night:#0b0d12; --green:#1f7a4d; --green-soft:#e4f3ea; --pen:#27358a; --pen-light:#5a67a8; --paper:#f8f4ed;
+  --f-head:'Inter',system-ui,sans-serif; --f-turn:'Fraunces',Georgia,serif; --f-body:'Inter',system-ui,sans-serif;
+  --f-hand:'Mrs Saint Delafield',cursive;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font:15px/1.55 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1240px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-head);text-wrap:balance;margin:0}
+a{color:var(--pen)}
+button{font:500 14px var(--f-body);cursor:pointer;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--ground);padding:9px 18px}
+button.ghost{background:transparent;color:var(--ink)}
+button:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
+
+/* head */
+.top{padding-block:40px 24px;display:grid;gap:14px}
+.brand{display:flex;align-items:center;gap:8px;font:600 16px var(--f-head);letter-spacing:-.01em;color:var(--ink)}
+.eyebrow{font:400 13px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.claim{font:300 clamp(38px,6.4vw,96px)/1.02 var(--f-turn);letter-spacing:-.01em;max-width:22ch}
+.facts{display:flex;flex-wrap:wrap;gap:8px 22px;color:var(--ink-2);font-size:14px}
+.facts b{font-family:var(--f-head);font-weight:600;color:var(--ink)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+
+/* colour script */
+.script{margin-top:18px}
+.strip{display:flex;height:74px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.strip a{position:relative;display:block;min-width:0;text-decoration:none;border-right:1px solid rgba(255,255,255,.35)}
+.strip a span{position:absolute;left:5px;bottom:4px;font:600 13px var(--f-head);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.strip a.light span{color:var(--ink);text-shadow:none}
+.strip a.turn{box-shadow:inset 3px 0 0 var(--green)}
+.acts{display:flex;flex-wrap:wrap;gap:0 14px;font:400 13px var(--f-body);color:var(--muted);margin-top:6px}
+.acts div{border-top:2px solid var(--line);padding-top:4px;min-width:0;overflow-wrap:anywhere}
+
+/* section titles */
+.sec{margin-top:48px;display:grid;gap:6px}
+.sec h2{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.sec p{margin:0;color:var(--ink-2);max-width:72ch}
+
+/* panels */
+.panel{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;padding-block:30px;border-top:1px solid var(--line)}
+.panel:first-of-type{border-top:0}
+.left{display:grid;gap:12px;align-content:start;position:sticky;top:12px}
+.frame{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:4px;overflow:hidden;background:var(--paper);border:1px solid var(--line)}
+.frame>img,.frame>svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 30%}
+.frame>img.contain{object-fit:contain;background:#efe9df}
+.frame .inset{position:absolute;right:8px;bottom:8px;width:34%;aspect-ratio:16/9;border:2px solid #fff;border-radius:3px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.frame .inset img{width:100%;height:100%;object-fit:cover}
+.rounds{display:grid;gap:14px;margin-top:4px}
+.round{display:grid;gap:6px}
+.rh{margin:0;font:400 13px var(--f-body);color:var(--ink-2)}
+.rh b{font:600 13px var(--f-head);color:var(--pen);margin-right:6px}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+.th{position:relative;padding:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--paper);cursor:pointer;aspect-ratio:16/9}
+.th img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s var(--ease)}
+.th:hover img{transform:scale(1.05)}
+.th.k-jan,.th.on{outline:2px solid var(--green,#2f7d4f);outline-offset:1px}
+.th.k-ours{outline:1px dashed var(--pen);outline-offset:1px}
+.th.k-no img{filter:grayscale(1) brightness(.6)}
+.frame .tag{position:absolute;left:8px;top:8px;font:600 13px var(--f-body);background:rgba(255,255,255,.9);color:var(--ink);padding:3px 8px;border-radius:999px}
+.frame .ov{position:absolute;left:6%;top:7%;right:40%;font:600 clamp(14px,2.2vw,26px)/1.05 var(--f-head);letter-spacing:-.03em;color:var(--ink)}
+.frame .ov.dark{color:#fff}.frame .ov.turn{font:300 clamp(15px,2.4vw,28px)/1.05 var(--f-turn)}
+.frame .ov.center{left:10%;right:10%;text-align:center;top:22%}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:400 13px var(--f-body);border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 10px;color:var(--ink-2)}
+.chip.st-built{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+.chip.st-picked{border-color:var(--pen-light);color:var(--pen)}
+.chip.st-open{border-style:dashed;color:var(--muted)}
+.timeline{display:grid;gap:0;border:1px solid var(--line);border-radius:4px;background:var(--card);font-size:13px}
+.timeline div{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:7px 10px;border-top:1px solid var(--line)}
+.timeline div:first-child{border-top:0}
+.timeline code{font:400 13px ui-monospace,Menlo,monospace;color:var(--pen)}
+
+.right{display:grid;gap:16px;min-width:0}
+.ph{display:grid;gap:6px}
+.num{font:400 13px var(--f-head);color:var(--muted);letter-spacing:.02em}
+.ph h3{font-size:clamp(26px,3vw,36px);font-weight:600;letter-spacing:-.03em;line-height:1.05}
+.ph h3.turn{font:300 clamp(28px,3.3vw,40px)/1.05 var(--f-turn)}
+.feel{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:12px 14px}
+.feel b{font:600 18px var(--f-head);color:var(--green)}
+.feel span{color:var(--ink-2)}
+.said{margin:0;padding:12px 14px;border:1px solid #d6d9ea;border-radius:4px;background:#f1f2f8;font-size:14.5px;color:var(--ink)}
+.said em{font-style:normal;font:400 13px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--pen);display:block;margin-bottom:3px}
+dl{margin:0;display:grid;grid-template-columns:118px minmax(0,1fr);border-top:1px solid var(--line)}
+dt,dd{margin:0;padding:9px 0;border-bottom:1px solid var(--line)}
+dt{font:400 13px var(--f-body);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding-top:11px}
+dd{color:var(--ink-2);min-width:0}
+dd b{color:var(--ink);font-weight:600}
+dd code{font:13px ui-monospace,Menlo,monospace;color:var(--pen);background:var(--paper);padding:1px 4px;border-radius:3px;overflow-wrap:anywhere}
+.verdict{display:grid;gap:6px}
+.verdict label{font:400 13px var(--f-body);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+textarea{width:100%;min-height:58px;font:14px/1.45 var(--f-body);border:1px solid var(--line);border-radius:4px;padding:9px 11px;background:var(--card);color:var(--ink);resize:vertical}
+
+/* build */
+.build{display:grid;gap:22px;margin-top:18px}
+.tp{display:grid;gap:22px;margin-top:18px}
+.tp-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.tp figure{margin:0;display:grid;gap:6px;min-width:0}
+.tp figcaption{font:400 13px var(--f-body);color:var(--muted)}
+.tp figcaption b{color:var(--ink)}
+.ts{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:6px;overflow:hidden;container-type:inline-size;background:#efe9d2 center/cover no-repeat;border:1px solid var(--line)}
+.tt{position:absolute;left:6.5cqw;top:7cqw;font:400 11cqw/.95 'Instrument Serif',Georgia,serif;letter-spacing:-.015em;color:#1f2a30}
+.tt i{color:inherit}
+.tt-hero{font-size:8.4cqw;color:#2b3442}.tt-hero i{color:inherit}
+.tt-day{font-size:8.4cqw;color:#3b3226}.tt-day i{color:inherit}
+.ts small{position:absolute;left:6.5cqw;bottom:5.5cqw;font:500 3cqw Inter,sans-serif;color:#5f5a4e}
+.tf-fr .tt{font-family:'Fraunces',Georgia,serif;font-weight:300;letter-spacing:-.025em}
+.tf-it .tt{font-family:'Inter Tight',sans-serif;font-weight:600;letter-spacing:-.045em}
+.bl{position:absolute;border-radius:50%;filter:blur(7cqw);pointer-events:none;z-index:0}
+.bl1{width:70cqw;height:60cqw;left:-18cqw;top:8cqw;background:radial-gradient(closest-side,#ead37c,#f0dd96 55%,transparent);opacity:.85;animation:bd1 18s ease-in-out infinite alternate}
+.bl2{width:55cqw;height:45cqw;left:22cqw;top:-6cqw;background:radial-gradient(closest-side,#f1d98a,transparent);animation:bd2 22s ease-in-out infinite alternate}
+.bl3{width:45cqw;height:40cqw;right:-12cqw;bottom:-14cqw;background:radial-gradient(closest-side,#c9e9ea,transparent);opacity:.9;animation:bd1 25s ease-in-out infinite alternate-reverse}
+.bl4{width:28cqw;height:24cqw;left:-8cqw;bottom:-6cqw;background:radial-gradient(closest-side,#e9b7a2,transparent);opacity:.6;animation:bd2 20s ease-in-out infinite alternate}
+@keyframes bd1{to{transform:translate(6cqw,-3cqw) scale(1.08)}}
+@keyframes bd2{to{transform:translate(-5cqw,4cqw) scale(.94)}}
+@media (max-width:760px){.tp-row{grid-template-columns:1fr}}
+.sl{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;margin-top:18px}
+.sl>div{display:grid;gap:6px;min-width:0}
+.sl h4{margin:0;font:600 13px var(--f-body);color:var(--ink)}.sl h4 span{font-weight:400;color:var(--muted)}
+.lg{position:absolute;left:4cqw;top:3.4cqw;display:flex;align-items:center;gap:.9cqw;font:700 max(13px,1.7cqw) Inter,sans-serif;letter-spacing:-.01em;color:#1f2a30;z-index:5}
+.lg svg{width:2.8cqw;height:2.8cqw}
+.tc{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font:400 9cqw/.95 'Instrument Serif',Georgia,serif;letter-spacing:-.015em;color:#1f2a30}
+.sm{position:absolute;font:400 max(13px,1.6cqw) Inter,sans-serif;color:#4a463c}
+.fly{position:absolute;padding:.7cqw 1.2cqw;border-radius:.8cqw;background:#fffdf6;border:1px solid #e3dcc6;font:400 max(13px,1.4cqw) Inter,sans-serif;color:#2b3442;box-shadow:0 .6cqw 1.6cqw #4a3f2014;animation:fl 3.2s cubic-bezier(.2,.7,.2,1) infinite both}
+@keyframes fl{0%{transform:translate(var(--x),var(--y)) scale(.9);opacity:0}25%{opacity:1}70%,100%{transform:none;opacity:1}}
+.fp{position:absolute;z-index:2;left:40%;top:44%;width:70cqw;height:12cqw;margin-left:-35cqw;perspective:60cqw}
+.fp b{position:absolute;inset:0;display:grid;place-items:center;font:400 8.6cqw/.95 'Instrument Serif',Georgia,serif;color:#1f2a30;backface-visibility:hidden;animation:fa 3.2s cubic-bezier(.2,.7,.2,1) .4s both}
+.fp b+b{animation-name:fb;font-style:italic}
+@keyframes fa{0%,45%{transform:rotateX(0)}70%,100%{transform:rotateX(180deg)}}
+@keyframes fb{0%,45%{transform:rotateX(-180deg)}70%,100%{transform:rotateX(0)}}
+.gi{position:absolute;right:6cqw;top:11cqw;width:19cqw;aspect-ratio:2/3;border-radius:1.2cqw;background:#0e1418 no-repeat;background-size:auto 128%;background-position:95% 72%;box-shadow:0 1.5cqw 4cqw #1f2a3033,0 0 0 .4cqw #c9e9ea80;animation:gw 1.4s cubic-bezier(.2,.7,.2,1) 2.4s both}
+@keyframes gw{from{opacity:0;transform:translateX(6cqw)}to{opacity:1;transform:none}}
+.ic{position:absolute;top:13cqw;display:grid;justify-items:center;gap:.5cqw;font:400 max(13px,1.25cqw) Inter,sans-serif;color:#4a463c;transform:translateX(-50%)}
+.ic i{width:4.4cqw;height:4.4cqw;border-radius:1cqw;background:#fffdf6;border:1px solid #e3dcc6;display:grid;place-items:center;font:400 max(13px,1.4cqw) Inter,sans-serif;font-style:normal;color:#2b3442}
+.ln{position:absolute;inset:0;width:100%;height:100%}
+.ln path{fill:none;stroke-width:.18;stroke-dasharray:1;stroke-dashoffset:1;animation:dr 4s cubic-bezier(.2,.7,.2,1) infinite}
+@keyframes dr{0%{stroke-dashoffset:1}45%,100%{stroke-dashoffset:0}}
+.ap{position:absolute;left:50%;top:70%;width:7cqw;height:7cqw;margin:-3.5cqw;border-radius:1.8cqw;background:#fffdf6;border:1px solid #e3dcc6;display:grid;place-items:center;box-shadow:0 0 0 1.2cqw #fffdf670,0 1cqw 3cqw #c9e9ea}
+.ap svg{width:4cqw;height:4cqw;color:#1f2a30}
+.tl{position:absolute;bottom:4.5cqw;width:27cqw;height:21cqw;border-radius:1.2cqw;background:#fffdf6;border:1px solid #e3dcc6;padding:1.6cqw;box-sizing:border-box;font:400 max(13px,1.35cqw) Inter,sans-serif;color:#4a463c}
+.tl b{display:block;font:500 max(13px,1.7cqw) Inter,sans-serif;color:#1f2a30;margin-bottom:.4cqw}
+.tl svg{position:absolute;left:1.6cqw;right:1.6cqw;bottom:1.4cqw;width:calc(100% - 3.2cqw);height:11cqw}
+.tl .ac{color:#2a9d96}
+.gl{position:absolute;left:46cqw;top:9cqw;width:46cqw;height:46cqw}
+.gl ellipse,.gl circle,.gl line{fill:none;stroke:#8a8676;stroke-width:.25;stroke-dasharray:.6 .9}
+.gc{position:absolute;left:6.5cqw;top:31cqw;width:34cqw;border-radius:1cqw;background:#fffdf6d0;border:1px solid #e3dcc6;font:400 max(13px,1.5cqw) Inter,sans-serif;color:#4a463c;backdrop-filter:blur(1cqw)}
+.gc div{display:flex;justify-content:space-between;gap:1cqw;padding:1.4cqw 1.6cqw}.gc div+div{border-top:1px solid #e3dcc6}.gc b{color:#1f2a30;font-weight:500}
+.clip{position:absolute;max-width:24cqw;padding:.9cqw 1.2cqw;background:#f7f3e8;font:400 max(13px,1.9cqw)/1.1 'Instrument Serif',Georgia,serif;color:#1a1a1a;box-shadow:0 .4cqw 1cqw #0000001f;clip-path:polygon(0 4%,3% 0,30% 3%,62% 0,100% 2%,98% 50%,100% 97%,70% 100%,35% 97%,2% 100%,0 60%)}
+.hx{position:absolute;left:0;right:0;top:20cqw;text-align:center;font:400 max(13px,1.4cqw) Inter,sans-serif;letter-spacing:.5em;color:#2b3442}
+.hy{position:absolute;left:0;right:0;top:24.5cqw;text-align:center;font:italic 400 5.4cqw/1 'Instrument Serif',Georgia,serif;color:#2b3442}
+.hz{top:31cqw;transform:scaleY(-1);opacity:.18;filter:blur(.15cqw);-webkit-mask:linear-gradient(transparent 30%,#000);mask:linear-gradient(transparent 30%,#000)}
+.ab{position:absolute;box-sizing:border-box;padding:1.1cqw 1.2cqw;border-radius:1cqw;background:#fffdf6e6;border:1px solid #e3dcc6;font:400 max(13px,1.02cqw)/1.3 Inter,sans-serif;color:#5a564b;z-index:2}
+.ab em{display:block;font:italic 400 max(13px,1.7cqw)/1 'Instrument Serif',Georgia,serif;color:#1f2a30;margin-bottom:.5cqw}
+.ab b{display:block;font-weight:500;color:#1f2a30;margin-top:.7cqw}
+.ag{border-color:#2a9d96;box-shadow:0 0 0 .5cqw #c9e9ea80}
+.tools{display:flex;flex-wrap:wrap;gap:.4cqw;margin-top:.9cqw}.tools i{font:400 max(13px,.95cqw) Inter,sans-serif;font-style:normal;padding:.2cqw .5cqw;border-radius:.4cqw;background:#c9e9ea80;color:#1f4e4b}
+.ar .sm{z-index:2}
+@media (max-width:760px){.ar{aspect-ratio:auto;display:flex;flex-direction:column;gap:10px;padding:14px}.ar .ab,.ar .tt,.ar .sm,.ar .lg{position:static!important;width:auto!important}.ar .ln{display:none}.ar .tt{font-size:30px!important}.sl{grid-template-columns:1fr!important}.clip:nth-of-type(n+4){display:none}.fly:nth-of-type(n+3),.tl svg,.sl .sm,.ic{display:none}.tl{font-size:0;height:auto!important;width:28cqw;padding:1cqw}.tl b{font-size:13px;margin:0}}
+@media (prefers-reduced-motion:reduce){.fly,.fp b,.gi,.ln path{animation:none}.fp b+b{display:none}.gi{opacity:1}.ln path{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.bl{animation:none}}
+.decision{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:18px 20px;display:grid;gap:8px}
+.decision h3{font-size:20px;font-weight:600}
+.decision ol,.decision ul{margin:0;padding-left:20px;color:var(--ink-2);display:grid;gap:4px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font:400 13px var(--f-body);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--paper)}
+td code{font:13px ui-monospace,Menlo,monospace;color:var(--pen)}
+pre{margin:0;overflow-x:auto;background:var(--night);color:#e8e6df;border-radius:6px;padding:16px 18px;font:13px/1.6 ui-monospace,Menlo,monospace}
+pre .c{color:#8f95a3}
+.pipe{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.pipe div{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px;display:grid;gap:4px;align-content:start}
+.pipe b{font:600 14px var(--f-head)}
+.pipe span{font-size:13px;color:var(--ink-2)}
+.pipe i{font:400 13px var(--f-body);font-style:normal;color:var(--pen);letter-spacing:.05em;text-transform:uppercase}
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rules div{border-top:2px solid var(--ink);padding-top:8px;font-size:13.5px;color:var(--ink-2)}
+.rules b{display:block;font:600 15px var(--f-head);color:var(--ink);margin-bottom:2px}
+.prop{border:1px dashed var(--pen-light);border-radius:6px;padding:12px 14px;color:var(--ink-2);font-size:14px}
+.prop b{color:var(--pen)}
+
+/* animatic */
+.anim{background:var(--night);display:grid;gap:12px;padding:14px;border-radius:6px;margin-top:14px}
+.anim .stage{position:relative;width:min(100%,900px,calc((100vh - 220px)*16/9));max-width:100%;aspect-ratio:16/9;margin:0 auto;overflow:hidden;border-radius:4px;background:#000}
+.anim .stage>*{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.anim .stage .ov{position:absolute;inset:auto;left:6%;top:7%;right:30%;height:auto;width:auto;font:600 clamp(18px,4.4vw,58px)/1.04 var(--f-head);letter-spacing:-.03em;color:var(--ink)}
+.anim .stage .ov.dark{color:#fff}.anim .stage .ov.turn{font:300 clamp(20px,4.8vw,64px)/1.04 var(--f-turn)}
+.anim .stage .ov.center{left:10%;right:10%;text-align:center;top:22%}
+.anim .bar{display:grid;gap:8px;color:#e8e6df;max-width:1100px;width:100%;margin:0 auto}
+.anim .line{font-size:15px;min-height:46px}
+.anim .ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.anim .ctl button{background:#e8e6df;color:var(--night);border-color:#e8e6df}
+.anim .ctl button.ghost{background:transparent;color:#e8e6df}
+.anim .prog{height:3px;background:#2a2e38;border-radius:2px;overflow:hidden}
+.anim .prog i{display:block;height:100%;background:var(--green);width:0}
+.anim .clock{font:400 14px var(--f-head);font-variant-numeric:tabular-nums;margin-left:auto}
+.empty{position:absolute;inset:0;display:grid;align-content:space-between;padding:7% 6%;background:#fbfaf7;border:1px dashed var(--pen-light)}
+.empty b{font:600 clamp(16px,3vw,44px)/1.05 var(--f-head);letter-spacing:-.03em;color:var(--ink);max-width:14ch}
+.empty span{font:400 clamp(13px,1.3vw,16px)/1.4 var(--f-body);color:var(--muted);max-width:40ch}
+.rise{transform:translateY(18px);transition:transform .9s var(--ease)}
+.rise.in{transform:none}
+.anim .stage img,.anim .stage video{-webkit-mask-image:radial-gradient(130% 120% at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(130% 120% at 50% 50%,#000 62%,transparent 100%)}
+.fade{animation:fade .6s var(--ease)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+@media (max-width:860px){
+  .panel{grid-template-columns:1fr}
+  .left{position:static}
+  .pipe,.rules{grid-template-columns:1fr 1fr}
+  dl{grid-template-columns:1fr}
+  dt{border-bottom:0;padding-bottom:0}
+}
+@media (max-width:480px){.pipe,.rules{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><svg width="34" height="24" viewBox="0 0 34 24" aria-hidden="true"><path d="M2 12.5 L31.5 2.2 L22.8 21.4 L15.6 14.1 Z M15.6 14.1 L31.5 2.2 M15.6 14.1 L14.9 20.6 L19.1 17.6" fill="none" stroke="#27358a" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span>START Milan</span></div>
+    <div class="eyebrow">5U room pitch · Sun 22 Nov, 13:15 · storyboard v3</div>
+    <h1 class="claim">Giulia remembers what the mail doesn't say.</h1>
+    <div class="facts">
+      <span><b>11</b> panels</span><span><b>3:00</b> spoken, live</span><span><b>3</b> acts, <b>1</b> turn</span>
+      <span><b>3</b> video plates</span><span><b>≤ 5</b> words per slide</span><span><b>1</b> HTML file, no framework</span>
+    </div>
+    <div class="actions">
+      <button id="copy" class="ghost" type="button">Copy all notes as markdown</button>
+      <a class="chip" href="#build" style="align-self:center;text-decoration:none">How it is built ↓</a>
+    </div>
+    <div class="script" aria-label="Colour script">
+      <div class="strip" id="strip"></div>
+      <div class="acts" id="acts"></div>
+    </div>
+    <section class="anim" id="anim" aria-label="Animatic">
+      <div class="stage" id="stage"></div>
+      <div class="bar">
+        <div class="prog"><i id="prog"></i></div>
+        <div class="line" id="aline"></div>
+        <div class="ctl">
+          <button id="apause" type="button">Play</button>
+          <button id="aprev" class="ghost" type="button">← Back</button>
+          <button id="anext" class="ghost" type="button">Next →</button>
+          <span class="clock" id="aclock">0:00 / 3:00</span>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <div class="sec" id="story6">
+    <h2>Storyline v6, Jan 22.11. 09:50</h2>
+    <p>Seven slides: night, overload, calm, what she does, why it fits you, how you run it, why it gets better. The panels below are the older v5 and stay as the store of stills.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>#</th><th>Feel</th><th>On screen</th><th>Motion</th><th>Made from</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Quiet unease</td><td>Painted night sea. Title: <b>"2 a.m. Your forwarders sleep. Your freight doesn't."</b></td><td>Water shimmers, the plane crosses left to right, one bridge window glows</td><td>Panel 1 v4, hero-paint-1</td></tr>
+        <tr><td>2</td><td>Overload</td><td>The overwhelmed coordinator. Mails, PDFs, rate sheets, calls fly in from every edge</td><td>Fast and crowding, 40 ms stagger speeding up to 10 ms, the last cards cover the frame</td><td>Panel 3 v3, head-v3-0, cards in code</td></tr>
+        <tr><td>3</td><td>Calm</td><td>Cut to the empty dawn ground. One line in the centre: <b>"She decides."</b>, which flips to <b>"Code guarantees."</b> Then Giulia, the cartoon, walks in</td><td>Hard cut to silence, 1 s hold, a 3D flip of the words (0.6 s), Giulia eases in from the right</td><td>Mattia's vision.md §0: "The model decides what makes sense. The system guarantees it can do so coherently."</td></tr>
+        <tr><td>4</td><td>Clarity</td><td>Inputs on the left (mail, PDF, scan, sheet, voice, every language), Giulia in the middle, outputs on the right (price, booking, truck, tracking answer)</td><td>The tangle runs in and leaves as three clean green lines</td><td>Deck v3 slide 4 "However it arrives"</td></tr>
+        <tr><td>5</td><td>"That's us"</td><td>Title <b>"Hyper individualised. Kept simple."</b> Three tiles, each with an icon: 1 workflows fitted to your role, 2 every language in, bulk mails too, 3 you are not stuck at a screen: the app</td><td>Tiles rise one after another, 40 ms stagger</td><td>Deck v3 glass boxes</td></tr>
+        <tr><td>6</td><td>"I can start Monday"</td><td>Two ways to run her: <b>inside your tools (MCP)</b> and <b>as our software</b></td><td>Two cards, one line joining both to Giulia</td><td>New</td></tr>
+        <tr><td>7</td><td>Conviction</td><td>The hero by day. Two lines: a rented model stays flat, Giulia climbs with every deal she learns. The area between them is yours. Title: <b>"She gets better every night."</b></td><td>The lines draw left to right, then the area fills, while the sun rises behind them</td><td>Panel 11 v2, hero-sea-day-1, deck v3 slide 6 curve</td></tr>
+        <tr><td>B</td><td>"They have the data"</td><td>Backup for Q&amp;A, built like Jan's isometric card pin (09:57): three white cards, hairline isometric graphics, one teal accent. 1 requests answered per hour over the night, as an isometric line. 2 what came in, by format and language, as stacked blocks. 3 quotes accepted out of requests, as filled tiles</td><td>Each card draws its lines on click, 40 ms stagger</td><td>Our register: the CRM rows export (<code>/api/crm/rows?format=csv</code>, branch jan-crm) and the 5U board. Numbers pulled at pitch time, never typed</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>v7 arc, Jan 10:15: the tension rises to a peak, then Simplicity</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>#</th><th>Beat</th><th>On screen</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Night</td><td>The painted hero, kept</td></tr>
+        <tr><td>2</td><td>Money at stake</td><td>The coordinator with real trade-press headlines cut out like newspaper strips, left and right of him (below)</td></tr>
+        <tr><td>3</td><td>The peak</td><td>One shipper mail lands in an inbox. An agent swarm goes berserk on it: 40 cursors, sub-agents, critics, supervisors, tokens and dollars racing. "That's not what you want." twice</td></tr>
+        <tr><td>4</td><td>Bam. Pause.</td><td>Hard cut. All the swarm's lines collapse into one horizon line. "Simplicity." 1.5 s of stillness</td></tr>
+        <tr><td>5 to 9</td><td>Our answer</td><td>Giulia, inputs to outputs, hyper individualised, two ways to run, she gets better every night</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Slide 2 with the clippings: every headline is real and published</h3>
+    <div class="sl"><div><h4>2 · Money at stake <span>· FreightWaves, Air Cargo Week, Supply Chain Dive, Sedna, Freightos</span></h4>
+      <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+        <div style="position:absolute;left:30cqw;right:30cqw;top:0;bottom:0;background:url(frames/r/head-v3-0.jpg) center/cover;-webkit-mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)"></div>
+        <span class="clip" style="left:4cqw;top:10cqw;--r:-3deg">Forwarders slow to respond to online rate requests</span>
+        <span class="clip" style="left:6cqw;top:22cqw;--r:2deg">57 hours for a manual quote</span>
+        <span class="clip" style="left:3cqw;top:33cqw;--r:-1.5deg">Navigating the freight quote request avalanche</span>
+        <span class="clip" style="right:4cqw;top:12cqw;--r:2.5deg">Air cargo spot rates surge 30%</span>
+        <span class="clip" style="right:5cqw;top:25cqw;--r:-2deg">Freight forwarders are failing to meet customer expectations</span>
+        <span class="clip" style="right:3cqw;top:40cqw;--r:1.5deg">Tame unruly email inboxes</span></div></div></div>
+
+    <h3>Simplicity, four ideas in our watercolour world: the horizon is the pick, since the swarm's lines collapse into it and it is the line the hero and the day slide share</h3>
+    <div class="sl" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div><h4>A · One horizon <span>· the pick</span></h4><div class="ts ts-img" style="background-image:url(frames/r/simple-horizon.jpg)"><b class="tc" style="font-size:7cqw;top:-8cqw">Simplicity.</b></div></div>
+      <div><h4>B · The mail becomes a paper boat</h4><div class="ts ts-img" style="background-image:url(frames/r/simple-paperboat.jpg)"><b class="tc" style="font-size:7cqw;top:-14cqw">Simplicity.</b></div></div>
+      <div><h4>C · The knot pulled straight</h4><div class="ts ts-img" style="background-image:url(frames/r/simple-rope.jpg)"><b class="tc" style="font-size:7cqw;top:-10cqw">Simplicity.</b></div></div>
+      <div><h4>D · Hero as line-and-wash, a different watercolour</h4><div class="ts ts-img" style="background-image:url(frames/r/simple-hero-linewash.jpg)"><span class="hx">2 A.M.</span><b class="hy">Your forwarders sleep.</b><b class="hy hz">Your forwarders sleep.</b></div></div>
+    </div>
+
+    <h3>The slides, built: dawn ground and the Milan Forwarding mark from Sam's desk on every one, each layout rebuilt from its pin</h3>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="mk-goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="3.4"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -12"/></filter><symbol id="mk" viewBox="0 0 64 64"><g filter="url(#mk-goo)" fill="currentColor" stroke="currentColor"><circle cx="21" cy="42" r="15" stroke="none"/><circle cx="42" cy="23" r="9.5" stroke="none"/><path d="M28 36 39 26" stroke-width="6.5" stroke-linecap="round"/></g><circle cx="56" cy="10" r="4.4" fill="currentColor"/></symbol></defs></svg>
+    <div class="sl">
+
+      <div><h4>1 · Night <span>· Jan's painted hero, kept</span></h4>
+        <div class="ts ts-img" style="background-image:url(frames/r/hero-paint-1.jpg)"><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <b class="tt tt-hero" style="top:9cqw;font-size:7cqw">2 a.m.<br><i>Your forwarders sleep.</i></b><span class="sm" style="left:6.5cqw;top:26cqw;color:#4b5566">The ships and planes don't.</span></div></div>
+
+      <div><h4>2 · Overload <span>· the coordinator, requests fly in</span></h4>
+        <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <div style="position:absolute;right:0;top:0;bottom:0;width:56cqw;background:url(frames/r/head-v3-0.jpg) center/cover;-webkit-mask:linear-gradient(90deg,transparent,#000 30%);mask:linear-gradient(90deg,transparent,#000 30%)"></div>
+          <b class="tt" style="top:11cqw;font-size:8.5cqw">25 requests.<br><i>One head.</i></b>
+          <span class="fly" style="left:44cqw;top:5cqw;--x:-30cqw;--y:-20cqw;animation-delay:0s">RFQ Munich → Riyadh</span>
+          <span class="fly" style="left:62cqw;top:34cqw;--x:30cqw;--y:10cqw;animation-delay:.12s">Rate sheet Q4.xlsx</span>
+          <span class="fly" style="left:52cqw;top:44cqw;--x:-10cqw;--y:25cqw;animation-delay:.22s">Richiesta urgente · 2 pallets</span>
+          <span class="fly" style="left:74cqw;top:28cqw;--x:25cqw;--y:-18cqw;animation-delay:.3s">Scan: invoice</span>
+          <span class="fly" style="left:40cqw;top:32cqw;--x:-35cqw;--y:6cqw;animation-delay:.36s">Where is my cargo?</span>
+          <span class="fly" style="left:66cqw;top:47cqw;--x:20cqw;--y:22cqw;animation-delay:.4s">Class 8 DG · PDF</span>
+          <span class="fly" style="left:58cqw;top:24cqw;--x:5cqw;--y:-30cqw;animation-delay:.44s">Anfrage Frankfurt → Shanghai</span></div></div>
+
+      <div><h4>3 · Calm <span>· vision.md: the model decides, the system guarantees</span></h4>
+        <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl2"></i><i class="bl bl3"></i><i class="bl bl4"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <div class="fp"><b>She decides.</b><b>Code guarantees.</b></div>
+          <div class="gi" style="background-image:url(frames/r/g-holo-v2-0.jpg)"></div></div></div>
+
+      <div><h4>4 · Inputs to outputs <span>· pin 354 "Your tools. Your rules."</span></h4>
+        <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <svg class="ln" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true">
+            <path pathLength="1" stroke="#7fc8c4" d="M20 20 C20 40 50 30 50 39"/><path pathLength="1" stroke="#d9b85a" d="M32 20 C32 38 50 32 50 39"/><path pathLength="1" stroke="#c9a3c9" d="M44 20 C44 34 50 34 50 39"/><path pathLength="1" stroke="#7fc8c4" d="M56 20 C56 34 50 34 50 39"/><path pathLength="1" stroke="#d9b85a" d="M68 20 C68 38 50 32 50 39"/><path pathLength="1" stroke="#c9a3c9" d="M80 20 C80 40 50 30 50 39"/></svg>
+          <span class="ic" style="left:20cqw"><i>@</i>Mail</span><span class="ic" style="left:32cqw"><i>PDF</i>Attachment</span><span class="ic" style="left:44cqw"><i>▦</i>Rate sheet</span><span class="ic" style="left:56cqw"><i>◰</i>Scan</span><span class="ic" style="left:68cqw"><i>◉</i>Voice</span><span class="ic" style="left:80cqw"><i>Aa</i>Any language</span>
+          <b class="tc" style="font-size:5.4cqw;top:-2cqw">However it arrives.</b>
+          <div class="ap"><svg><use href="#mk"/></svg></div>
+          <span class="sm" style="left:0;right:0;text-align:center;bottom:4cqw">Price · Booking · Truck · Tracking answer</span></div></div>
+
+      <div><h4>5 · Why it fits <span>· pin 357 cards</span></h4>
+        <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <b class="tt" style="top:8.5cqw;font-size:6.4cqw">Hyper individualised.<br><i>Kept simple.</i></b>
+          <div class="tl" style="left:4cqw"><b>Fitted to your role</b>Sales, ops, finance each get their flow<svg viewBox="0 0 60 24"><g fill="none" stroke="#8a8676" stroke-width=".4"><path d="M10 14 22 8 34 14 22 20Z"/><path d="M10 14v4l12 6 12-6v-4"/><path d="M26 10 38 4 50 10 38 16Z" class="ac" stroke="#2a9d96" fill="#c9e9ea80"/><path d="M26 10v4l12 6 12-6v-4" stroke="#2a9d96"/></g></svg></div>
+          <div class="tl" style="left:36.5cqw"><b>Every language in</b>Bulk mails too, answered in theirs<svg viewBox="0 0 60 24"><g font-family="Inter" font-size="4" fill="#4a463c"><rect x="2" y="4" width="12" height="7" rx="1.5" fill="none" stroke="#8a8676" stroke-width=".4"/><text x="4.6" y="9">DE</text><rect x="17" y="4" width="12" height="7" rx="1.5" fill="#c9e9ea80" stroke="#2a9d96" stroke-width=".4"/><text x="19.8" y="9">IT</text><rect x="32" y="4" width="12" height="7" rx="1.5" fill="none" stroke="#8a8676" stroke-width=".4"/><text x="34.4" y="9">EN</text><rect x="47" y="4" width="12" height="7" rx="1.5" fill="none" stroke="#8a8676" stroke-width=".4"/><text x="49.6" y="9">ZH</text><rect x="10" y="14" width="12" height="7" rx="1.5" fill="none" stroke="#8a8676" stroke-width=".4"/><text x="12.6" y="19">FR</text><rect x="25" y="14" width="12" height="7" rx="1.5" fill="none" stroke="#8a8676" stroke-width=".4"/><text x="27.4" y="19">ES</text><rect x="40" y="14" width="12" height="7" rx="1.5" fill="none" stroke="#8a8676" stroke-width=".4"/><text x="42.8" y="19">TR</text></g></svg></div>
+          <div class="tl" style="left:69cqw"><b>Not stuck at a screen</b>Talk to her from the app<svg viewBox="0 0 60 24"><g fill="none" stroke-width=".4"><rect x="24" y="1" width="12" height="22" rx="2" stroke="#8a8676"/><path d="M26.5 12h1.4v-3h1.4v6h1.4v-8h1.4v5h1.4v-2h1.4" stroke="#2a9d96"/></g></svg></div></div></div>
+
+      <div><h4>6 · How you run her <span>· pin 353 globe and card</span></h4>
+        <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <svg class="gl" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48"/><circle cx="50" cy="50" r="44"/><ellipse cx="50" cy="50" rx="16" ry="44"/><ellipse cx="50" cy="50" rx="32" ry="44"/><ellipse cx="50" cy="50" rx="44" ry="14"/><ellipse cx="50" cy="50" rx="44" ry="30"/><line x1="6" y1="50" x2="94" y2="50"/></svg>
+          <b class="tt" style="top:8.5cqw;font-size:7cqw">Two ways<br><i>to run her.</i></b>
+          <div class="gc"><div><b>Inside your tools</b><span>MCP</span></div><div><b>As our desk</b><span>Software</span></div></div></div></div>
+
+      <div><h4>7 · Day <span>· Jan's mirror ending, kept, pin 344 lines on top</span></h4>
+        <div class="ts ts-img" style="background-image:url(frames/r/hero-sea-day-1.jpg)"><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <b class="tt tt-day" style="top:7cqw;font-size:7cqw">She gets better<br><i>every night.</i></b>
+          <svg class="ln" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true"><path d="M8 44 C30 43 60 42 92 41 L92 22 C70 26 45 36 8 44Z" fill="#fff6" stroke="none"/><path pathLength="1" stroke="#6b5a3e" d="M8 44 C30 43 60 42 92 41"/><path pathLength="1" stroke="#2a9d96" style="stroke-width:.3" d="M8 44 C45 36 70 26 92 22"/></svg>
+          <span class="sm" style="right:8cqw;top:34cqw;color:#2a6f6b">Giulia, learning each customer</span><span class="sm" style="right:8cqw;top:47cqw;color:#6b5a3e">A rented model</span></div></div>
+
+      <div><h4>B · Backup for Q&amp;A <span>· pin 357 isometric cards, numbers from the register at pitch time</span></h4>
+        <div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <b class="tt" style="top:8.5cqw;font-size:6.4cqw">What our agents<br><i>saw tonight.</i></b>
+          <div class="tl" style="left:4cqw;height:24cqw"><b>Requests answered</b>per hour, live<svg viewBox="0 0 60 24"><g fill="none" stroke-width=".4"><path d="M4 18 30 8 56 18 30 28Z" stroke="#d6d1c0"/><path d="M8 17c4 0 5-8 9-8s4 5 8 5 4-9 8-9 4 7 8 7" stroke="#2a9d96"/><path d="M8 17c4 0 5-8 9-8s4 5 8 5 4-9 8-9 4 7 8 7v3H8Z" fill="#c9e9ea60" stroke="none"/></g></svg></div>
+          <div class="tl" style="left:36.5cqw;height:24cqw"><b>What came in</b>by format and language<svg viewBox="0 0 60 24"><g stroke-width=".4"><path d="M12 12 20 8 28 12 20 16Z M12 12v6l8 4 8-4v-6" fill="#c9e9ea80" stroke="#2a9d96"/><path d="M28 12 36 8 44 12 36 16Z M28 12v6l8 4 8-4v-6" fill="#eceae2" stroke="#b9b4a3"/><path d="M44 12 52 8 60 12 52 16Z M44 12v6l8 4 8-4v-6" fill="#eceae2" stroke="#b9b4a3"/></g></svg></div>
+          <div class="tl" style="left:69cqw;height:24cqw"><b>Quotes accepted</b>of requests, from the 5U board<svg viewBox="0 0 60 24"><g stroke-width=".4"><path d="M6 12 24 4 54 12 36 20Z" fill="none" stroke="#d6d1c0"/><path d="M12 12 24 7 36 10 24 15Z" fill="#c9e9ea" stroke="#2a9d96"/><path d="M28 14 40 9 48 11 36 16Z" fill="#eceae2" stroke="#b9b4a3"/></g></svg></div></div></div>
+
+      <div><h4>B2 · How it works <span>· backup for the technical question, read from origin/main 22.11. 10:40, nothing changed there</span></h4>
+        <div style="overflow-x:auto"><div class="ts ts-dawn ar"><i class="bl bl1"></i><i class="bl bl3"></i><span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
+          <b class="tt" style="left:auto;right:4cqw;top:3cqw;font-size:4.2cqw">How Giulia works.</b>
+          <svg class="ln" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true"><g style="stroke:#8a8676;stroke-width:.15;fill:none"><path d="M17.5 24H20"/><path d="M31.5 24H34"/><path d="M62.5 24H65"/><path d="M81 24H83"/><path d="M48 38.6V41.5"/></g></svg>
+          <div class="ab" style="left:3cqw;top:12cqw;width:14.5cqw"><em>In</em><b>Customer mail</b>any language, any shape<b>Attachments</b>pdf, xlsx, docx, scans, photos<b>Carrier &amp; airline mail</b>bids, tariffs, bookings<b>Voice and desk</b>a person speaks or types<b>A person steps in</b>a message into the session</div>
+          <div class="ab" style="left:20cqw;top:12cqw;width:11.5cqw"><em>Router · code</em>By sender and thread, never by what a mail claims<b>Customer, tracking</b>to Giulia<b>Bids, tariffs</b>read into offers by a small model, wakes nobody</div>
+          <div class="ab ag" style="left:34cqw;top:12cqw;width:28.5cqw"><em>Giulia · one agent</em><b>One session per thread</b>kept in the register, resumed by every new mail, survives a restart<b>Context</b>who she is, how we are judged, the task, the time, notes from the customer's earlier deals, the thread so far, attachments as text<b>One duty</b>every mail answered, or a reasoned no-reply. Stops after 10 turns without progress
+            <span class="tools"><i>get_offers</i><i>send_mail</i><i>book</i><i>cancel_booking</i><i>crm</i><i>deal</i><i>mail_carrier</i><i>carrier_status</i><i>note</i><i>browser</i><i>no_reply</i></span></div>
+          <div class="ab" style="left:65cqw;top:12cqw;width:16cqw"><em>Engine · code</em><b>Pricing</b>every number: chargeable weight, next break, minimum, surcharges, in Decimal<b>Carriers</b>5U portal API, mail-only airlines, truckers by zone, the rate desk<b>Bookings</b>by rate id, by mail when the API is down<b>Board watcher</b>every 30 s</div>
+          <div class="ab" style="left:83cqw;top:12cqw;width:14cqw"><em>Register · SQLite</em>deals, bookings, sessions, mails, notes. This is the CRM<b>Desk</b>shipments, customers, sessions, efficiency<b>Desk assistant</b>reads the register, never writes<b>Voice app</b>installable, on the phone</div>
+          <div class="ab" style="left:34cqw;top:41.5cqw;width:28.5cqw;padding-block:.8cqw"><em style="margin:0">Model</em>gpt-6-luna, effort low, through the 5U gateway. A few tenths of a cent per deal</div>
+          <span class="sm" style="left:4cqw;bottom:2.4cqw;font-size:max(13px,1.15cqw)">One container · API and UI on :8000 · register on a volume · a tunnel for the team</span></div></div></div>
+
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>The panels</h2>
+    <p>Each panel is a brief: what the jury feels, what is on screen and said, where the camera stands, what moves and when, how it cuts, how it is made, and what could go wrong. A dashed status means the piece does not exist yet.</p>
+  </div>
+  <main id="panels"></main>
+
+  <div class="sec" id="type">
+    <h2>Type and ground for the deck</h2>
+    <p>Jan, 08:38: the dawn gradient behind every slide after the hero, big titles, the last slide the hero by day. One serif for every title, Inter for every small line.</p>
+  <div class="tp">
+    <div class="tp-row">
+      <figure><div class="ts ts-img" style="background-image:url(frames/r/hero-paint-1.jpg)"><b class="tt tt-hero">Who answers<br><i>at 2 a.m.?</i></b></div><figcaption>Slide 1 · painted night, title 8.4 % of width</figcaption></figure>
+      <figure><div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl2"></i><i class="bl bl3"></i><i class="bl bl4"></i><b class="tt">25 requests.<br><i>One head.</i></b><small>Slides 2 to 10 · Jan's dawn ground</small></div><figcaption>Slides 2 to 10 · dawn, title 11 % of width</figcaption></figure>
+      <figure><div class="ts ts-img" style="background-image:url(frames/r/hero-sea-day-1.jpg)"><b class="tt tt-day">We are<br><i>the forwarder.</i></b></div><figcaption>Last slide · the hero by day</figcaption></figure>
+    </div>
+    <div class="tp-row">
+      <figure><div class="ts ts-dawn"><i class="bl bl1"></i><i class="bl bl3"></i><b class="tt">56<br><i>seconds.</i></b></div><figcaption><b>Instrument Serif</b> · the pick</figcaption></figure>
+      <figure><div class="ts ts-dawn tf-fr"><i class="bl bl1"></i><i class="bl bl3"></i><b class="tt">56<br><i>seconds.</i></b></div><figcaption>Fraunces 300 · the CI's turn font</figcaption></figure>
+      <figure><div class="ts ts-dawn tf-it"><i class="bl bl1"></i><i class="bl bl3"></i><b class="tt">56<br><i>seconds.</i></b></div><figcaption>Inter Tight 600 · a sans</figcaption></figure>
+    </div>
+    <h3>The other candidate: deck v3 as the deck session built it, centred two-tone Inter 600 in Ramp's grammar</h3>
+    <img src="frames/r/deck3-sheet.jpg" alt="Deck v3 by the deck session: six slides, centred two-tone Inter titles on the dawn ground, glass boxes with hairline graphics, photographic night ships as hero" style="width:100%;border-radius:6px;border:1px solid var(--line)">
+    <div class="decision">
+      <h3>Instrument Serif 400 for every title, second phrase in italic</h3>
+      <ul>
+        <li>It is the face of the Velorah night meadow, the style key Jan loves, so the watercolour and the titles read as one hand.</li>
+        <li>Condensed and high contrast: five words fill half a slide without shouting. A sans at that size reads as a SaaS ad.</li>
+        <li>Size: 11 % of the slide width on dawn slides, 8.4 % on the two sea slides, line height 0.95, tracking -1.5 %.</li>
+        <li>Small lines: Inter 500 at 1.5 % of width, numbers tabular. Ink #1f2a30 on dawn, #2b3442 on the night sea, #3b3226 on the day sea.</li>
+      </ul>
+    </div>
+  </div>
+  </div>
+
+  <section class="sec" id="build">
+    <h2>How it is built</h2>
+    <p>Your question: transitions, which code, React or not, and how pictures and looping animations get packed into one thing that runs in the room and in the browser.</p>
+  </section>
+  <div class="build">
+    <div class="decision">
+      <h3>One HTML file, plain HTML, CSS and JavaScript. No React.</h3>
+      <ol>
+        <li><b>The deck has one piece of state:</b> which slide and which beat. React exists to keep many components in sync with changing data. Here it adds about 140 KB and a build step and solves nothing.</li>
+        <li><b>The room is the risk, not the code.</b> Hackathon Wi-Fi can drop. A single file with everything inside runs from the laptop disk with zero network.</li>
+        <li><b>It already runs this way.</b> <code>pins/deck.html</code> (slide engine, beats, crossfade) and <code>pins/sketch.html</code> (swarm, line boil, chugging S-Bahn) are both plain JS. Merging them is copying sections, not porting.</li>
+      </ol>
+      <p style="margin:0;color:var(--ink-2)"><b>What would change it:</b> if a slide had to run the real product UI live (Sam's React frontend). It does not. Slide 9 shows a screenshot taken at 10:00, which never fails.</p>
+    </div>
+
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Layer</th><th>Made with</th><th>How it loops</th><th>Slides</th><th>Exists</th></tr></thead>
+        <tbody>
+          <tr><td><b>Video plate</b> (real place, light, weather)</td><td><code>&lt;video muted autoplay loop playsinline preload="auto" poster="still.jpg"&gt;</code>, H.264 MP4, 1600 px, about 1.5 MB, from Seedance 2.5 image-to-video on the picked still</td><td>10 s clip, the last 1 s crossfaded onto the first 1 s with ffmpeg <code>xfade</code>, so the restart has no jump. The poster is the still, so a failed video still shows the picture</td><td>1, 6, 11</td><td>Stills yes, clips no</td></tr>
+          <tr><td><b>Photo</b></td><td>JPG 1600 px, CSS <code>filter</code> and <code>transform</code></td><td>Never still: a slow drift, scale 1.00 to 1.06 over the slide's length, ease-out</td><td>2, 3, 8 (plate)</td><td>Yes</td></tr>
+          <tr><td><b>Pen drawing</b></td><td>Inline SVG in pen <code>#27358a</code>. Lines draw on with <code>stroke-dashoffset</code> and <code>pathLength="1"</code></td><td><code>requestAnimationFrame</code> loop, started when the slide enters, stopped when it leaves. Line boil: <code>feTurbulence</code> gets a new seed every 125 ms (8 per second, hand animation on twos)</td><td>4, 6, 7, 8, 10</td><td>6, 7, 8 yes</td></tr>
+          <tr><td><b>Particles</b></td><td>Canvas 2D: 340 boids, 70 wave lines</td><td><code>requestAnimationFrame</code>, only while the slide is on</td><td>3, 5</td><td>Yes</td></tr>
+          <tr><td><b>Words</b></td><td>Real text in Outfit or Fraunces, never baked into a picture</td><td>Once per entry: rise 900 ms <code>cubic-bezier(.2,.7,.2,1)</code>, words staggered 40 ms</td><td>All</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <pre><span class="c">&lt;!-- every slide is one section. The engine only reads its data attributes --&gt;</span>
+&lt;section class="s" id="s7" data-act="III" data-in="grow" data-beats="1"&gt; … &lt;/section&gt;
+
+<span class="c">// the whole engine, about 40 lines in deck.html</span>
+function go(i, beat = 0) {
+  const from = S[cur], to = S[i]
+  from.leave?.()                       <span class="c">// stops its rAF loop and pauses its video</span>
+  TRANSITION[to.dataset.in](from, to)  <span class="c">// xfade | cut | grow | match | dawn</span>
+  to.dataset.beat = beat
+  to.enter?.()                         <span class="c">// starts its loop, plays its video from 0</span>
+  cur = i
+  history.replaceState(null, "", "#" + (i + 1))
+}
+<span class="c">// → Space PageDown = next beat, else next slide. ← = back. Clicker sends PageDown.</span></pre>
+
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Transition</th><th>What the jury sees</th><th>Code</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td><b>xfade</b></td><td>Two pictures dissolve, inside one act</td><td>CSS <code>opacity</code> 600 ms, both slides on screen during it</td><td>1→2, 9→10</td></tr>
+          <tr><td><b>dim</b></td><td>The light goes out with the story</td><td>Opacity 900 ms through the night ground <code>#0b0d12</code></td><td>2→3</td></tr>
+          <tr><td><b>cut</b></td><td>A jolt. The act changes</td><td><code>transition: none</code>, the new slide is drawn in the same frame</td><td>3→4, 5→6, 8→9</td></tr>
+          <tr><td><b>grow</b></td><td>No cut is visible. The last shape becomes the first shape of the next slide</td><td>The outgoing shape is redrawn at the same coordinates on the incoming slide, then the rest draws on around it</td><td>4→5, 6→7</td></tr>
+          <tr><td><b>match</b></td><td>The camera flies into a window and lands on a screen</td><td>Outgoing <code>scale(1→3)</code>, <code>transform-origin</code> on the window, 500 ms ease-in, then a 300 ms crossfade onto the laptop screen of the same size</td><td>7→8</td></tr>
+          <tr><td><b>dawn</b></td><td>Night turns into morning in the same valley</td><td>Two stacked videos, the dawn layer's opacity goes 0→1 over 2.4 s</td><td>10→11</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pipe">
+      <div><i>1 · source</i><b>pins/ folder</b><span><code>deck.html</code>, <code>img/</code>, <code>video/</code>. Each file is edited and checked on its own.</span></div>
+      <div><i>2 · pack</i><b>one file</b><span>A pack step base64-inlines images, the 3 clips and the fonts into <code>deck.room.html</code>. About 4.5 MB of video, 2 MB of pictures, 0.3 MB of fonts.</span></div>
+      <div><i>3 · share</i><b>Artifact</b><span>The same file is published as a claude.ai Artifact, under the 16 MB limit. The team and the jury open one link.</span></div>
+      <div><i>4 · room</i><b>local, F11</b><span>Chrome fullscreen from the laptop disk. The clicker sends PageDown. No Wi-Fi needed.</span></div>
+      <div><i>5 · fallback</i><b>1080p recording</b><span>A screen recording of one clean click-through on a USB stick.</span></div>
+    </div>
+
+    <div class="rules">
+      <div><b>Preload everything</b>All three clips decode at load (<code>preload="auto"</code>), so a slide never opens on a black frame.</div>
+      <div><b>Only the visible slide moves</b>Every loop runs between <code>enter()</code> and <code>leave()</code>. At most 7 moving layers on screen.</div>
+      <div><b>Reduced motion</b>With <code>prefers-reduced-motion</code> the deck shows the stills and the final state of every drawing.</div>
+      <div><b>Deep links</b><code>#7</code> opens slide 7 and reloads on <code>hashchange</code>, so a teammate can review one slide.</div>
+      <div><b>Projector test</b>11:30 on the room projector: blacks no darker than <code>#0b0d12</code>, every word readable from the back row.</div>
+      <div><b>One ink</b>Plates and code lines share pen <code>#27358a</code>, so nobody sees where the picture ends and the code begins.</div>
+    </div>
+
+    <p class="prop"><b>Proposal:</b> a presenter view. <code>#notes</code> opens a second window, synced with <code>BroadcastChannel</code>, that shows the spoken line, the next slide and a 3:00 countdown. The jury sees the deck, the speaker sees the script. It is about 30 lines and needs no network.</p>
+  </div>
+</div>
+
+
+<script>
+const P=[
+{n:1,act:'I',job:'Hook',secs:6,title:'Who answers at 2 a.m.?',ov:'center',frame:'frames/r/hero-paint-1.jpg',bg:'#eef0f2',status:['open','v4 painted night sea per Jan 08:36 · his pick open'],
+ feel:['Unease','A quiet valley at night, one lit window. Someone is still awake, and the jury wonders who.'],
+ said:['Jan','Who answers your customers\' mails at 2 a.m.?'],
+ screen:'Outfit 600, 6 cqw, white, centred in the upper third, the way pin-347 Haven sets a landing. Nav pill top centre: <b>START Milan</b> with the paper-plane mark.',
+ shot:'<b>Extreme wide, locked-off, eye level.</b> Rock face on the left third, the house with the one lit window low on the left (x 14 %, y 70 %). Sky takes the top 45 % so the question has air.',
+ light:'Cold moonlight on the rock, <code>#0b0d12</code> floor. The window is the only warm spot in the deck, a small yellow glow, never orange.',
+ motion:'<b>Primary:</b> nothing, the room should go still. <b>Secondary:</b> the window glow breathes, opacity 0.35 to 0.9 over 3.2 s. <b>Ambient:</b> stars drift, grass sways in the plate.',
+ beats:[['0:00','Black. The room quiets for 1 s.'],['0:01','The valley fades up over 1.2 s.'],['0:02','The question rises, 900 ms, 40 ms per word.'],['0:06','Next click.']],
+ cut:'<b>In:</b> from black, 1.2 s. <b>Out:</b> crossfade 600 ms into the selfie.',
+ sound:'Silence, then Jan\'s voice. No music in the room.',
+ make:'<b>Seedance 2.5</b>, image-to-video on <code>valley-night.jpg</code>, 10 s at 1080p, looped with <code>xfade</code>. Until the clip exists: the still with the CSS glow, already in <code>deck.html</code>.',
+ prompt:'The valley stays still at 2 a.m. Locked-off static camera. Stars drift slowly across the sky, wildflowers sway gently in a light night wind, the single lit window of the small house flickers softly like a screen glow. Cold moonlight on the rock face, warm light only in the window. Tack sharp, calm.',
+ risk:'A projector crushes the blacks and the valley disappears. Lift the darkest values to <code>#0b0d12</code> and check at 11:30.'},
+{n:2,act:'I',job:'Team',secs:30,title:'START Milan.',ov:'',frame:'frames/r/g-holo-0.jpg',fit:'',noov:true,bg:'#d9cbb6',light1:true,status:['picked','Freight garage and Giulia as a hologram, both Jan\'s picks · v2 still beats v3'],
+ feel:['Warmth, then a laugh','Four friends from Milan. Then the twist: one of them is the AI.'],
+ said:['Jan, then Mattia','We\'re START Milan. Sam, Mattia, Jan. Oh, we forgot someone. (grey) Giulia. At [2:14] last night a customer asked for [480] kilos to [Chicago]. [38] seconds later Giulia had quoted.<br>MATTIA: Yes, she\'s Italian. She answers in thirty-eight seconds, at two in the morning. That\'s how we knew she was AI.'],
+ screen:'Headline <b>START Milan.</b> top left on cream. On beat 2 Giulia\'s card carries <b>ciao</b> in Mrs Saint Delafield, 64 px, green, the one green on this slide.',
+ shot:'<b>Medium group selfie at arm\'s length, slightly high.</b> The freight garage at night, the three of us in colour. On the beat Giulia fades in at the right as a cyan hologram, coffee cup in hand, while the three go grey (Jan\'s pick, 07:25).',
+ light:'Cream ground <code>#f4f3ef</code>, the photo in its own colour, then grey.',
+ motion:'<b>Primary:</b> beat 2, three faces go grey over 1.4 s. <b>Secondary:</b> Giulia\'s card slides 6 cqw in, 1.2 s, ease-out. "ciao" writes itself in 1.1 s. <b>Ambient:</b> the polaroid drifts 1.00 to 1.04.',
+ beats:[['0:06','The selfie, all in colour.'],['0:12','"Oh, we forgot someone." Click: three go grey, Giulia slides in.'],['0:20','Giulia\'s 2 a.m. quote, spoken over the card.'],['0:28','Mattia\'s line. Hold 2 s for the laugh.'],['0:36','Next click.']],
+ cut:'<b>In:</b> crossfade 600 ms. <b>Out:</b> dim 900 ms. The light goes out with the story.',
+ sound:'Live voices. The laugh is the sound design. Never talk over it.',
+ make:'Photo + code. The beat already runs in <code>deck.html</code> (<code>.s.grey</code>). The selfie is taken at 10:00 at the same tilt, and the numbers in brackets come from the register.',
+ prompt:'',risk:'The joke dies if Mattia starts before the card has landed. He speaks after the "ciao" has finished writing.'},
+{n:3,act:'I',job:'Pain',secs:18,title:'25 requests. One head.',ov:'',frame:'frames/r/head-v3-0.jpg',bg:'#f1ece0',status:['open','v3 after Jan rejected v2 at 08:00 · his verdict open'],
+ feel:['Overload','Recognition. Every forwarder in the room knows this person.'],
+ said:['Jan','This is a forwarder. Twenty, thirty requests a day. Every answer hangs on what the mail doesn\'t say. Which warehouse. Which customer. Why 299 kilos cost more than 300. All of it lives in one tired head.'],
+ screen:'Outfit 600, ink, top left. <b>One head.</b> may sit in muted grey on a second line. 25 glass request cards, each with a real lane and weight, orbit his head.',
+ shot:'<b>Studio portrait, centred, from the chest up.</b> An overwhelmed freight coordinator in black and white: hand in his hair, eyes up at the cards, headset on, hi-vis vest, warehouse badge. Cream ground, lots of air above him for the orbit (Mindly pin, v3 after Jan\'s 08:00 verdict).',
+ light:'Soft studio light on cream. The photo is black and white, the cards are frosted glass with ink text. The one colour comes later, with Giulia.',
+ motion:'<b>Primary:</b> the 25 cards arrive one by one and join the orbit, it gets crowded. <b>Secondary:</b> the orbit turns slowly, nearer cards faster. <b>Ambient:</b> the portrait drifts 1.00 to 1.04.',
+ beats:[['0:36','The portrait alone, eyes closed.'],['0:40','The first request card arrives, then the rest, one per beat.'],['0:50','25 cards orbit, the head barely visible.'],['0:54','Next click.']],
+ cut:'<b>In:</b> dim from 2. <b>Out:</b> hard cut to white. Act I ends, the noise starts.',
+ sound:'Voice only. The 299 kg line gets one short pause before "cost more than 300".',
+ make:'Still <code>head-1.png</code> (fal, from the Mindly pin) + cutout <code>head-cut.png</code>, 25 cards in code. Live in the deck session\'s page, section "Slide 3".',
+ prompt:'',risk:'Cards cover his face. The orbit keeps the face clear: cards pass behind the head, never across the eyes.'},
+{n:4,act:'II',job:'Shift',secs:8,title:'Freight runs on email.',ov:'',svg:'inbox',bg:'#ffffff',light1:true,status:['open','Open · sketch only'],
+ feel:['Absurdity','A billion-euro industry, still typed by hand. The jury thinks "still?"'],
+ said:['Jan','Freight still runs on email. Every price is new, every answer typed by hand.'],
+ screen:'Outfit 600, ink, top left on white.',
+ shot:'<b>Close-up, frontal, flat and graphic</b> like pin-342. One inbox tray in the right half, the headline on the left.',
+ light:'White ground, ink lines, grey contour strips (pin-342).',
+ motion:'<b>Primary:</b> envelopes drop into the tray one every 180 ms, ease-in like gravity. <b>Secondary:</b> the stack grows until the 15th tips over the edge and falls out of frame. <b>Ambient:</b> line boil.',
+ beats:[['0:54','Hard cut in. Envelopes start falling at once.'],['0:58','The stack spills over the edge.'],['1:02','Next click.']],
+ cut:'<b>In:</b> hard cut from the night. <b>Out:</b> grow. The spilled envelopes turn into the first circles of the swarm on 5, at the same positions.',
+ sound:'Voice.',
+ make:'SVG in code, about 40 lines. The envelopes are one <code>&lt;symbol&gt;</code> reused.',
+ prompt:'',risk:'It reads as a cartoon. Keep the line weight of pin-342 (1.5 px at 1600) and no faces on the envelopes.'},
+{n:5,act:'II',job:'Today\'s answer',secs:8,title:'More agents?',ov:'',frame:'frames/v5.jpg',inset:'frames/s5b.jpg',bg:'#efeae0',light1:true,status:['open','Rebuilt 06:10 in the deck session · frame is the old version'],
+ feel:['Chaos, then a jolt','As confusing as possible. The industry\'s answer piles up until it shakes and bursts.'],
+ said:['Jan','The industry\'s answer: more agents.'],
+ screen:'Outfit 600, ink, top left. The question mark is the joke. Named agent labels pile up around it.',
+ shot:'<b>Wide, graphic, filling to the edges.</b> No empty corner by the end.',
+ light:'Paper ground, pen-blue agents with names, the density turns the paper dark.',
+ motion:'<b>Primary:</b> every mail spawns named agents, the count climbs to 10,000. <b>Secondary:</b> the frame shakes harder as it fills. <b>End:</b> it bursts, and the deck cuts to 6 on its own.',
+ beats:[['1:02','Mails arrive, agents spawn with names.'],['1:05','The count climbs, the frame starts to shake.'],['1:09','10,000. It bursts.'],['1:10','Auto-cut to the meadow.']],
+ cut:'<b>In:</b> grow from the envelopes. <b>Out:</b> the burst, then an automatic hard cut to 6. The turn of the film.',
+ sound:'Voice, then silence the moment it bursts.',
+ make:'Canvas 2D, owned by the deck session (<code>sketch.html</code>, live: claude.ai/artifact/9xZSF5o6C6QdmzmwaYekBw). Jan, 06:10: "so verwirrend wie möglich ... explodiert das Ding, es rüttelt".',
+ prompt:'',risk:'Shake on a projector can make people look away. Keep the shake under 6 px and under 1.5 s.'},
+{n:6,act:'III',job:'Insight',secs:10,title:'Stop. Simplicity.',ov:'turn',frame:'frames/s7a.jpg',inset:'frames/v6.jpg',bg:'#dfe9d2',light1:true,turn:true,status:['picked','Still picked · pen built · video open'],
+ feel:['Relief, a breath','After the noise, an empty meadow. The jury exhales with us.'],
+ said:['Jan','Stop. Simplicity. The model decides. The system guarantees.'],
+ screen:'Fraunces 300, opsz 144, 104 px. <b>Stop.</b> appears instantly, the one place in the deck without easing. <b>Simplicity.</b> follows 400 ms later.',
+ shot:'<b>Wide, low angle.</b> The horizon sits on the lower third, the sky takes 60 % for the words. The sprout sits low centre, the first calm point after the burst.',
+ light:'Soft white daylight, white sky. Then the photo fades to paper and the same hill is drawn in pen.',
+ motion:'<b>Primary:</b> 1.2 s of meadow, nothing else. <b>Then:</b> the photo fades to paper over 1.2 s while the hill and the sprout draw themselves, 2.4 s, <code>stroke-dashoffset</code>. <b>Ambient:</b> grass in the plate, then line boil.',
+ beats:[['1:10','Hard cut to the meadow. 1.2 s of nothing.'],['1:11','"Stop." instantly. "Simplicity." 400 ms later.'],['1:13','The meadow turns into a pen drawing.'],['1:20','Next click.']],
+ cut:'<b>In:</b> automatic hard cut on the burst. <b>Out:</b> grow. The hill stays, the valley draws on around it.',
+ sound:'1.2 s of real silence in the room. The silence is the effect.',
+ make:'<b>Seedance 2.5</b> on <code>meadow-sprout.jpg</code>, 10 s, then SVG pen hill (<code>sketch.html</code>).',
+ prompt:'The meadow stays still. Locked-off static camera. A light wind moves the grass and the wildflowers on the hill, the small green sprout sways slightly. Soft white daylight, white sky. Tack sharp, calm.',
+ risk:'Someone clicks during the silence. The 1.2 s is timed in code, the click only arrives after it.'},
+{n:7,act:'III',job:'Reveal',secs:18,title:'One agent per deal.',ov:'',frame:'frames/r/ink-sea-v4.jpg',noov:true,bg:'#f4f0e6',light1:true,status:['open','v4, mountains out (Jan, "die sind bissl unnötig") · his verdict open'],
+ feel:['Calm competence','Oh, that\'s simple. A whole small world runs, and nothing hurries.'],
+ said:['Mattia','One agent per deal. Giulia reads the mail, asks the airlines, prices every option, writes back and books. Every new mail in the thread wakes the same Giulia, with everything said before.'],
+ screen:'Outfit 600, ink, top left. No sub line.',
+ shot:'<b>Extreme wide, side-on, flat.</b> Open hatched sea, denser towards the horizon. The container ship GIULIA lower left, a 747 freighter on the dashed route, a freight train on the shore. No mountains: the vehicles and the route carry the slide.',
+ light:'Paper <code>#f4f0e6</code>, ballpoint blue <code>#22339c</code>. Every vehicle in the same stroke density as the sea, never a flat icon.',
+ motion:'<b>Primary:</b> the 747 flies the dashed route, the line draws on ahead of it. <b>Secondary:</b> the ship moves right at walking pace, funnel smoke curling; the train crosses the shore and chugs on twos (1.6 px every 125 ms). <b>Ambient:</b> the hatching boils, 8 times a second.',
+ beats:[['1:20','The sea hatches on from the horizon down, 1.6 s.'],['1:22','The world runs: 747, ship, train.'],['1:38','Next click.']],
+ cut:'<b>In:</b> grow from the horizon of 6. <b>Out:</b> match. A push into the ship\'s bridge window, 500 ms, landing on the screen of slide 8.',
+ sound:'Mattia\'s voice. The speaker changes on the slide change.',
+ make:'Ink drawn in code. Live in the deck session\'s page, section "Slide 7" (still <code>slide7-v4.png</code>).',
+ prompt:'',risk:'An empty upper half. The route and the 747 hold it; the headline stays top left.'},
+{n:8,act:'III',job:'Moat',secs:24,title:'She remembers.',ov:'',frame:'frames/v8.jpg',bg:'#f8f4ed',light1:true,status:['built','Built · note beats open'],
+ feel:['Trust, a smile at the details','She knows the things nobody wrote down. The jury sees the moat in three small notes.'],
+ said:['Mattia','She remembers. Simple for her. Not underneath. All night 5U changed the rules. Every detail we missed once became one line of code: the warehouse that isn\'t the signature, the real customer behind a copied address, 299 kilos. She never misses it twice.'],
+ screen:'Outfit 600, ink, top left. Three handwritten pen notes on the left: <b>299 kg</b>, <b>from our warehouse</b>, <b>a copied address</b>.',
+ shot:'<b>Medium close-up, three-quarter high angle</b> on the ballpoint desk: laptop with the Italian flag, coffee, flowers, on the right third.',
+ light:'The flux line plate with <code>darken</code> blend on paper, so plate and code share one ink.',
+ motion:'<b>Primary:</b> each note writes itself on its click, 900 ms, its underline 300 ms after. <b>Secondary:</b> mails fly in and leave answered. <b>Ambient:</b> boil.',
+ beats:[['1:38','The desk and the headline.'],['1:46','Click: "from our warehouse" writes itself.'],['1:52','Click: "a copied address".'],['1:58','Click: "299 kg".'],['2:02','Next click.']],
+ cut:'<b>In:</b> match from the window. <b>Out:</b> hard cut to the question.',
+ sound:'Voice. Each note lands on its spoken word.',
+ make:'Flux plate <code>giulia-line.jpg</code> + SVG notes. The notes still appear together, so the three beats need to be added.',
+ prompt:'',risk:'The notes appear in a different order than they are said. The spoken order is warehouse, copied address, 299 kg, so the beats follow it.'},
+{n:9,act:'III',job:'Proof',secs:12,title:'Does it work?',ov:'',svg:'board',bg:'#f4f3ef',light1:true,status:['open','Open · number at 10:00'],
+ feel:['Proof','One number, no chart. The Lio move: a question, then a one-word answer over the evidence.'],
+ said:['Sam','Does it work? Last night she answered [every] mail. Under two minutes each. A third of a cent per quote.'],
+ screen:'Beat 1: <b>Does it work?</b> alone. Beat 2: <b>#[rank] of [n].</b> in Outfit 500, 144 px, green, over the leaderboard screenshot at 40 %.',
+ shot:'<b>Flat, frontal.</b> The question top left. The number fills the centre.',
+ light:'Cream ground, the screenshot dimmed so the number wins.',
+ motion:'<b>Primary:</b> the number lands, no count-up, a single cut. <b>Secondary:</b> the screenshot drifts 1.00 to 1.04.',
+ beats:[['2:02','"Does it work?" alone for 1.5 s.'],['2:04','400 ms of silence, then click: the number.'],['2:14','Next click.']],
+ cut:'<b>In:</b> hard cut. <b>Out:</b> crossfade 600 ms.',
+ sound:'Silence before the number. Sam says it, the screen confirms it.',
+ make:'Screenshot of the board and of our live UI at 10:00. Only verified numbers, from the register.',
+ prompt:'',risk:'An unverified number in front of the 5U jury. If the rank is not final at 10:00, the slide says "Every mail answered." instead.'},
+{n:10,act:'III',job:'Business',secs:22,title:'We keep the margin.',ov:'',svg:'margin',bg:'#f4f3ef',light1:true,status:['open','Open · sketch only'],
+ feel:['"This is a business"','Two numbers side by side, and the jury does the maths itself.'],
+ said:['Sam','And here is the business. We are not selling software to forwarders. We are the forwarder. We earn the margin on every kilo, like Kuehne+Nagel. They pay a desk hours per quote. We pay a third of a cent.'],
+ screen:'Outfit 600 headline. Two numbers, Outfit 500: <b>hours</b> in ink on the left, <b>⅓ ¢</b> in green on the right.',
+ shot:'<b>Flat, two columns.</b> The left number small and grey-heavy, the right one with air around it.',
+ light:'Cream. The green blob (pin-343, in green) grows only behind ⅓ ¢.',
+ motion:'<b>Primary:</b> under ⅓ ¢ the blob grows ring by ring, one ring every 400 ms, five rings. <b>Secondary:</b> none.',
+ beats:[['2:14','Headline and "hours".'],['2:24','Click: ⅓ ¢ and the rings.'],['2:36','Next click.']],
+ cut:'<b>In:</b> crossfade. <b>Out:</b> cut to the night valley, which then turns to dawn.',
+ sound:'Voice. Sam lands "a third of a cent" on the click.',
+ make:'SVG, the concentric blob already exists in <code>deck.html</code> (old slide 11).',
+ prompt:'',risk:'"hours" needs to be our own number, not a study. Use what our ops desk timed, or say "hours" without a figure.'},
+{n:11,act:'III',job:'Vision',secs:24,title:'We are the forwarder.',ov:'center',frame:'frames/r/hero-sea-day-1.jpg',bg:'#f3e7cf',status:['open','v2 the hero by day, its mirror (Jan 08:38) · his pick open'],
+ feel:['Arrival, conviction','The same valley the jury started in. The night they heard about turns into morning.'],
+ said:['Jan','So we\'re not building a tool for forwarders. We are the forwarder. [Next: our first shippers in Milan.] At night, Giulia answers. She remembers every customer and every lesson. In the morning, the judgement calls are ours.'],
+ screen:'Outfit 600, ink on the dawn sky, centred like slide 1. The bookend has the same position as the opening question.',
+ shot:'<b>Extreme wide, locked-off, the exact framing of slide 1.</b> Same house, same window.',
+ light:'Warm light reaches the peaks and slides down the slopes. The window light goes out.',
+ motion:'<b>Primary:</b> night crossfades into dawn over 2.4 s. <b>Secondary:</b> mist lifts off the meadow in the plate. <b>Ambient:</b> drift 1.00 to 1.06.',
+ beats:[['2:36','The night valley again, then 2.4 s to dawn.'],['2:40','The line appears.'],['2:59','The last word. Hold 1 s.'],['3:00','Hard cut to black.']],
+ cut:'<b>In:</b> dawn transition. <b>Out:</b> hard cut to black on the last word, logo rule 0.5 to 1 s.',
+ sound:'Jan\'s last line. Then silence until the applause.',
+ make:'<b>Seedance 2.5</b> on <code>valley-dawn.jpg</code>, 10 s. The night-to-dawn blend is code: two stacked videos.',
+ prompt:'Sunrise in the same valley. Locked-off static camera. Warm light reaches the mountain peaks and slides slowly down the slopes, the window light of the small house goes out, mist lifts gently off the meadow. Tack sharp.',
+ risk:'Night and dawn framings drift apart, so the house jumps. Both clips come from stills with the same composition, and the corners are checked within 2 px.'}
+];
+const JOINTS=['xfade','dim','cut','grow','cut · turn','grow','match','cut','xfade','dawn'];
+const TOTAL=P.reduce((a,p)=>a+p.secs,0);
+let t=0;P.forEach(p=>{p.t=t;t+=p.secs});
+const mmss=s=>Math.floor(s/60)+':'+String(Math.round(s%60)).padStart(2,'0');
+const esc=s=>s;
+
+/* pen sketches for panels that have no frame yet */
+/* panels without a frame show the words that will be on the slide, on its ground, until Jan picks a still */
+const EMPTY={inbox:['Freight runs on email.','Still to make: overflowing inbox tray in pen, envelopes spilling (pin-342)'],
+  board:['Does it work?','Screenshot of the board at 10:00, the rank in green over it'],
+  margin:['We keep the margin.','hours against ⅓ ¢, concentric green rings behind ⅓ ¢']};
+function sketch(kind){
+  const [t,d]=EMPTY[kind];
+  return `<div class="empty"><b>${t}</b><span>${d}</span></div>`;
+}
+
+/* colour script */
+const strip=document.getElementById('strip');
+P.forEach(p=>{
+  const a=document.createElement('a');a.href='#p'+p.n;a.style.flex=p.secs;a.style.background=p.bg;
+  if(p.light1)a.className='light';if(p.turn)a.classList.add('turn');
+  a.innerHTML=`<span>${p.n}</span>`;a.title=`${p.n} ${p.title} · ${p.secs} s · then ${JOINTS[p.n-1]||'black'}`;strip.appendChild(a);
+});
+const acts=document.getElementById('acts');
+[['I · Night','I'],['II · Noise','II'],['III · Day','III']].forEach(([l,k])=>{
+  const s=P.filter(p=>p.act===k).reduce((a,p)=>a+p.secs,0);
+  const d=document.createElement('div');d.style.flex=window.innerWidth<700?'0 1 auto':s;d.textContent=`${l} · ${s} s`;acts.appendChild(d)});
+
+/* panels */
+const store={get(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const main=document.getElementById('panels');
+/* every still we make lives here, one row per round, oldest first. pick: 'jan' = his choice, 'ours' = the maker's */
+const R={
+  1:[{v:'v1',what:'Valley night, fal',pics:[['s1.jpg','Valley night','jan']]},
+     {v:'v2',what:'Velorah night meadow, the style key',pics:[['r/meadow-screen-0.jpg','Meadow, screen glow','ours']]},
+     {v:'v3',what:'Ships at sea at night (Jan, 08:15), two takes by the deck sessions',pics:[['r/hero-sea-fal.jpg','fal still, grey ships','no'],['r/hero-sea-3d.jpg','Three.js toy ship','no']]},
+     {v:'v4',what:'Painted: watercolour, white sky, grey moon, low horizon, ship silhouettes, plane left (Jan, 08:36)',pics:[['r/hero-paint-1.jpg','Moon centre, one lit bridge','ours'],['r/hero-paint-0.jpg','Moon right, plane with trail']]}],
+  2:[{v:'v1',what:'The three of us, faces kept',pics:[['r/team-freight-0.jpg','Freight garage','jan'],['r/team-garage-0.jpg','Garage'],['r/team-goldengate-0.jpg','Golden Gate'],['r/team-boat-selfie-0.jpg','Boat selfie'],['r/team-boat-selfie-1.jpg','Boat selfie, wide']]},
+     {v:'v2',what:'Giulia joins, six styles',pics:[['r/g-holo-0.jpg','Hologram','jan'],['r/g-lowpoly-0.jpg','Low poly'],['r/g-ink-0.jpg','Ink'],['r/g-soft3d-0.jpg','Soft 3D'],['r/g-porcelain-0.jpg','Porcelain'],['r/g-paper-0.jpg','Paper']]},
+     {v:'v3',what:'Hologram, second round',pics:[['r/g-holo-v2-0.jpg','Hologram v3 a'],['r/g-holo-v2-1.jpg','Hologram v3 b']]}],
+  3:[{v:'v1',what:'One head',pics:[['s3.jpg','Smoking head','no']]},
+     {v:'v2',what:'Jan\'s Mindly pin as a forwarder, 25 request cards orbit in code',pics:[['r/head-1.jpg','Forwarder, eyes closed, headset','no'],['r/head-0.jpg','Forwarder, second take','no'],['r/ref-mindly.jpg','Reference pin, Mindly']]},
+     {v:'v3',what:'Overwhelmed coordinator, hand in hair, eyes up at the cards, hi-vis, warehouse badge',pics:[['r/head-v3-0.jpg','Coordinator, hand in hair','ours']]}],
+  7:[{v:'v1',what:'Pin 304 rebuilt in code, the ink route draws itself',pics:[['r/pin304-v1.jpg','Route: mail, price, book, done']]},
+     {v:'v2',what:'Blue ballpoint sea from Jan\'s Lucbert and coast pins, in code',pics:[['r/ink-sea-v2.jpg','Ink cloud, boat, plane, train','no']]},
+     {v:'v3',what:'Vehicles in the same ballpoint hatching: container ship GIULIA, 747 freighter, locomotive with 4 container wagons',pics:[['r/ink-sea-v3.jpg','Ship, 747, freight train','no']]},
+     {v:'v4',what:'Mountains out, open hatched sea, the vehicles and the route carry it',pics:[['r/ink-sea-v4.jpg','Open sea, ship, 747, train','ours']]}],
+  11:[{v:'v1',what:'Jan\'s gradient rebuilt in code, orange pulled to gold, petrol night lifts at load',pics:[['r/dawn-b.jpg','Dawn, settled frame']]},
+      {v:'v2',what:'The hero by day, same ships, same horizon (Jan, 08:38: "spiegelbild der hero ... tagsüber hell")',pics:[['r/hero-sea-day-1.jpg','Sunrise on the horizon','ours'],['r/hero-sea-day-0.jpg','Sun where the moon was']]}],
+};
+function rounds(n){
+  const rs=R[n];if(!rs)return '';
+  const tag=k=>k==='jan'?' (Jan\'s pick)':k==='ours'?' (our pick)':k==='no'?' (rejected)':'';
+  return `<div class="rounds">${rs.map(r=>`<div class="round"><p class="rh"><b>${r.v}</b> ${r.what}: ${r.pics.map(([f,l,k])=>l+tag(k)).join(', ')}</p><div class="thumbs">${
+    r.pics.map(([f,l,k])=>`<button type="button" class="th${k?' k-'+k:''}" data-src="frames/${f}" title="${l}${tag(k)}" aria-label="Show ${l} in the frame"><img src="frames/${f}" alt="${l}" loading="lazy"></button>`).join('')
+  }</div></div>`).join('')}</div>`;
+}
+main.addEventListener('click',e=>{const b=e.target.closest('.th');if(!b)return;
+  const img=b.closest('.panel').querySelector('.frame > img');if(img){img.src=b.dataset.src;img.classList.remove('contain')}
+  b.closest('.rounds').querySelectorAll('.th').forEach(x=>x.classList.toggle('on',x===b));});
+P.forEach(p=>{
+  const el=document.createElement('article');el.className='panel';el.id='p'+p.n;
+  const pic=p.svg?sketch(p.svg):`<img src="${p.frame}" alt="Frame for slide ${p.n}, ${p.title}"${p.fit?' class="contain"':''}>`;
+  const ovText=(p.svg||p.noov||p.frame.startsWith('frames/v'))?'':`<div class="ov ${p.ov}">${p.title}</div>`;
+  el.innerHTML=`
+  <div class="left">
+    <div class="frame">${pic}${ovText}${p.inset?`<div class="inset"><img src="${p.inset}" alt="Second state of slide ${p.n}"></div>`:''}${p.svg?'<span class="tag">No frame yet</span>':''}</div>
+    <div class="meta"><span class="chip">${mmss(p.t)} – ${mmss(p.t+p.secs)}</span><span class="chip">${p.secs} s</span><span class="chip">Act ${p.act}</span><span class="chip st-${p.status[0]}">${p.status[1]}</span></div>
+    <div class="timeline">${p.beats.map(b=>`<div><code>${b[0]}</code><span>${b[1]}</span></div>`).join('')}</div>
+    ${rounds(p.n)}
+  </div>
+  <div class="right">
+    <div class="ph"><span class="num">${String(p.n).padStart(2,'0')} · ${p.job}</span><h3 class="${p.turn?'turn':''}">${p.title}</h3></div>
+    <div class="feel"><b>${p.feel[0]}</b><span>${p.feel[1]}</span></div>
+    <p class="said"><em>Said · ${p.said[0]}</em>${p.said[1]}</p>
+    <dl>
+      <dt>On screen</dt><dd>${p.screen}</dd>
+      <dt>Shot</dt><dd>${p.shot}</dd>
+      <dt>Light, colour</dt><dd>${p.light}</dd>
+      <dt>Motion</dt><dd>${p.motion}</dd>
+      <dt>Cut</dt><dd>${p.cut}</dd>
+      <dt>Sound</dt><dd>${p.sound}</dd>
+      <dt>Made with</dt><dd>${p.make}</dd>
+      ${p.prompt?`<dt>Video prompt</dt><dd><code>${p.prompt}</code></dd>`:''}
+      <dt>Risk</dt><dd>${p.risk}</dd>
+    </dl>
+    <div class="verdict"><label for="v${p.n}">Your verdict on ${p.n}</label><textarea id="v${p.n}" placeholder="What is wrong, what stays, what to try"></textarea></div>
+  </div>`;
+  main.appendChild(el);
+  const ta=el.querySelector('textarea');ta.value=store.get('sb3-'+p.n);ta.addEventListener('input',()=>store.set('sb3-'+p.n,ta.value));
+});
+
+/* copy notes */
+document.getElementById('copy').addEventListener('click',e=>{
+  const md='# Storyboard v3 verdicts\n\n'+P.map(p=>{const v=store.get('sb3-'+p.n)||document.getElementById('v'+p.n).value;return v?`- **${p.n} ${p.title}**: ${v}`:''}).filter(Boolean).join('\n');
+  const b=e.currentTarget;
+  navigator.clipboard.writeText(md).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy all notes as markdown',1600)})
+  .catch(()=>{const ta=document.createElement('textarea');ta.value=md;document.body.appendChild(ta);ta.select();b.textContent='Selected, press Cmd+C';setTimeout(()=>{ta.remove();b.textContent='Copy all notes as markdown'},2500)});
+});
+
+/* animatic: the panels in a row, timed, with the spoken line */
+const A=document.getElementById('anim'),stage=document.getElementById('stage'),prog=document.getElementById('prog'),aline=document.getElementById('aline'),aclock=document.getElementById('aclock'),apause=document.getElementById('apause');
+let ai=0,start=0,paused=false,pausedAt=0,raf=0;
+function show(i){
+  ai=Math.max(0,Math.min(P.length-1,i));const p=P[ai];
+  stage.innerHTML=(p.svg?sketch(p.svg):`<img src="${p.frame}" alt="">`)+((p.svg||p.noov||p.frame.startsWith('frames/v'))?'':`<div class="ov ${p.ov}">${p.title}</div>`);
+  stage.firstElementChild.classList.add('fade');
+  aline.innerHTML=`<b>${p.n} · ${p.said[0]}:</b> ${p.said[1]}`;
+  start=performance.now()-0;pausedAt=0;
+}
+function tick(now){
+  if(!paused){const p=P[ai],el=(now-start)/1000;
+    const g=p.t+Math.min(el,p.secs);prog.style.width=(g/TOTAL*100)+'%';aclock.textContent=mmss(g)+' / '+mmss(TOTAL);
+    if(el>=p.secs){if(ai<P.length-1)show(ai+1);else{paused=true;apause.textContent='Replay'}}}
+  raf=requestAnimationFrame(tick);
+}
+function open(){paused=false;apause.textContent='Pause';show(0);cancelAnimationFrame(raf);raf=requestAnimationFrame(tick)}
+show(0);paused=true;raf=requestAnimationFrame(tick);
+document.getElementById('anext').addEventListener('click',()=>show(ai+1));
+document.getElementById('aprev').addEventListener('click',()=>show(ai-1));
+apause.addEventListener('click',()=>{
+  if(apause.textContent==='Replay'){open();return}
+  if(paused){start+=performance.now()-pausedAt;paused=false;apause.textContent='Pause'}else{pausedAt=performance.now();paused=true;apause.textContent='Play'}});
+/* panels rise in as they scroll into view */
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&'IntersectionObserver' in window){
+  const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}}),{rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.panel,.build>*').forEach(el=>{el.classList.add('rise');io.observe(el)});
+}
+document.addEventListener('keydown',e=>{if(e.target.tagName==='TEXTAREA')return;if(e.key==='ArrowRight')show(ai+1);if(e.key==='ArrowLeft')show(ai-1)});
+</script>

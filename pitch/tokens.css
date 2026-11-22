@@ -1,0 +1,31 @@
+/* START Milan CI tokens. Source of the values: ../pitch/decks/pins/CI.md sections 3, 4, 6, 12.
+   A value changes here and in CI.md together, and only with a verdict logged in LEARNED.md. */
+:root {
+  /* colour, Sam's product tokens as base */
+  --ci-ground: #f4f3ef;
+  --ci-card: #ffffff;
+  --ci-ink: #17181a;
+  --ci-ink-2: #3a3d42;
+  --ci-muted: #7a7e85;
+  --ci-line: #d9d6ce;
+  --ci-night: #0b0d12;
+  --ci-green: #1f7a4d;      /* the one accent, at most one green element per slide */
+  --ci-green-soft: #e4f3ea;
+  /* act III, the drawn world */
+  --ci-pen: #27358a;
+  --ci-pen-light: #5a67a8;
+  --ci-paper: #f8f4ed;
+
+  /* type */
+  --ci-font-head: "Outfit", system-ui, sans-serif;
+  --ci-font-turn: "Fraunces", Georgia, serif;
+  --ci-font-ui: "Inter", system-ui, sans-serif;
+  --ci-font-hand: "Mrs Saint Delafield", cursive;
+
+  /* motion */
+  --ci-ease-in: cubic-bezier(.2,.7,.2,1);     /* everything that enters */
+  --ci-ease-arrive: cubic-bezier(.16,1,.3,1); /* opener arrivals */
+  --ci-dur-text: 900ms;
+  --ci-stagger: 40ms;
+  --ci-crossfade: 600ms;
+}

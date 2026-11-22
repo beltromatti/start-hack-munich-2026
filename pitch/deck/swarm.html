@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swarm overkill: Simplicity</title>
+<!-- Pitch scene, START Hack Munich 2026, 5U "Build the Forwarder". Jan, 22.11.2026: "a mail comes in ... the agents go
+     completely crazy. Total overkill, and we say: that's not what you want ... Then Simplicity. Bam! Pause."
+     Engine: ~/dev/Slides/agent-swarm (Jan-approved look). Only the data and the cut are new.
+     ?t=9 seeks, ?click holds at 0 until a click or Space, then plays once and stops on the last frame. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif&family=Inter:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070506; --panel:#0e0a0b; --line:#2a1d20; --ink:#f4ecec; --dim:#a08c8f; --faint:#5c4a4d;
+  --red:#ff2d3d; --red-deep:#9e0d18;
+  --a1:#7aa2ff; --a2:#e6e27a; --a3:#ff4d5e; --a4:#5be3a5; --a5:#c58cff; --a6:#9ad8ff;
+  --sans:"Geist",system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,monospace;
+  --disp:"Archivo",system-ui,sans-serif;
+  --cream:#efe9d2; --calm-ink:#2b3442;
+}
+.cap{font-family:var(--disp);font-stretch:118%}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden}
+body.click{cursor:pointer}
+#fit{position:fixed;inset:0;display:grid;place-items:center}
+#stage{width:1920px;height:1080px;position:relative;transform-origin:center;display:grid;overflow:hidden;
+  grid-template-columns:320px 1fr 400px;grid-template-rows:60px 1fr 64px;
+  background:radial-gradient(1200px 700px at 52% 46%,#2a0a0e 0%,var(--bg) 70%)}
+
+/* top bar */
+#top{grid-column:1/-1;display:flex;align-items:center;gap:28px;padding:0 28px;border-bottom:1px solid var(--line)}
+#top .proj{font-weight:600;font-size:18px;letter-spacing:-.01em}
+#top .proj span{color:var(--dim);font-weight:400}
+.live{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--dim)}
+.live i{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px #ff2d3d33;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px #ff2d3d00}}
+#top .meters{margin-left:auto;display:flex;gap:34px;font-family:var(--mono);font-size:16px;color:var(--dim)}
+#top .meters b{color:var(--ink);font-weight:500;display:inline-block;text-align:left}
+#top .meters .hot b{color:var(--red)}
+
+/* swarm dock: flat list, dense once the swarm grows past six */
+#dock{border-right:1px solid var(--line);padding:22px 18px;display:flex;flex-direction:column;overflow:hidden}
+#dock h2,#log h2{font-size:15px;font-weight:500;color:var(--dim);margin:0 6px 8px}
+#dock h2 b{color:var(--ink);font-weight:600;margin-left:6px}
+.agent{position:relative;padding:16px 8px 16px 34px;border-top:1px solid var(--line);opacity:.55}
+.agent.off{display:none}
+.agent.busy,.agent.done{opacity:1}
+.agent .av{position:absolute;left:8px;top:22px;width:10px;height:10px;border-radius:2px;font-size:0}
+.agent .nm{font-size:17px;font-weight:600;white-space:nowrap}
+.agent .tk{font-size:15px;color:var(--dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent .st{position:absolute;right:14px;top:16px;font-family:var(--mono);font-size:13px;color:var(--faint)}
+.agent.busy .st{color:var(--ink)}
+#dock.dense .agent{padding:2px 8px 2px 26px}
+#dock.dense .agent .av{top:8px;width:8px;height:8px}
+#dock.dense .agent .nm{font-size:14px;font-weight:500;line-height:18px}
+#dock.dense .agent .tk{display:none}
+#dock.dense .agent .st{top:3px;font-size:12px}
+
+/* canvas */
+#canvas{position:relative;overflow:hidden;
+  background-image:radial-gradient(#ffffff10 1px,transparent 1px);background-size:24px 24px}
+#board{position:absolute;left:50%;top:44px;width:1280px;height:880px;transform-origin:top left;
+  background:#0b0809;border-radius:14px;box-shadow:0 30px 80px -20px #000,0 0 0 1px #ffffff12;overflow:hidden}
+.boardlabel{position:absolute;left:50%;top:14px;transform:translateX(-50%);font-size:14px;color:var(--dim);font-family:var(--mono)}
+
+/* the mail client on the board */
+.el{position:absolute}
+.fill{opacity:0;transition:opacity .45s ease-out,transform .55s cubic-bezier(.16,1,.3,1),filter .55s;transform:translateY(10px);filter:blur(6px)}
+.fill.on{opacity:1;transform:none;filter:none}
+.mbar{left:0;top:0;width:1280px;height:64px;display:flex;align-items:center;gap:22px;padding:0 28px;background:#100b0c;border-bottom:1px solid #ffffff0e}
+.mbar .app{font-weight:600;font-size:19px}
+.mbar .search{flex:0 0 420px;height:38px;border-radius:10px;background:#ffffff0a;color:var(--faint);font-size:16px;display:flex;align-items:center;padding:0 16px;margin-left:26px}
+.mbar .who{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--dim);font-size:16px}
+.mbar .who i{width:30px;height:30px;border-radius:50%;background:#2a1d20;display:grid;place-items:center;font-style:normal;color:var(--ink);font-size:13px;font-weight:600}
+.folders{left:0;top:64px;width:210px;height:816px;padding:22px 14px;display:flex;flex-direction:column;gap:4px;background:#0d090a}
+.folders span{display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-size:17px;color:var(--dim)}
+.folders span.sel{background:#ffffff0c;color:var(--ink)}
+.folders b{font-weight:600;color:var(--ink);font-size:15px;opacity:0;transition:opacity .3s}
+.folders b.on{opacity:1}
+.list{left:210px;top:64px;width:360px;height:816px;border-left:1px solid #ffffff0a;border-right:1px solid #ffffff0a}
+.msg{position:relative;padding:16px 20px 16px 30px;border-bottom:1px solid #ffffff08}
+.msg .f{font-size:16px;font-weight:500;color:var(--dim);display:flex;justify-content:space-between}
+.msg .f em{font-style:normal;font-size:14px;color:var(--faint)}
+.msg .s{font-size:15px;color:var(--faint);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg.new{background:#ffffff0d}
+.msg.new .f{color:var(--ink);font-weight:600}
+.msg.new .s{color:var(--ink)}
+.msg.new::before{content:"";position:absolute;left:12px;top:23px;width:8px;height:8px;border-radius:50%;background:var(--a1)}
+.newrow{overflow:hidden;max-height:0;transition:max-height .45s cubic-bezier(.16,1,.3,1)}
+.newrow.on{max-height:90px}
+.read{left:570px;top:64px;width:710px;height:816px;padding:40px 48px}
+.read .empty{position:absolute;left:0;right:0;top:360px;text-align:center;color:var(--faint);font-size:17px;transition:opacity .2s}
+.read .empty.gone{opacity:0}
+.rsubj{font-size:27px;font-weight:600;letter-spacing:-.015em;line-height:1.22;text-wrap:balance}
+.rfrom{display:flex;gap:14px;align-items:center;margin-top:24px}
+.rfrom i{width:44px;height:44px;border-radius:50%;background:#7aa2ff22;color:var(--a1);display:grid;place-items:center;font-style:normal;font-weight:600;font-size:16px}
+.rfrom .n{font-size:17px;font-weight:600}
+.rfrom .n span{font-weight:400;color:var(--dim)}
+.rfrom .to{font-size:15px;color:var(--dim);margin-top:2px}
+.rfrom em{margin-left:auto;font-style:normal;font-size:15px;color:var(--dim);align-self:flex-start;margin-top:4px}
+.rbody{margin-top:30px;font-size:18px;line-height:1.6;color:#e6dcdc;display:flex;flex-direction:column;gap:14px;width:600px}
+.spec{display:flex;flex-direction:column;gap:2px}
+.rbody b{font-weight:600;color:var(--ink)}
+.att{display:inline-flex;gap:12px;align-items:center;margin-top:26px;padding:12px 16px;border-radius:10px;background:#ffffff0a;font-size:15px}
+.att i{width:30px;height:36px;border-radius:4px;background:#ff2d3d26;color:var(--red);font-style:normal;font-size:11px;font-weight:600;display:grid;place-items:center}
+.att span{color:var(--dim)}
+
+/* boxes the swarm drags open */
+.wire{position:absolute;border:2px dashed var(--c);border-radius:8px;opacity:0;pointer-events:none}
+.wire em{position:absolute;left:-2px;top:-28px;font-style:normal;font-family:var(--mono);font-size:15px;
+  background:var(--c);color:#120d0e;padding:2px 9px;border-radius:6px 6px 6px 0;white-space:nowrap}
+.wire.on{opacity:1}
+.wire .h{position:absolute;width:10px;height:10px;background:#fff;border:2px solid var(--c);border-radius:2px;opacity:0}
+.wire.drawing .h{opacity:1}
+.wire .tl{left:-6px;top:-6px}.wire .tr{right:-6px;top:-6px}.wire .bl{left:-6px;bottom:-6px}.wire .br{right:-6px;bottom:-6px}
+.wire b{position:absolute;right:-4px;bottom:-30px;font-family:var(--mono);font-weight:500;font-size:14px;background:#fff;color:#120d0e;
+  padding:1px 7px;border-radius:5px;opacity:0;white-space:nowrap}
+.wire.drawing b{opacity:1}
+.wire.drawing{background:color-mix(in srgb,var(--c) 8%,transparent)}
+.guide{position:absolute;background:#ff2d74;opacity:0;pointer-events:none}
+.guide.v{top:0;bottom:0;width:1.5px}.guide.h{left:0;right:0;height:1.5px}
+
+/* cursors */
+.cur{position:absolute;left:0;top:0;pointer-events:none;will-change:transform;z-index:5}
+.cur svg{display:block;filter:drop-shadow(0 4px 8px #000a);transition:transform .12s}
+.cur.press svg{transform:scale(.86)}
+.cur span{position:absolute;left:18px;top:20px;font-size:15px;font-weight:600;color:#120d0e;padding:3px 9px;border-radius:0 8px 8px 8px;white-space:nowrap}
+.cur.small span{font-size:12px;padding:2px 7px;left:14px;top:16px}
+.cur.small svg{width:16px;height:18px}
+
+/* log */
+#log{border-left:1px solid var(--line);padding:22px 20px;display:flex;flex-direction:column;overflow:hidden}
+#lines{display:flex;flex-direction:column;gap:9px;font-family:var(--mono);font-size:14px;line-height:1.4;overflow:hidden;flex:1;justify-content:flex-end}
+.ln{opacity:0;transform:translateY(8px);animation:ln .3s ease-out forwards}
+@keyframes ln{to{opacity:1;transform:none}}
+.ln b{font-weight:500}
+.ln .ts{color:var(--faint);margin-right:8px}
+.ln .no{color:var(--red)}
+
+/* timeline */
+#tl{grid-column:1/-1;border-top:1px solid var(--line);display:flex;align-items:center;gap:20px;padding:0 28px}
+#play{width:40px;height:40px;border-radius:50%;border:1px solid #ffffff2a;background:none;color:var(--ink);font-size:15px;cursor:pointer}
+#play:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+#track{position:relative;flex:1;height:30px;cursor:pointer}
+#track .seg{position:absolute;top:8px;height:14px;border-radius:5px;opacity:.85}
+#head{position:absolute;top:0;width:2px;height:30px;background:var(--ink)}
+#clock{font-family:var(--mono);font-size:16px;color:var(--dim);width:110px;text-align:right}
+
+/* 8 to 10 s: dimmed frame, the verdict twice */
+#dim{position:absolute;inset:0;background:#070506;opacity:0;z-index:20;pointer-events:none}
+#say{position:absolute;inset:0;z-index:21;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;pointer-events:none}
+#say div{font-weight:800;letter-spacing:-.025em;line-height:1;white-space:nowrap;color:#fff;opacity:0}
+#say .s1{font-size:64px;color:#ffffffc8}
+#say .s2{font-size:104px}
+
+/* 10 s: hard cut to the horizon */
+#calm{position:absolute;inset:0;z-index:30;display:none;overflow:hidden;
+  background:linear-gradient(180deg,var(--cream) 0,var(--cream) 640px,#dfe6ea 641px,#e6e8e2 860px,var(--cream) 1080px)}
+#calm.on{display:block}
+#calm svg.ghost{position:absolute;inset:0}
+#hz{position:absolute;left:0;top:640px;height:1.5px;width:1920px;background:var(--calm-ink);transform-origin:left center;transform:scaleX(0)}
+#simp{position:absolute;left:0;right:0;top:400px;text-align:center;font-family:"Instrument Serif",Georgia,serif;font-weight:400;
+  font-size:211px;line-height:1;letter-spacing:-.01em;color:var(--calm-ink);opacity:0}
+#one{position:absolute;left:0;right:0;top:700px;text-align:center;font-family:"Inter",system-ui,sans-serif;font-weight:500;
+  font-size:34px;letter-spacing:-.01em;color:var(--calm-ink);opacity:0}
+#mark{position:absolute;left:64px;top:56px;display:flex;align-items:center;gap:14px;color:var(--calm-ink);opacity:0;
+  font-family:"Inter",system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:-.01em}
+#mark svg{width:42px;height:42px}
+#ship{position:absolute;top:617px;left:0;width:64px;height:24px;color:var(--calm-ink)}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}.live i{animation:none}}
+</style>
+</head>
+<body>
+<div id="fit"><div id="stage">
+  <header id="top">
+    <div class="proj">Milan Forwarding <span>/ inbox / multi-agent pipeline</span></div>
+    <div class="live"><i></i><span id="livetxt">waiting for mail</span></div>
+    <div class="meters">
+      <div>agents <b id="m-ag" style="width:2ch">0</b></div>
+      <div class="hot">tokens <b id="m-tok" style="width:9ch">0</b></div>
+      <div class="hot">cost <b id="m-usd" style="width:7ch">$0.00</b></div>
+      <div class="hot">reply time <b id="m-rt" style="width:8ch">00:00:00</b></div>
+    </div>
+  </header>
+
+  <aside id="dock"><h2>Swarm<b id="dcount">6</b></h2></aside>
+
+  <main id="canvas">
+    <div class="boardlabel">quotes@milanforwarding.it · Inbox</div>
+    <div id="board">
+      <div class="el mbar"><span class="app">Mail</span><span class="search">Search mail</span><span class="who"><i>MF</i>quotes@milanforwarding.it</span></div>
+      <div class="el folders"><span class="sel">Inbox <b id="unread">1</b></span><span>Quotes</span><span>Bookings</span><span>Carriers</span><span>Sent</span></div>
+      <div class="el list">
+        <div class="newrow" data-id="row"><div class="msg new"><div class="f">Lena Hoffmann <em>09:14</em></div><div class="s">RFQ air freight Munich → Riyadh, 2 pallets…</div></div></div>
+        <div class="msg"><div class="f">Turkish Cargo <em>Fri</em></div><div class="s">Re: AWB 235-1184 0921 departed IST</div></div>
+        <div class="msg"><div class="f">Kühne Spedition <em>Fri</em></div><div class="s">Pickup confirmed, Garching, 2 pcs</div></div>
+        <div class="msg"><div class="f">Paolo Rinaldi <em>Thu</em></div><div class="s">Thanks for the quick quote to Dubai</div></div>
+        <div class="msg"><div class="f">Lufthansa Cargo <em>Thu</em></div><div class="s">Rate update MUC, valid from 1 Dec</div></div>
+        <div class="msg"><div class="f">Qatar Airways Cargo <em>Wed</em></div><div class="s">Booking QR 060 accepted</div></div>
+        <div class="msg"><div class="f">Marta Weiss <em>Wed</em></div><div class="s">Customs docs for shipment 4471</div></div>
+      </div>
+      <div class="el read">
+        <div class="empty" id="empty">No message selected</div>
+        <div class="rsubj fill" data-id="subj">RFQ air freight Munich → Riyadh, 2 pallets, 340 kg, ready Monday</div>
+        <div class="rfrom fill" data-id="from"><i>LH</i><div><div class="n">Lena Hoffmann <span>&lt;l.hoffmann@brenner-pumpen.de&gt;</span></div><div class="to">to quotes@milanforwarding.it</div></div><em>Today 09:14</em></div>
+        <div class="rbody">
+          <p class="fill" data-id="hi">Hello Milan Forwarding team,</p>
+          <p class="fill" data-id="ask">could you quote air freight from Munich (MUC) to Riyadh (RUH) for the shipment below?</p>
+          <div class="spec fill" data-id="spec"><span>2 pallets, <b>120 × 80 × 110 cm</b> each</span><span><b>340 kg</b> total, general cargo (pump parts)</span><span>Pickup at our site in Garching, <b>ready Monday</b></span></div>
+          <p class="fill" data-id="end">Door to airport is fine. A price by today would help us a lot.</p>
+          <p class="fill" data-id="sig">Best regards,<br>Lena Hoffmann, Brenner Pumpen GmbH</p>
+        </div>
+        <div class="att fill" data-id="att"><i>PDF</i>packing-list.pdf <span>84 KB</span></div>
+      </div>
+      <i id="gv" class="guide v"></i><i id="gh" class="guide h"></i>
+    </div>
+  </main>
+
+  <aside id="log"><h2>Live log</h2><div id="lines"></div></aside>
+
+  <footer id="tl">
+    <button id="play" aria-label="Pause">❚❚</button>
+    <div id="track"><div id="head"></div></div>
+    <div id="clock">00.0 / 14.0</div>
+  </footer>
+
+  <div id="dim"></div>
+  <div id="say"><div class="cap s1">That's not what you want.</div><div class="cap s2">That's not what you want.</div></div>
+
+  <div id="calm">
+    <svg class="ghost" id="ghost" viewBox="0 0 1920 1080"></svg>
+    <div id="hz"></div>
+    <div id="simp">Simplicity.</div>
+    <svg id="ship" viewBox="0 0 64 24"><path d="M2 14h60l-7 10H9z" fill="currentColor"/><rect x="10" y="7" width="34" height="7" fill="currentColor"/><rect x="47" y="2" width="9" height="12" fill="currentColor"/></svg>
+    <div id="one">One agent. One mail. One answer.</div>
+    <div id="mark"><svg viewBox="0 0 64 64"><defs><filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="3.4"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -12"/></filter></defs><g filter="url(#goo)" fill="currentColor" stroke="currentColor"><circle cx="21" cy="42" r="15" stroke="none"/><circle cx="42" cy="23" r="9.5" stroke="none"/><path d="M28 36 39 26" stroke-width="6.5" stroke-linecap="round"/></g><circle cx="56" cy="10" r="4.4" fill="currentColor"/></svg>Milan Forwarding</div>
+  </div>
+</div></div>
+
+<script>
+// 14 s. 0-1.5 the mail arrives. 1.5-8 the swarm escalates (spawn and box stagger 300 ms down to 30 ms).
+// 8-10 "That's not what you want." twice over a dimmed frame. 10 hard cut: every box collapses into one horizon line.
+// 12-14 the line and the mark.
+const D = 14, APPROACH = .35, DRAW = .45, LIFE = 1.7, CUT = 10, HZ = 640;
+const HEX = ["#7aa2ff","#e6e27a","#ff4d5e","#5be3a5","#c58cff","#9ad8ff"];
+const NAMES = ["Parser","Router","Pricing-Agent","Validator","Critic","Planner",
+  "Re-Planner","Pricing-Agent-2","Summariser","Translator","Compliance","Supervisor","Intent-Classifier","Entity-Extractor",
+  "Weight-Checker","Dims-Agent","Customs-Agent","Dangerous-Goods","Carrier-Scout","Rate-Fetcher","Critic-2","Rate-Fetcher-2",
+  "Currency-Agent","Pricing-Agent-3","Tone-Agent","Reflection","Memory-Agent","Retriever","Re-Ranker","Fact-Checker","Judge",
+  "Orchestrator","Supervisor-2","Escalation","Judge-of-Judges","Meta-Planner","Sentiment","Supervisor-of-Supervisor"];
+// regions of the mail the swarm boxes, with the word each label carries
+const REGIONS = [["subj","subject"],["from","sender"],["hi","greeting"],["ask","intent"],["spec","cargo"],["end","deadline"],
+  ["sig","signature"],["att","packing list"],["row","thread"]];
+// what the log says; {v} is the plan version, which keeps rising
+const SAYS = [
+  ["Parser","extracted 340 kg (confidence 0.71)"],["Validator","340 kg unverified, asking Weight-Checker"],
+  ["Planner","spawning 4 sub-agents"],["Router","routing to Pricing-Agent"],["Critic","rejecting Pricing-Agent output",1],
+  ["Pricing-Agent","MUC → RUH, waiting for Rate-Fetcher"],["Re-Planner","plan v{v} → v{v+}"],
+  ["Pricing-Agent-2","disagrees with Pricing-Agent"],["Critic","rejecting Pricing-Agent-2",1],["Summariser","summarising the summary"],
+  ["Translator","translating English to English"],["Supervisor","re-running plan v{v}"],["Compliance","is a pallet dangerous goods?"],
+  ["Intent-Classifier","intent: quote (0.58), re-asking"],["Weight-Checker","340 kg? re-checking"],["Dims-Agent","120 × 80 × 110 cm, recomputing"],
+  ["Customs-Agent","HS code unknown, asking Retriever"],["Dangerous-Goods","pump parts: escalating"],["Retriever","1,204 chunks for 'pallet'"],
+  ["Carrier-Scout","found 11 carriers, ranking"],["Rate-Fetcher","portal 429, retry 3/5",1],["Critic-2","rejecting Critic",1],
+  ["Currency-Agent","EUR or SAR? asking Planner"],["Pricing-Agent-3","third opinion on 340 kg"],["Tone-Agent","rewriting greeting (v6)"],
+  ["Reflection","reflecting on the reflection"],["Memory-Agent","storing 'Monday' (×4)"],["Fact-Checker","is Monday a date?"],
+  ["Judge","score 0.61, retry",1],["Orchestrator","spawning Supervisor-2"],["Supervisor-2","overruling Supervisor"],
+  ["Escalation","escalating to Judge-of-Judges"],["Judge-of-Judges","judging Judge, retry",1],["Meta-Planner","planning the planner"],
+  ["Sentiment","customer mood: neutral (0.5)"],["Supervisor-of-Supervisor","supervising Supervisor-2"],["Re-Ranker","re-ranking 11 carriers"],
+  ["Rate-Fetcher-2","duplicate request, portal 429",1],["Entity-Extractor","found 'Garching' (city? person?)"]];
+
+// deterministic randomness, so ?t= frames repeat
+let seed = 7; const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let x = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+// stagger: 300 ms at 1.5 s, falling exponentially to 30 ms
+const gapAt = (t, span) => Math.max(.03, .3 * Math.pow(.1, (t - 1.5) / span));
+
+const AGENTS = []; { let t = 1.5;
+  for (let i = 0; i < NAMES.length; i++) { AGENTS.push({id: "g" + i, name: NAMES[i], hex: HEX[i % 6], spawn: t, L: i % 2 === 0, i}); t += gapAt(t, 4); } }
+const byName = n => AGENTS.find(a => a.name === n);
+
+const $ = s => document.querySelector(s);
+const board = $("#board"), canvas = $("#canvas"), dock = $("#dock"), lines = $("#lines"), stage = $("#stage");
+const el = id => board.querySelector(`[data-id="${id}"]`);
+const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+const lerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+
+for (const a of AGENTS) {
+  const d = document.createElement("div");
+  d.className = "agent" + (a.i < 6 ? "" : " off"); d.id = "ag-" + a.id;
+  d.innerHTML = `<i class="av" style="background:${a.hex}"></i><div class="nm">${a.name}</div><div class="tk">waiting</div><div class="st">idle</div>`;
+  dock.appendChild(d);
+  const c = document.createElement("div");
+  c.className = "cur" + (a.i < 6 ? "" : " small"); c.id = "cu-" + a.id;
+  c.innerHTML = `<svg width="22" height="24" viewBox="0 0 22 24"><path d="M2 2l17 9-7.5 2.2L8 21z" fill="${a.hex}" stroke="#120d0e" stroke-width="1.5" stroke-linejoin="round"/></svg><span style="background:${a.hex}">${a.name}</span>`;
+  stage.insertBefore(c, $("#dim"));
+}
+
+let TASKS = [], LOG = [], S = 1, B = .8;
+function rect(node) {
+  let x = 0, y = 0, n = node;
+  while (n && n !== board) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+  return {x, y, w: node.offsetWidth, h: node.offsetHeight};
+}
+function fit() {
+  S = Math.min(innerWidth / 1920, innerHeight / 1080);
+  stage.style.transform = `scale(${S})`;
+  B = Math.min((canvas.clientWidth - 80) / 1280, (canvas.clientHeight - 70) / 880);
+  board.style.transform = `translateX(${-640 * B}px) scale(${B})`;
+}
+const toStage = (x, y) => [canvas.offsetLeft + canvas.clientWidth / 2 - 640 * B + x * B, canvas.offsetTop + 44 + y * B];
+
+function build() {
+  // the new row is collapsed until the mail arrives, so measure the message inside it
+  const R = Object.fromEntries(REGIONS.map(([id]) => [id, rect(id === "row" ? el(id).firstElementChild : el(id))]));
+  // tasks: one box each, handed to the agent that is free longest; stagger ramps 300 ms to 30 ms
+  const free = Object.fromEntries(AGENTS.map(a => [a.id, a.spawn + .25]));
+  seed = 11;
+  for (let t = 1.75; t < 9.7; t += gapAt(t, 5)) {
+    const ready = AGENTS.filter(a => free[a.id] <= t - APPROACH);
+    if (!ready.length) continue;
+    const a = ready.sort((p, q) => free[p.id] - free[q.id])[0];
+    const [id, word] = REGIONS[Math.floor(rnd() * REGIONS.length)], r = R[id];
+    const j = (n) => (rnd() - .5) * n;
+    const box = {x: Math.max(6, r.x - 10 + j(60)), y: Math.max(70, r.y - 10 + j(40)), w: Math.min(700, r.w + 20 + j(120)), h: Math.max(40, r.h + 20 + j(60))};
+    box.w = Math.min(box.w, 1274 - box.x); box.h = Math.min(box.h, 874 - box.y);
+    TASKS.push({ag: a, box, label: word, w: t});
+    free[a.id] = t + DRAW + .2;
+  }
+  for (const k of TASKS) {
+    const b = document.createElement("div");
+    b.className = "wire"; b.style.setProperty("--c", k.ag.hex);
+    Object.assign(b.style, {left: k.box.x + "px", top: k.box.y + "px"});
+    b.innerHTML = `<em>${k.ag.name} · ${k.label}</em><b></b><i class="h tl"></i><i class="h tr"></i><i class="h bl"></i><i class="h br"></i>`;
+    board.insertBefore(b, $("#gv")); k.node = b;
+  }
+  // log: ramps the same way; each line from an agent already in the swarm
+  // a queue: the first line whose agent exists is said, then goes to the back
+  let v = 2; const queue = [...SAYS];
+  for (let t = 1.6; t < 9.9; t += gapAt(t, 4.5)) {
+    const i = queue.findIndex(([n]) => byName(n).spawn <= t);
+    if (i < 0) continue;
+    const [say] = queue.splice(i, 1); queue.push(say);
+    const [n, txt, no] = say, text = txt.replace("{v+}", v + 1).replace("{v}", v);
+    if (txt.includes("{v")) v++;
+    LOG.push({t, a: byName(n), text, no});
+  }
+  // timeline segments
+  const track = $("#track");
+  for (const k of TASKS) {
+    const s = document.createElement("div"); s.className = "seg"; s.style.background = k.ag.hex;
+    s.style.left = (k.w / D * 100) + "%"; s.style.width = (DRAW + .2) / D * 100 + "%"; track.appendChild(s);
+  }
+}
+
+function homeOf(a) {
+  const x = a.L ? canvas.offsetLeft + 60 + (a.i % 4) * 22 : canvas.offsetLeft + canvas.clientWidth - 170 - (a.i % 4) * 22;
+  return [x, canvas.offsetTop + 120 + ((a.i * 137) % 760)];
+}
+function wander(p, t, i) { return [p[0] + Math.sin(t * 1.7 + i * 2) * 22, p[1] + Math.cos(t * 1.3 + i) * 18]; }
+function cursorAt(a, t) {
+  const home = homeOf(a), off = [a.L ? canvas.offsetLeft - 120 : canvas.offsetLeft + canvas.clientWidth + 120, home[1]];
+  let pos = lerp(off, wander(home, t, a.i), smooth((t - a.spawn) / .45)), prev = pos, active = null, drag = 0;
+  for (const k of TASKS) {
+    if (k.ag !== a) continue;
+    const w = k.w, go = w - APPROACH;
+    if (t < go) break;
+    const s0 = toStage(k.box.x, k.box.y), s1 = toStage(k.box.x + k.box.w, k.box.y + k.box.h);
+    if (t < w) { const kk = smooth((t - go) / APPROACH), p = lerp(prev, s0, kk); pos = [p[0], p[1] - Math.sin(Math.PI * kk) * 60]; }
+    else if (t < w + DRAW) { drag = smooth((t - w) / DRAW); pos = lerp(s0, s1, drag); }
+    else pos = wander(s1, t, a.i).map((q, j) => s1[j] + (q - s1[j]) * .3);
+    prev = s1; active = t <= w + DRAW + .15 ? k : active;
+  }
+  return {pos, active, drag};
+}
+
+let shownLog = 0;
+function addLine(e) {
+  const d = document.createElement("div"); d.className = "ln";
+  d.innerHTML = `<span class="ts">${e.t.toFixed(2).padStart(5, "0")}s</span><b style="color:${e.a.hex}">${e.a.name}</b> ${e.no ? '<span class="no">✕</span> ' : ""}${e.text}`;
+  lines.appendChild(d);
+  while (lines.children.length > 34) lines.firstChild.remove();
+}
+const fmtInt = n => Math.round(n).toLocaleString("en-US");
+const hms = s => [s / 3600, s / 60 % 60, s % 60].map(x => String(Math.floor(x)).padStart(2, "0")).join(":");
+const ARRIVE = {row: .3, subj: .45, from: .5, hi: .58, ask: .62, spec: .66, end: .7, sig: .74, att: .78};
+let ghostBuilt = false;
+
+function render(t) {
+  // 0-1.5: the mail arrives
+  for (const [id, at] of Object.entries(ARRIVE)) el(id).classList.toggle("on", t >= at);
+  $("#unread").classList.toggle("on", t >= .35);
+  $("#empty").classList.toggle("gone", t >= .6);
+
+  // boxes
+  let guide = null;
+  for (const k of TASKS) {
+    const W = k.node, r = k.box, kk = smooth((t - k.w) / DRAW), drawing = t >= k.w && t < k.w + DRAW;
+    const on = t >= k.w && t < k.w + LIFE;
+    W.classList.toggle("on", on); W.classList.toggle("drawing", drawing);
+    if (on) {
+      W.style.opacity = t > k.w + LIFE - .4 ? (k.w + LIFE - t) / .4 : "";
+      W.style.width = r.w * Math.max(.02, kk) + "px"; W.style.height = r.h * Math.max(.02, kk) + "px";
+      if (drawing) { W.querySelector("b").textContent = `${Math.round(r.w * kk)} × ${Math.round(r.h * kk)}`; guide = r; }
+    }
+  }
+  $("#gv").style.opacity = $("#gh").style.opacity = guide ? 1 : 0;
+  if (guide) { $("#gv").style.left = guide.x + "px"; $("#gh").style.top = guide.y + "px"; }
+
+  // cursors and swarm list
+  let live = 0;
+  for (const a of AGENTS) {
+    const in_ = t >= a.spawn && t < CUT; if (in_) live++;
+    const cu = $("#cu-" + a.id), {pos, active, drag} = cursorAt(a, t);
+    cu.style.display = t >= a.spawn - .05 && t < CUT ? "" : "none";
+    cu.style.transform = `translate(${pos[0]}px,${pos[1]}px)`;
+    cu.classList.toggle("press", drag > 0 && drag < 1);
+    const card = $("#ag-" + a.id);
+    if (a.i >= 6) card.classList.toggle("off", t < a.spawn);
+    card.classList.toggle("busy", !!active && t >= a.spawn);
+    card.querySelector(".tk").textContent = active ? `${active.label}` : t >= a.spawn ? "thinking" : "waiting";
+    card.querySelector(".st").textContent = active ? "working" : t >= a.spawn ? "thinking" : "idle";
+  }
+  dock.classList.toggle("dense", live > 6);
+  $("#dcount").textContent = Math.max(6, live);
+
+  // log
+  const n = LOG.filter(e => e.t <= t).length;
+  if (n < shownLog) { lines.innerHTML = ""; shownLog = 0; }
+  for (let i = Math.max(shownLog, n - 34); i < n; i++) addLine(LOG[i]);
+  shownLog = n;
+
+  // meters: tokens, cost and reply time run away
+  const x = Math.max(0, Math.min(t, CUT) - 1.5);
+  const tok = 9000 * (Math.exp(.75 * x) - 1);
+  $("#m-ag").textContent = live;
+  $("#m-tok").textContent = fmtInt(tok);
+  $("#m-usd").textContent = "$" + (tok * .000015).toFixed(2);
+  $("#m-rt").textContent = hms(60 * (Math.exp(.9 * x) - 1));
+  $("#livetxt").textContent = t < .35 ? "waiting for mail" : t < 1.5 ? "1 new mail" : `${live} agents live`;
+
+  // 8-10: dim, then the verdict twice
+  $("#dim").style.opacity = t >= CUT ? 0 : .8 * smooth((t - 7.9) / .35);
+  const s1 = $("#say .s1"), s2 = $("#say .s2");
+  const v1 = t < CUT ? smooth((t - 8.05) / .25) : 0, v2 = t < CUT ? smooth((t - 8.85) / .2) : 0;
+  s1.style.opacity = v1; s1.style.transform = `translateY(${(1 - v1) * 14}px)`;
+  s2.style.opacity = v2; s2.style.transform = `scale(${1.06 - .06 * v2})`;
+
+  // 10: hard cut; every box collapses into one horizon line, drawn left to right
+  const calm = $("#calm"); calm.classList.toggle("on", t >= CUT);
+  if (t >= CUT) {
+    const c = smooth((t - CUT) / .35);
+    if (!ghostBuilt) { ghostBuilt = true;
+      $("#ghost").innerHTML = TASKS.filter(k => k.w > CUT - 2.4).map(k => {
+        const [x0, y0] = toStage(k.box.x, k.box.y); return `<rect data-x="${x0}" data-y="${y0}" data-w="${k.box.w * B}" data-h="${k.box.h * B}" fill="none" stroke="#2b3442" stroke-width="1.5" stroke-dasharray="6 5"/>`;
+      }).join(""); }
+    for (const r of $("#ghost").children) {
+      const y0 = +r.dataset.y, h0 = +r.dataset.h;
+      r.setAttribute("x", r.dataset.x); r.setAttribute("width", r.dataset.w);
+      r.setAttribute("y", y0 + (HZ - y0) * c); r.setAttribute("height", Math.max(0, h0 * (1 - c)));
+      r.setAttribute("opacity", 1 - smooth((t - CUT - .2) / .2));
+    }
+    $("#hz").style.transform = `scaleX(${smooth((t - CUT) / .6)})`;
+    $("#simp").style.opacity = t >= CUT + .35 ? 1 : 0;  // lands the moment the boxes are flat, no fade: "Bam"
+    $("#ship").style.transform = `translateX(${1430 + (t - CUT) * 24}px)`;
+    $("#ship").style.opacity = smooth((t - CUT - .6) / .6);
+    const o = smooth((t - 12) / .8);
+    $("#one").style.opacity = o; $("#one").style.transform = `translateY(${(1 - o) * 10}px)`;
+    $("#mark").style.opacity = o;
+  }
+  $("#head").style.left = (t / D * 100) + "%";
+  $("#clock").textContent = `${t.toFixed(1).padStart(4, "0")} / ${D.toFixed(1)}`;
+}
+
+// clock: loop by default; ?t= seeks; ?click holds at 0, plays once on click or Space, stops on the last frame
+const P = new URLSearchParams(location.search), CLICK = P.has("click");
+let t0 = performance.now(), paused = false, pausedAt = 0, armed = false;
+const now = () => {
+  if (paused) return pausedAt;
+  const e = (performance.now() - t0) / 1000;
+  if (CLICK && e >= D) { paused = true; pausedAt = D - .001; return pausedAt; }
+  return e % D;
+};
+function toggle() {
+  if (armed) { armed = false; paused = false; t0 = performance.now(); return; }
+  if (CLICK && paused && pausedAt >= D - .01) { paused = false; t0 = performance.now(); return; }  // replay from the start
+  if (paused) { t0 = performance.now() - pausedAt * 1000; paused = false; }
+  else { pausedAt = now(); paused = true; }
+  $("#play").textContent = paused ? "▶" : "❚❚";
+}
+$("#play").onclick = e => { e.stopPropagation(); toggle(); };
+$("#track").onclick = e => {
+  e.stopPropagation();
+  const r = $("#track").getBoundingClientRect(), t = (e.clientX - r.left) / r.width * D;
+  t0 = performance.now() - t * 1000; if (paused) pausedAt = t;
+};
+addEventListener("keydown", e => { if (e.code === "Space") { e.preventDefault(); toggle(); } });
+if (CLICK) { document.body.classList.add("click"); paused = true; pausedAt = 0; armed = true; addEventListener("click", () => { if (armed) toggle(); }); }
+if (P.get("t") !== null) { paused = true; pausedAt = +P.get("t"); $("#play").textContent = "▶"; }
+function frame() { render(now()); requestAnimationFrame(frame); }
+addEventListener("resize", fit);
+document.fonts.ready.then(() => { fit(); build(); t0 = performance.now(); window.__vizStarted = true; requestAnimationFrame(frame); });
+</script>
+</body>
+</html>
