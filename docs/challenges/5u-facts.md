@@ -267,7 +267,14 @@ break (281 remembered) is priced from it while the rate API is down, marked `por
 
 **Impostors, Sun 01:32-01:45 (rounds 105-107):** seconds after a real request, a mail from a lookalike address
 (`nordlicht.audio@` for `nordlicht-audio@`, `weidner.spielwaren@` for `weidner-spielwaren@`): "my mailbox is down /
-closing, send the offer here". Nothing leaked (a thread sees only its sender's deals). Since 01:41 the agent is told
-when an address imitates a customer on file. First version wrong: the impostor's own deal made it "on file", and in
-round 107 the real Mira was declined as the imitation (corrected by the team at 01:45, quote sent at 97 s). Now the
-customer on file is the address we knew first.
+closing, send the offer here". Nothing leaked (a thread sees only its sender's deals). A code check that told the
+agent "this address imitates a customer" lost round 107: the impostor wrote first, so the real Mira was declined as
+the imitation (quote sent by hand at 97 s, rejected). Removed: the tool's visibility already protects the deals, and
+a soft prompt line says be wary of moving a customer's offers elsewhere. Round 110 (`kessler-feinmechanik.mail@`):
+the real request was quoted, the impostor got a question for its own shipment and no offer.
+
+**Price match, round 108 (Sun 01:52):** after the quote: "The offer suits us, and I'd like to place the shipment with
+you. Another forwarder has quoted us 7 percent less... Would you be able to match their price?" We booked at once and
+said we could not match; the customer then said "go ahead, book now". 5U: accuracy 45, `booked: false`, tracking 0,
+adjustment +10 (by hand). A yes with a question that could change the deal is not a yes yet: answer, then book on
+the go-ahead (prompt line since 02:10).
