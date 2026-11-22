@@ -1242,6 +1242,10 @@ def test_dates_units_and_text_files_as_people_write_them():
     today = date.today()
     monday = (today + timedelta(days=(0 - today.weekday() - 1) % 7 + 1)).isoformat()
     assert _day("Montag") == monday == _day("lundi") == _day("Monday") and _day("morgen") == _day("tomorrow")
+    tuesday = (today + timedelta(days=(1 - today.weekday() - 1) % 7 + 1)).isoformat()
+    thursday = (today + timedelta(days=(3 - today.weekday() - 1) % 7 + 1)).isoformat()
+    assert _day("Tuesday") == _day("next Tuesday") == _day("Tue") == _day("Dienstag") == tuesday   # fold: "tusday"
+    assert _day("jueves") == _day("Thursday") == thursday and _day("aujourd'hui") == today.isoformat()
     assert _day("KW 48") is None and _day("whenever") is None                 # not guessed: it stays the customer's words
     lots = [{"pieces": 2, "weight": {"value": 25, "unit": "kg", "per_piece": True},
              "volume": {"value": 500000, "unit": "cm³", "per_piece": True}}]

@@ -938,7 +938,7 @@ def _day(text: Any, nearest: bool = False) -> str | None:
     # said relative to today ("ready Monday", "tomorrow", "24 November" without a year): the next such day
     from datetime import date, timedelta
     today, low = date.today(), t.lower()
-    if low in ("today", "now", "asap", "immediately", "heute", "sofort", "ab sofort", "aujourd'hui", "oggi", "hoy"):
+    if low in ("today", "now", "asap", "immediately", "heute", "sofort", "ab sofort", "aujourd hui", "oggi", "hoy"):
         return today.isoformat()
     if low in ("tomorrow", "morgen", "demain", "domani", "manana"):
         return (today + timedelta(days=1)).isoformat()
@@ -967,6 +967,9 @@ _DAYS = ("monday montag lundi lunedi lunes", "tuesday dienstag mardi martedi mar
          "wednesday mittwoch mercredi mercoledi miercoles", "thursday donnerstag jeudi giovedi jueves",
          "friday freitag vendredi venerdi viernes", "saturday samstag sonnabend samedi sabato sabado",
          "sunday sonntag dimanche domenica domingo")
+# each name as written and as kit.fold makes it: fold drops an e after a, o, u (Muenchen is Munchen), so the
+# input "Tuesday" arrives as "tusday" and Spanish "jueves" as "juves"; both forms must be the day
+_NAMES = [(names.split()[0], {f for n in names.split() for f in (n, kit.fold(n))}) for names in _MONTHS + _DAYS]
 
 
 def _in_english(t: str) -> str:
@@ -981,8 +984,8 @@ def _in_english(t: str) -> str:
         if w in ("am", "den", "dem", "der", "le", "il", "el", "de", "del", "di", "of", "the", "on", "ab", "from", "vom", "du"):
             continue
         w = re.sub(r"^(\d{1,2})(?:st|nd|rd|th|er|e)$", r"\1", w)
-        m = next((names.split()[0] for names in _MONTHS + _DAYS if w in names.split() or (len(w) == 3 and any(
-            n.startswith(w) for n in names.split()))), None)
+        m = next((english for english, forms in _NAMES if w in forms or (len(w) == 3 and any(
+            n.startswith(w) for n in forms))), None)
         words.append(m.capitalize() if m else w)
     out = " ".join(words)
     return re.sub(r"^([A-Z][a-z]+ \d{1,2}) (\d{4})$", r"\1, \2", out)
