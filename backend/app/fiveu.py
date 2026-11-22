@@ -142,6 +142,22 @@ class FiveU:
                 return {"error": True, "status": r.status_code, "detail": _detail(r)}
         return {"error": True, "status": 429, "detail": "rate limit"}
 
+    def rate_from_page(self, origin: str, destination: str, airline: str, weight_kg: Any,
+                       volume_cbm: Any = None) -> dict:
+        """One priced rate from the portal's web page, for when the rate API fails. 5U: "Rates are still published on
+        the portal page" (round 93); rounds 95-100 the lane's fastest airline was missing and the winners booked it.
+        Same shape as rate() (its rate_id books through the API), or {"error", "status", "detail"}."""
+        form = {"team_key": self.http.headers.get("X-API-Key", ""), "origin": origin, "destination": destination,
+                "airline": airline, "weight_kg": str(weight_kg), "volume_cbm": str(volume_cbm or "")}
+        try:
+            r = httpx.post(portal_page_url(str(self.http.base_url)), data=form, timeout=20, follow_redirects=True)
+        except httpx.TransportError as e:
+            return {"error": True, "status": 0, "detail": f"portal page: {e!r}"}
+        rate = read_rate_page(r.text)
+        if rate is None:
+            return {"error": True, "status": r.status_code, "detail": "portal page: no rate in the answer"}
+        return rate
+
     def book(self, rate_id: str, team_reference: str) -> tuple[int, dict]:
         r = self._req("POST", "/v1/portal/bookings", json={"rate_id": rate_id, "team_reference": team_reference})
         try:
@@ -178,3 +194,31 @@ def _detail(r: httpx.Response) -> str:
         return str(d.get("detail") or d)
     except ValueError:
         return r.text[:300]
+
+
+def portal_page_url(api_base: str) -> str:
+    """The portal page lives on the site, the API on api.: https://api.start-hack.5u.ai -> .../portal/ui."""
+    return re.sub(r"//api\.", "//", api_base.rstrip("/")) + "/portal/ui"
+
+
+def read_rate_page(html: str) -> dict | None:
+    """The rate table of the portal page (cells by id: rate_id, airline, chargeable_weight_kg, total, currency,
+    transit_days, valid_until) in the shape of the API's rate. Digits hidden with display:none are dropped (the page
+    did that on Sun 00:52)."""
+    hidden = set(re.findall(r"\.([\w-]+)\s*\{[^}]*display\s*:\s*none", html))
+    for cls in hidden:
+        html = re.sub(rf'<span[^>]*class="[^"]*\b{re.escape(cls)}\b[^"]*"[^>]*>.*?</span>', "", html, flags=re.S)
+    cells = {k: re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", v)).strip()
+             for k, v in re.findall(r'<td[^>]*\bid="(\w+)"[^>]*>(.*?)</td>', html, re.S)}
+    num = {k: cells.get(k, "").replace(" ", "") for k in ("total", "chargeable_weight_kg", "transit_days")}
+    if not cells.get("rate_id") or not num["total"]:
+        return None
+    m = re.match(r"(.*?)\s*\(([A-Z0-9]{2})\)$", cells.get("airline", ""))
+    try:
+        return {"rate_id": cells["rate_id"], "airline": m.group(1) if m else cells.get("airline", ""),
+                "airline_code": m.group(2) if m else None,
+                "chargeable_weight_kg": num["chargeable_weight_kg"] or None, "total": num["total"],
+                "currency": cells.get("currency") or "EUR", "transit_days": int(float(num["transit_days"])),
+                "valid_until": cells.get("valid_until"), "source": "page"}
+    except (KeyError, ValueError):
+        return None

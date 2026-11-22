@@ -167,13 +167,6 @@ class Forwarder:
                 d = store.get(deal_id)["data"]
                 return {"carrier_messages": d.get("carrier_messages", []), "still_waiting_for": waiting_for(d)}
             return {"error": "no shipment yet: call get_offers with the shipment"}
-        pm = deal["data"].get("portal_missing") or {}
-        if pm.get("airlines") and not pm.get("shown") and store.kv_get("operator_on") == "1":
-            # the portal turned airlines away and a person is at the desk: the agent hears it now, not after the
-            # carriers' wait, so the person gets the minutes they need while the carriers answer (rounds 93-100)
-            store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_missing": {
-                **(r["data"].get("portal_missing") or {}), "shown": True}}))
-            wait = 0
         self._wait(deal_id, wait)
         return self.options(deal_id, preference)
 
@@ -382,13 +375,12 @@ class Forwarder:
                                    is not None else {"included_in_every_total": False, "why": "the goods value is "
                                    "not in EUR or a term is missing: ask, never compute it yourself"})
         pm = d.get("portal_missing") or {}
-        if pm.get("airlines"):  # their rates are on 5U's portal page, for people who pass its check
+        if pm.get("airlines"):  # neither the rate API nor the portal page (read by code) priced them
             result["portal_page"] = {
                 "airlines": [f"{a['name']} ({a.get('code')})" for a in pm["airlines"]],
-                "person_at_desk": store.kv_get("operator_on") == "1",
-                "how": "with a person at the desk: now, while the carriers answer, browser open (5U's portal "
-                       "page), fill the form for the airline that matters most for this request, ask_person kind "
-                       "page; its price then joins these options. Without one: quote with what you have"}
+                "how": "the system asked 5U's portal page for them and got no rate (it may sit behind a security "
+                       "check). You may try the page yourself with browser; no person acts on it (5U's rule). The "
+                       "rate desk and the carriers are asked too. Otherwise quote with what you have"}
         if req.get("extra_charges"):
             _, skipped = pricing.extra_charges(req.get("extra_charges"), Decimal(0), Decimal(req["chargeable_kg"]))
             result["extra_charges"] = {"included_in_every_total": [c.get("label") for c in req["extra_charges"]
@@ -455,6 +447,12 @@ class Forwarder:
                 weights.append(nb)  # billing at the next break is often cheaper (rates fall < 1.5x per break)
             for wt in weights:
                 r = self.api.rate(o, d, a["code"], wt, cbm)
+                if r.get("error") and r["status"] in (500, 502, 503, 504) and hasattr(self.api, "rate_from_page"):
+                    page = self.api.rate_from_page(o, d, a["code"], wt, cbm)  # the portal page still publishes rates
+                    store.log("bids", "info" if not page.get("error") else "error",
+                              f"portal {a['code']} {o}-{d}: API {r['status']}, page "
+                              f"{page.get('total') or page.get('detail')}"[:300], run_id=deal_id)
+                    r = page if not page.get("error") else r
                 if r.get("error"):
                     store.log("bids", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
                               run_id=deal_id)

@@ -165,8 +165,8 @@ def human_reply(deal_id: str, payload: dict) -> dict:
 
 @app.get("/api/operator")
 def operator_mode() -> dict:
-    """Operator mode: a person is at the desk and reads 5U's portal page when its rate API fails; the agent then
-    waits up to 80 s after the customer's mail for their prices."""
+    """Operator mode: a person is at the desk and may answer the agent's questions in words (ask_person). Never the
+    portal page or a check: 5U, Sun 04:06, no person solves anything there."""
     from .forwarder import OPERATOR_WAIT
     needed = []
     for r in store.records("deal"):
@@ -176,7 +176,6 @@ def operator_mode() -> dict:
         req = r["data"].get("request") or {}
         needed.append({"deal": r["id"], "subject": r["data"].get("subject"), "customer": r["data"].get("customer"),
                        "received_at": r["data"].get("received_at"), "preference": r["data"].get("preference"),
-                       # what 5U's portal form asks for, ready to copy: origin, destination, gross weight, volume
                        "origin": req.get("origin"), "destination": req.get("destination"),
                        "gross_kg": req.get("weight_kg"), "volume_cbm": req.get("volume_cbm"),
                        "chargeable_kg": req.get("chargeable_kg"), **pm})
@@ -190,25 +189,9 @@ def set_operator_mode(payload: dict) -> dict:
     return operator_mode()
 
 
-@app.post("/api/deals/{deal_id}/portal_rate")
-def portal_rate(deal_id: str, payload: dict) -> dict:
-    """A person enters a rate they read on 5U's portal page (airline, total EUR, transit days, rate_id)."""
-    from .forwarder import add_portal_page_rate, read_portal_page
-    if payload.get("pasted") is not None:  # the page's result as copied: read by code, shown back before it is added
-        read = read_portal_page(payload["pasted"])
-        if payload.get("dry"):
-            return {"read": read}
-        payload = {**payload, **{k: v for k, v in read.items() if v and not payload.get(k)}}
-    out = add_portal_page_rate(deal_id, payload.get("airline") or "", payload.get("total"), payload.get("days"),
-                               payload.get("rate_id"), payload.get("weight_kg"), payload.get("who") or "operator")
-    if out.get("error"):
-        raise HTTPException(400, out["error"])
-    return out
-
-
 @app.get("/api/portal/{deal_id}/shot")
 def portal_shot(deal_id: str) -> Response:
-    """The shared browser's page for this deal, live, for the person in the deal's conversation."""
+    """The agent's browser page for this deal, live, to watch in the deal's conversation (nobody acts on it)."""
     import httpx
     try:
         r = httpx.get(f"http://127.0.0.1:8010/pages/{deal_id}/shot", timeout=10)
@@ -217,18 +200,6 @@ def portal_shot(deal_id: str) -> Response:
     if r.status_code != 200:
         raise HTTPException(r.status_code, r.text[:200])
     return Response(r.content, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
-
-
-@app.post("/api/portal/{deal_id}/{what}")
-def portal_input(deal_id: str, what: str, payload: dict) -> dict:
-    """The person's click or typing in the live view (what: click | type)."""
-    import httpx
-    if what not in ("click", "type"):
-        raise HTTPException(404)
-    try:
-        return httpx.post(f"http://127.0.0.1:8010/pages/{deal_id}/{what}", json=payload, timeout=10).json()
-    except Exception:
-        raise HTTPException(503, "the shared browser is not running")
 
 
 @app.post("/api/deals/{deal_id}/person_answer")

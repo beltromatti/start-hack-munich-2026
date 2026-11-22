@@ -346,6 +346,7 @@ def test_portal_down_asks_its_airlines_by_mail_also_at_the_break(monkeypatch):
     api = FakeFiveU()
     kit.load(api)
     monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    monkeypatch.setattr(api, "rate_from_page", lambda *a, **k: {"error": True, "status": 503, "detail": "down"})
     monkeypatch.setattr(api, "brackets", lambda *a, **k: None)
     kit.world().brackets.clear()
     f = Sync(api)
@@ -1055,6 +1056,7 @@ def test_while_the_rate_api_is_down_an_airline_is_priced_from_its_own_portal_rat
     live = {o["airline"]: Decimal(o["total"].split()[0]) for o in seen["options"] if o["source"] == "portal"}
     assert live
     api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+    api.rate_from_page = api.rate  # the page is down too (behind Cloudflare since Sun ~04:00)
     down = tools.get_offers(ctx_for("b@b.example"), ship(700), "cheapest", 1)
     mem = {o["airline"]: o for o in down["options"] if o["source"] == "portal_memory"}
     assert set(mem) == set(live)
@@ -1361,48 +1363,47 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     f.watch_scoring({"requests": ["row", r84], "frozen_at": None}, {"rules": "changed", "rounds": {"84": {}}, "ranking": None})
 
 
-def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
-    """Rounds 93-98: the rate API answered 503 for some airlines; 5U's portal page still shows them, to people who
-    pass its check. With operator mode on, the agent hears it at once and the person gets minutes (people took
-    83-358 s in those rounds); the
-    price joins the offers like a portal price, and every total is still computed by code."""
-    from decimal import Decimal
+def test_no_person_acts_on_the_portal_page_and_the_page_is_read_by_code():
+    """5U, Sun 04:03-04:06: no human in the loop, also on the portal page ("If the harness asks a person to solve
+    anything, that's a human"); they check code and logs. A dead rate API is priced from the page by code (Sam's
+    reader, live Sun 02:18: the same totals as the API); a page that gives nothing is listed, and no person is
+    asked, also with operator mode on."""
     from app import tools
-    from app.forwarder import add_portal_page_rate, waiting_for
+    from app.main import app
     api = FakeFiveU()
     kit.load(api)
     f = Sync(api)
     api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
-    store.kv_set("operator_on", "1")
-    rfq = api.customer("k@k.example", "Quote", "320 kg FRA to ORD")
-    for m in api.poll(0)[0]:
-        store.save_mail(m, "in", handled=True)
-    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
     q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
     ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
             "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
             "lots": [{"pieces": 1, "weight": q(320, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}],
             "insurance": None, "extra_charges": []}
-    import time
-    t0 = time.time()
-    first = tools.get_offers(ctx, ship, "fastest", 60)  # with a person at the desk it does not wait for carriers:
-    assert time.time() - t0 < 10  # the agent brings the person in at once (rounds 93-100: people took 83-358 s)
-    d = store.get(ctx.deal_id)["data"]
-    missing = [a["name"] for a in d["portal_missing"]["airlines"]]
-    assert missing and first["portal_page"]["person_at_desk"]  # the agent is told, and drives the page itself
-    assert d["portal_missing"]["shown"]  # only once: the next get_offers waits for the carriers as usual
-    assert not any(x.startswith("person:") for x in waiting_for(d))  # get_offers does not block on a person
-    code = d["portal_missing"]["airlines"][0]["code"]
-    out = add_portal_page_rate(ctx.deal_id, f"{missing[0]} ({code})", "1696,00", 1, "R-page1")  # as the agent says it
-    assert out["offer"]["carrier"] == missing[0]
-    assert out["ok"] and out["offer"]["source"] == "portal_page"
-    opts = tools.get_offers(ctx, None, "fastest", 0)["options"]
-    page = next(o for o in opts if o["airline"] == missing[0])
-    assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
-    from app.forwarder import OPERATOR_WAIT
-    assert 200 <= OPERATOR_WAIT <= 300  # minutes for the person, and the quote still inside the 6-minute close
+
+    def ctx_for(who):
+        rfq = api.customer(who, "Quote", "320 kg FRA to ORD")
+        for m in api.poll(0)[0]:
+            store.save_mail(m, "in", handled=True)
+        return tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    page = tools.get_offers(ctx_for("p@p.example"), ship, "fastest", 0)  # the page answers: priced, bookable
+    portal = [o for o in page["options"] if o["source"] == "portal"]
+    assert portal and "portal_page" not in page
+    assert all(o["bookable_reference"] in api.rates for o in portal)
+
+    api.rate_from_page = api.rate  # the page gives nothing too (Cloudflare's check since Sun ~04:00)
+    store.kv_set("operator_on", "1")
+    ctx = ctx_for("k@k.example")
+    out = tools.get_offers(ctx, ship, "fastest", 0)
+    assert out["portal_page"]["airlines"] and "person_at_desk" not in out["portal_page"]
+    assert "no person" in out["portal_page"]["how"]
+    assert "never acts on 5U's portal page" in tools.ask_person(ctx, "page", "pass the check", None, 30)["error"]
+    assert store.get(ctx.deal_id)["data"].get("person_needed") is None
     store.kv_set("operator_on", "0")
-    assert "operator mode off" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
+    paths = {getattr(r, "path", "") for r in app.routes}
+    assert "/api/deals/{deal_id}/portal_rate" not in paths  # no price copied by hand
+    assert "/api/portal/{deal_id}/{what}" not in paths  # no person's click or typing on the page
+    from app import browser
+    assert not any(getattr(r, "path", "").endswith(("/click", "/type")) for r in browser.app.routes)
 
 
 def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_airlines_away():
@@ -1416,6 +1417,7 @@ def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_air
     kit.load(api)
     f = Sync(api)
     api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+    api.rate_from_page = api.rate  # the page is down too (behind Cloudflare since Sun ~04:00)
     rfq = api.customer("k@k.example", "Quote", "320 kg FRA to ORD")
     for m in api.poll(0)[0]:
         store.save_mail(m, "in", handled=True)
@@ -1430,14 +1432,6 @@ def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_air
     assert desk and desk[0]["subject"] == "Rate request FRA-ORD 320 kg" and "Total weight: 320 kg" in desk[0]["body"]
     d = store.get(ctx.deal_id)["data"]
     assert RATEDESK in waiting_for(d)  # awaited like a carrier, not a fallback
-    missing = d["portal_missing"]["airlines"][0]["name"]
-    store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "offers": r["data"]["offers"] + [
-        {"kind": "air", "carrier": missing, "total": "1171.20", "days": "1", "source": "ratedesk",
-         "rate_id": "R-desk1", "billed_kg": "320"}]}))
-    store.kv_set("operator_on", "1")
-    out = tools.ask_person(ctx, "page", "pass the check", missing, 30)
-    assert out["priced_meanwhile"] == "ratedesk"  # the person is free again at once
-    store.kv_set("operator_on", "0")
 
 
 def test_a_carrier_writing_unprompted_is_read_as_its_tariff():
@@ -1481,3 +1475,28 @@ def test_the_browser_opens_5u_sites_only_and_ask_person_brings_back_an_answer():
     assert out["answer"].startswith("Yes")
     assert store.get(ctx.deal_id)["data"]["person_needed"] is None
     store.kv_set("operator_on", "0")
+
+
+PAGE = """<section id="result"><table data-table><tbody>
+<tr><th>rate_id</th><td id="rate_id" class="px-3">R-_yGrvGMAOgB_1LDf</td></tr>
+<tr><th>Airline</th><td id="airline" class="px-3">Borealis Freight Airways (BX)</td></tr>
+<tr><th>Lane</th><td id="lane">FRA-ORD</td></tr>
+<tr><th>Chargeable weight (kg)</th><td id="chargeable_weight_kg">1076</td></tr>
+<tr><th>Total</th><td id="total">3378.64</td></tr>
+<tr><th>Currency</th><td id="currency">EUR</td></tr>
+<tr><th>Transit days</th><td id="transit_days">1</td></tr>
+<tr><th>Valid until</th><td id="valid_until">2026-11-22T01:33:14.830845+00:00</td></tr>
+</tbody></table></section>"""
+
+
+def test_the_portal_page_is_read_like_the_rate_api():
+    """The page's answer on Sun 02:18 (FRA-ORD BX 1076 kg, the same 3378.64 as the API), and the hidden digits the
+    page used at 00:52."""
+    from app.fiveu import portal_page_url, read_rate_page
+    r = read_rate_page(PAGE)
+    assert r["rate_id"] == "R-_yGrvGMAOgB_1LDf" and r["airline"] == "Borealis Freight Airways"
+    assert r["airline_code"] == "BX" and r["total"] == "3378.64" and r["transit_days"] == 1
+    hidden = '<style>.q7{display:none}</style>' + PAGE.replace("3378.64", '33<span class="q7">9</span>78.64')
+    assert read_rate_page(hidden)["total"] == "3378.64"
+    assert read_rate_page("<p>Origin and destination must be 3-letter airport codes.</p>") is None
+    assert portal_page_url("https://api.start-hack.5u.ai") == "https://start-hack.5u.ai/portal/ui"

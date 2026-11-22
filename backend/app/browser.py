@@ -1,10 +1,10 @@
-"""A browser the agent and a person share, for 5U's portal page (the one place its rates live when the rate API
-answers 503, behind a check meant for people).
+"""The agent's browser for 5U's portal page (the one place its rates live when the rate API answers 503).
 
 One page per deal, in a headless Chrome on the desk's Mac. The agent reads and fills it through the `browser`
-tool (by the labels a person sees, so the page may change its field names every load); the person sees it live in
-the deal's conversation in our UI and does what only a person may do there: the check, the team key, a banner if
-the agent cannot. Runs beside production, so a browser problem never stops the forwarder:
+tool (by the labels a person sees, so the page may change its field names every load); the team key is typed here
+from the settings, never shown to the model. The team watches the page in the deal's conversation and never acts
+on it: 5U, Sun 04:06, "If the harness asks a person to solve anything, that's a human". Runs beside production, so
+a browser problem never stops the forwarder:
 
     cd backend && uv run python -m app.browser        (listens on 127.0.0.1:8010)
 """
@@ -13,6 +13,8 @@ import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from playwright.async_api import async_playwright
+
+from .config import settings
 
 PORT = 8010
 app = FastAPI()
@@ -82,7 +84,7 @@ async def read_page(deal: str) -> dict:
 
 @app.post("/pages/{deal}/fill")
 async def fill(deal: str, body: dict) -> dict:
-    """Fill fields by index (from the form view). Secrets are typed by the person, never here."""
+    """Fill fields by index (from the form view). The team key is typed here from the settings, never by a person."""
     p = page(deal)
     form = await p.evaluate(FORM_JS)
     done, refused = [], []
@@ -91,12 +93,12 @@ async def fill(deal: str, body: dict) -> dict:
         if f is None or f["tag"] == "button":
             refused.append({"i": i, "why": "no such field"})
             continue
-        if str(v).strip() == "{team_key}":  # the agent says where the key goes; the person's click types it
-            state.setdefault("key_field", {})[deal] = int(i)
-            done.append(f"{f['label']} (the person's key, on their click)")
+        if str(v).strip() == "{team_key}":  # the agent says where the key goes; the system types it
+            await p.evaluate(FILL_JS, [int(i), settings.fiveu_api_key])
+            done.append(f"{f['label']} (the team key)")
             continue
         if any(w in f["label"].lower() for w in ("key", "password", "token", "secret")) or f["type"] == "password":
-            refused.append({"i": i, "why": "a key or password: pass {team_key}, the person types it"})
+            refused.append({"i": i, "why": "a key or password: pass {team_key}, the system types it"})
             continue
         await p.evaluate(FILL_JS, [int(i), str(v)])
         done.append(f["label"])
@@ -116,34 +118,6 @@ async def press(deal: str, body: dict) -> dict:
 @app.get("/pages/{deal}/shot")
 async def shot(deal: str) -> Response:
     return Response(await page(deal).screenshot(type="jpeg", quality=70), media_type="image/jpeg")
-
-
-@app.post("/pages/{deal}/click")
-async def click(deal: str, body: dict) -> dict:
-    """The person clicks in the live view (x, y in the page's own pixels)."""
-    await page(deal).mouse.click(float(body["x"]), float(body["y"]))
-    return {"ok": True}
-
-
-@app.post("/pages/{deal}/type")
-async def type_(deal: str, body: dict) -> dict:
-    """The person types in the live view (into the field they clicked); key: Enter, Tab, Backspace."""
-    p = page(deal)
-    if body.get("into") == "key":  # the person's own key, on their click, into the field the agent marked
-        idx = state.get("key_field", {}).get(deal)
-        if idx is None:
-            form = await p.evaluate(FORM_JS)
-            f = next((x for x in form if x["tag"] == "input" and "key" in x["label"].lower()), None)
-            idx = f["i"] if f else None
-        if idx is None:
-            return {"error": "no key field marked on the page: click the field, then paste the key below"}
-        await p.evaluate(FILL_JS, [idx, str(body.get("text") or "")])
-        return {"ok": True}
-    if body.get("key"):
-        await p.keyboard.press(body["key"])
-    if body.get("text"):
-        await p.keyboard.type(str(body["text"]))
-    return {"ok": True}
 
 
 @app.delete("/pages/{deal}")
