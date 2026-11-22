@@ -148,6 +148,9 @@ class Forwarder:
             same = deal and deal["data"].get("request") and all(
                 deal["data"]["request"].get(k) == req.get(k)
                 for k in ("origin", "destination", "chargeable_kg", "pickup_zone", "volume_cbm"))
+            if same and req.get("insurance") != deal["data"]["request"].get("insurance"):  # the same goods, insured
+                store.update(deal_id, lambda r: (r["status"], {**r["data"], "request": {**r["data"]["request"],
+                                                                                        "insurance": req.get("insurance")}}))
             if not same:
                 if deal and deal["data"].get("request"):  # another shipment in this deal: its options get a new
                     store.update(deal_id, lambda r: (r["status"], {**r["data"], "option_set": r["data"].get("option_set", 0) + 1}))
@@ -236,6 +239,7 @@ class Forwarder:
         air = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "air"]), key=lambda o: o.total)
         pickups = sorted(pricing.best_by_carrier([x for x in offers if x.leg == "pickup"]), key=lambda o: o.total)
         needs_pickup = bool(req["pickup_zone"])
+        premium = pricing.insurance_premium(req.get("insurance"))  # part of the all-in total when they ask for it
         # an option id names one option for the life of the deal: a changed or second shipment prices as B1, B2...,
         # and what was quoted before stays bookable under its own id (Sam's probe: two shipments in one mail, the
         # second pricing renamed A1 and book("A1") would have booked it)
@@ -248,10 +252,11 @@ class Forwarder:
                 if needs_pickup and p is None:
                     continue
                 oid = f"{letter}{i}{tag}"
-                total = pricing.money(a.total + (p.total if p else 0))
+                total = pricing.money(a.total + (p.total if p else 0) + (premium or 0))
                 # the shipment this option prices: a deal can price several (round 89: GRU and TLV in one mail),
                 # and the booking must carry the route and goods of the option booked, not of the last pricing
                 table[oid] = {"air": a.as_dict(), "pickup": p.as_dict() if p else None, "total": str(total),
+                              "insurance": str(premium) if premium is not None else None,
                               "total_text": pricing.fmt(total), "request": {k: v for k, v in req.items() if k != "missing"}}
                 _, leaves, arrives = pricing.schedule(req.get("ready_date"), float(p.days) * 24 if p else 0, a.days)
                 rows.append({"option": oid, "airline": a.carrier, "transit_days": float(a.days),
@@ -284,6 +289,10 @@ class Forwarder:
                 "carriers_without_price": [{"from": c["from"], "mail": c["mail"], "says": c["text"][:400]}
                                            for c in d.get("carrier_messages", [])
                                            if c.get("had_sheet_price") or c.get("declined") is False][-5:]}
+        if req.get("insurance"):
+            result["insurance"] = ({"premium": pricing.fmt(premium), "included_in_every_total": True} if premium
+                                   is not None else {"included_in_every_total": False, "why": "the goods value is "
+                                   "not in EUR or a term is missing: ask, never compute it yourself"})
         if d.get("not_asked"):  # the agent can still ask one of them (mail_carrier) when it judges it useful
             result["not_asked"] = [{"carrier": x["carrier"], "email": x["email"], "why": x["why"]}
                                    for x in d["not_asked"]]
@@ -720,7 +729,8 @@ def normalise(s: dict, w: kit.World) -> dict:
             # schedule as text, the dates fell back to today, and the agent told the customer to check the timing)
             "pickup_postcode": pickup.get("postcode"),
             "ready_date": _day((s.get("cargo") or {}).get("ready_date")) or (s.get("cargo") or {}).get("ready_date"),
-            "commodity": (s.get("cargo") or {}).get("commodity"), "missing": missing}
+            "commodity": (s.get("cargo") or {}).get("commodity"), "missing": missing,
+            "insurance": s.get("insurance") or None}
 
 
 def _goods(s: dict) -> tuple[int | None, Decimal | None, Decimal | None]:

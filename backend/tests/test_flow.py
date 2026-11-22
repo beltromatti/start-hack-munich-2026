@@ -887,3 +887,36 @@ def test_the_agent_writes_to_one_carrier_at_most_twice_in_ten_minutes():
     third = to_airline()
     assert "error" in third and "twice" in third["error"]
     assert "sent" in tools.mail_carrier(ctx, "solace-air-cargo@hackloop.mail", "Q", "A question.", None)
+
+
+def test_cargo_insurance_on_the_customers_terms_is_in_every_total():
+    """Round 91: "include cargo insurance in the all-in price: goods value 22000 EUR, insured at 110 % of that value,
+    premium rate 0.40 %" = 96.80 EUR, added by code to every option, never by the model."""
+    from decimal import Decimal
+    from app import pricing, tools
+    assert pricing.insurance_premium({"goods_value": 22000, "currency": "EUR", "insured_percent": 110,
+                                      "premium_percent": 0.40, "minimum_premium": None}) == Decimal("96.80")
+    assert pricing.insurance_premium({"goods_value": 1000, "currency": "EUR", "insured_percent": None,
+                                      "premium_percent": 0.5, "minimum_premium": 25}) == Decimal("25.00")
+    assert pricing.insurance_premium({"goods_value": 1000, "currency": "USD", "insured_percent": None,
+                                      "premium_percent": 0.5, "minimum_premium": None}) is None
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("sara@lind.example", "Quote", "176 kg FRA to ORD, insured")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-29", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(176, "kg"), "volume": q(1.26, "cbm"), "dimensions": None}],
+            "insurance": None}
+    plain = tools.get_offers(ctx, ship, "fastest", 5)
+    ins = {"goods_value": 22000, "currency": "EUR", "insured_percent": 110, "premium_percent": 0.40,
+           "minimum_premium": None}
+    insured = tools.get_offers(ctx, {**ship, "insurance": ins}, "fastest", 0)  # the same goods: no new asks
+    assert insured["insurance"]["premium"] == "96.80 EUR"
+    by = {o["airline"]: Decimal(o["total"].split()[0]) for o in plain["options"]}
+    for o in insured["options"]:
+        assert Decimal(o["total"].split()[0]) - by[o["airline"]] == Decimal("96.80")

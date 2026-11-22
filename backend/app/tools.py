@@ -53,6 +53,15 @@ SHIPMENT = obj({
                                        "size of ONE piece of this lot, as written")),
         })},
     "cargo": obj({"commodity": S, "ready_date": S, "notes": S}),
+    "insurance": nullable(obj({
+        "goods_value": {**N, "description": "the value of the goods as written"},
+        "currency": {**S, "description": "of the goods value, as written (EUR if they say nothing)"},
+        "insured_percent": {**N, "description": "share of the value insured, as written (110 for '110 % of the "
+                                                 "value'); null when they do not say: 100"},
+        "premium_percent": {**N, "description": "premium rate in percent, as written (0.40 for '0.40 %')"},
+        "minimum_premium": {**N, "description": "a minimum premium if they name one, else null"}},
+        "cargo insurance the customer wants in the all-in price, on the terms they give: our code adds the premium "
+        "to every option's total. null when they do not ask for insurance")),
 })
 
 

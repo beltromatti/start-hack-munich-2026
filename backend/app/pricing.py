@@ -194,3 +194,18 @@ def quote(air: list[Offer], pickup: list[Offer], preference: str, needs_pickup: 
     total = money(a.total + (p.total if p else 0))
     return {"total": str(total), "currency": "EUR", "air": a.as_dict(), "pickup": p.as_dict() if p else None,
             "transit_days": str(a.days)}
+
+
+def insurance_premium(ins: dict | None) -> Decimal | None:
+    """Cargo insurance on the customer's own terms (round 91: "goods value 22000 EUR, insured at 110 % of that
+    value, premium rate 0.40 %" = 96.80): value x insured share x rate, at least the minimum. In EUR only; another
+    currency is not converted here (None), never guessed."""
+    if not ins or ins.get("goods_value") in (None, "") or ins.get("premium_percent") in (None, ""):
+        return None
+    if (ins.get("currency") or "EUR").upper() not in ("EUR", "€", "EURO", "EUROS"):
+        return None
+    share = Decimal(str(ins.get("insured_percent") or 100)) / 100
+    premium = Decimal(str(ins["goods_value"])) * share * Decimal(str(ins["premium_percent"])) / 100
+    if ins.get("minimum_premium") not in (None, ""):
+        premium = max(premium, Decimal(str(ins["minimum_premium"])))
+    return money(premium)
