@@ -274,6 +274,19 @@ def board_history(limit: int = 200) -> list[dict]:
 
 
 # Last: the UI mount at "/" would shadow any route added after it.
+@app.post("/api/ask")
+def ask(payload: dict) -> dict:
+    """The desk's ask field (app/desk.py): our own OpenAI key, never the gateway; the answer is checked against the
+    desk data the page sent. 503 when there is no key or too many questions: the page then answers by plain lookup."""
+    from . import desk
+    try:
+        return desk.answer(payload.get("question") or "", payload.get("desk") or {}, payload.get("earlier"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:  # no key, the brake, OpenAI unreachable: the desk works without it
+        raise HTTPException(503, str(e)[:200])
+
+
 # The sessions UI, built (frontend/dist): served by the same process on a server (Docker), so one port is enough.
 _dist = Path(os.getenv("FRONTEND_DIST", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
 if _dist.is_dir():
