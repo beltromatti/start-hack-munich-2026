@@ -103,6 +103,15 @@ class World:
         return [c for c in self.carriers if c.kind == "airline" and destination in c.serves
                 and c.name.lower() not in on_portal and c.name.lower() not in portal_names]
 
+    def portal_airlines_off_lane(self, origin: str, destination: str) -> list[Carrier]:
+        """Airlines that sell on the portal elsewhere and fly to this destination, but are not on the portal for
+        this lane: 5U moves carriers between the portal and mail (Sun 01:40, said to the team), so they are asked
+        by mail rather than not at all."""
+        on_portal = {a["name"].lower() for a in self.portal.get((origin, destination), [])}
+        portal_names = {a["name"].lower() for lanes in self.portal.values() for a in lanes}
+        return [c for c in self.carriers if c.kind == "airline" and destination in c.serves
+                and c.name.lower() in portal_names and c.name.lower() not in on_portal]
+
     def truckers(self, zone: str) -> list[Carrier]:
         return [c for c in self.carriers if c.kind == "trucker" and zone in c.serves]
 

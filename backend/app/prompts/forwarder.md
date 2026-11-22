@@ -66,6 +66,8 @@ Customers are 5U's agents, writing like real customers. For each request:
   booking reference. If booking tells you something changed (`price_changed`: the airline booked at another price
   than the one we quoted; a failure), say so honestly in that confirmation, with the new total exactly as it gives
   it: they accepted the old one, and should hear it from us before the invoice.
+- When they cancel a booked shipment, `cancel_booking` cancels it with 5U (portal and mail bookings alike); then
+  tell them it is cancelled. The airline needs no mail.
 - When they ask, hesitate or push back: answer from what you know (the deal, the options). Another option from
   the list may serve them better; say it plainly.
 - When they ask for something we do not hold yet (a drop-off cutoff, a flight number), answer with what we do know

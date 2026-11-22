@@ -111,6 +111,11 @@ TOOLS = [
        "null for this thread's deal; the offer's own deal (crm finds it) when the customer accepts in a new mail "
        "an offer we made them in another thread, because its options live there.",
        {"option_id": {"type": "string"}, "deal_id": S}),
+    fn("cancel_booking",
+       "Cancel one of our bookings with 5U when the customer (or the team) asks to cancel: it works for portal and "
+       "mail bookings alike, before or after the airline's confirmation, and the shipment is then no longer booked. "
+       "The airline needs no mail. deal_id: null for this thread's deal, else the booking's own deal (crm finds it).",
+       {"booking_reference": {"type": "string"}, "deal_id": S}),
     fn("crm",
        "Search our CRM: deals and bookings by booking or rate reference, our reference (SM-...), customer name or "
        "address, company, route, airline, anything. Returns the matching deals with their shipment, quote, booking, "
@@ -157,7 +162,8 @@ class Ctx:
 
 
 def run(ctx: Ctx, name: str, args: dict) -> dict:
-    f = {"get_offers": get_offers, "send_mail": send_mail, "book": book, "crm": crm, "deal": deal,
+    f = {"get_offers": get_offers, "send_mail": send_mail, "book": book, "cancel_booking": cancel_booking,
+         "crm": crm, "deal": deal,
          "mail_carrier": mail_carrier, "carrier_status": carrier_status, "note": note,
          "no_reply": no_reply}.get(name)
     if f is None:
@@ -310,6 +316,19 @@ def book(ctx: Ctx, option_id: str, deal_id: str | None = None) -> dict:
         out["hint"] = ("this thread's deal has no priced options. If they accept an offer from another thread of "
                        "theirs, find its deal with crm and pass its deal_id")
     return out
+
+
+def cancel_booking(ctx: Ctx, booking_reference: str, deal_id: str | None = None) -> dict:
+    """Only a customer's own deal, from that customer's thread (the tracking desk asks, it does not cancel)."""
+    if ctx.task != "customer":
+        return {"error": "bookings are cancelled from the customer's own thread"}
+    did = deal_id or ctx.deal_id
+    rec = store.get(did)
+    if not rec or rec["type"] != "deal":
+        return {"error": "no such deal"}
+    if not _visible(ctx, rec):
+        return {"error": "that deal belongs to another customer"}
+    return ctx.fw.cancel_booking(did, booking_reference.strip())
 
 
 def _visible(ctx: Ctx, rec: dict) -> bool:
@@ -486,6 +505,8 @@ def timeline(booking: dict) -> dict:
     stage = ("booked, waiting for the goods to be ready" + (" and collected" if pickup_h else "")
              if now < ready else "collected, on its way to the airport" if now < departure
              else "in transit" if now < arrival else "arrived")
+    if booking.get("status") == "cancelled":  # cancelled at the customer's request: it is going nowhere
+        stage = "cancelled at the customer's request: not shipping"
     return {"ready_date": ready.strftime(pricing.DATE), "estimated_departure": departure.strftime(pricing.DATE),
             "estimated_arrival": arrival.strftime(pricing.DATE), "expected_stage_now": stage}
 

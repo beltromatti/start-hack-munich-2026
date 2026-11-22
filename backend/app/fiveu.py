@@ -150,6 +150,16 @@ class FiveU:
             body = {"detail": r.text[:300]}
         return r.status_code, body
 
+    def cancel_booking(self, booking_reference: str) -> tuple[int, dict]:
+        """DELETE /v1/portal/bookings/{ref} (new Sun 00:xx): cancels any of our bookings, portal or mail, before or
+        after its confirmation; a cancelled booking no longer counts for its shipment. 200 again on a repeat."""
+        r = self._req("DELETE", f"/v1/portal/bookings/{booking_reference}")
+        try:
+            body = r.json()
+        except ValueError:
+            body = {"detail": r.text[:300]}
+        return r.status_code, body
+
     def board(self) -> dict:
         """The public leaderboard: every team's rank, totals, accepted, bookings, the last rounds."""
         r = self._req("GET", "/v1/board")

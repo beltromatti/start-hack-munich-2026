@@ -34,6 +34,7 @@ class Forwarder:
         self.stop = threading.Event()
         self.fx: dict[str, Decimal] = {}  # EUR per 1 unit of a currency, as last stated with a price
         self._last_portal = time.time()
+        self._gone: dict[str, set[str]] = {}  # per deal: airlines the portal answered 404 for (to ask by mail)
         self._last_board = 0.0
 
     # ---- loop ----------------------------------------------------------------------------------------------
@@ -234,8 +235,17 @@ class Forwarder:
                 self._ask(asked, deal_id, c, self.ask_trucker, deal_id, c, req)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "asked": {**r["data"]["asked"], **asked},
                                                        "not_asked": not_asked}))
+        self._gone.pop(deal_id, None)
         portal, failed = self.portal_offers(deal_id, o, d, kg, cbm, cw)
         fallback: list = []  # mails to portal airlines while the portal fails: tried, never awaited (round 94)
+        # airlines that may have moved from the portal to mail: off the portal for this lane, or a 404 for it
+        for c in w.portal_airlines_off_lane(o, d) + [x for x in (w.carrier_by_name(n) for n in
+                                                                 self._gone.pop(deal_id, set())) if x]:
+            told = lanes_told(c.email)
+            if c.email in asked.values() or (told is not None and f"{o}-{d}" not in told["lanes"]):
+                continue
+            self._ask(asked, deal_id, c, self.ask_airline, deal_id, c, o, d, cw, cbm, req)
+            fallback.append(next(reversed(asked)) if asked else None)
         store.update(deal_id, lambda r: (r["status"], {**r["data"], "portal_retry": {
             "o": o, "d": d, "kg": str(kg), "cbm": str(cbm) if cbm else None, "cw": str(cw), "names": sorted(failed),
             "since": time.time(), "next": time.time() + self.PORTAL_RETRY[0]}}))
@@ -400,6 +410,9 @@ class Forwarder:
                 if r.get("error"):
                     store.log("bids", "error", f"portal {a['code']} {o}-{d}: {r['status']} {r['detail']}"[:300],
                               run_id=deal_id)
+                    if r["status"] == 404 and wt == kg:  # not on the portal for this lane (any more): by mail
+                        self._gone.setdefault(deal_id, set()).add(a["name"])
+                        self._last_portal = 0  # the lane list is stale: read it again now
                     if r["status"] in (429, 500, 502, 503, 504):
                         if wt == kg:
                             failed.add(a["name"])
@@ -483,6 +496,33 @@ class Forwarder:
             store.update(deal_id, lambda r: ("booked", {**r["data"], "booking": booking, "bookings": [
                 b for b in done if b.get("team_reference") != ref] + [booking]}))
         return booking
+
+    def cancel_booking(self, deal_id: str, booking_reference: str) -> dict:
+        """Cancel one of this deal's bookings with 5U (DELETE on the portal, for portal and mail bookings alike). The
+        booking stays in the register as cancelled, so the CRM and tracking say so (round 88: six mails to an
+        airline's quote desk, never cancelled, -20)."""
+        d = store.get(deal_id)["data"]
+        mine = [b for b in (d.get("bookings") or ([d["booking"]] if d.get("booking") else []))
+                if b.get("booking_reference") == booking_reference]
+        if not mine:
+            refs = [b.get("booking_reference") for b in (d.get("bookings") or [d.get("booking") or {}])]
+            return {"error": f"{booking_reference} is not a booking of this deal", "bookings": refs}
+        status, body = self.api.cancel_booking(booking_reference)
+        store.log("booking", "info", f"cancel {booking_reference}: {status}", body, run_id=deal_id)
+        if status != 200:
+            return {"error": f"5U answered {status}", "detail": body}
+        key = f"booking-{mine[0]['team_reference'][3:]}"
+        b = {**(store.get(key) or {"data": mine[0]})["data"], "status": "cancelled", "cancelled_at": time.time()}
+        store.put(key, "booking", "cancelled", b)
+        store.update(deal_id, lambda r: ("cancelled" if all(
+            x.get("booking_reference") == booking_reference or x.get("status") == "cancelled"
+            for x in (r["data"].get("bookings") or [r["data"].get("booking") or {}])) else r["status"], {
+            **r["data"], "booking": b if (r["data"].get("booking") or {}).get("booking_reference") == booking_reference
+            else r["data"].get("booking"),
+            "bookings": [b if x.get("booking_reference") == booking_reference else x
+                         for x in (r["data"].get("bookings") or [])]}))
+        return {"cancelled": booking_reference, "status": "cancelled", "note": "5U no longer counts it as booked; "
+                "the airline needs no mail"}
 
     # ---- carrier mail (system tasks, no agent) -------------------------------------------------------------
 

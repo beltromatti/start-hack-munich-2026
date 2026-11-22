@@ -106,6 +106,13 @@ class FakeFiveU:
         self.bookings[rate_id] = b
         return 201, b
 
+    def cancel_booking(self, booking_reference: str) -> tuple[int, dict]:
+        b = next((x for x in self.bookings.values() if x["booking_reference"] == booking_reference), None)
+        if b is None:
+            return 404, {"detail": "unknown booking_reference"}
+        b["status"] = "cancelled"
+        return 200, b
+
     def board(self) -> dict:
         return {"frozen_at": None, "overview": {"rounds_sent": 0, "teams": 1, "accepted": 0, "bookings": 0},
                 "ranking": [], "bookings": [], "rounds": []}

@@ -1026,3 +1026,62 @@ def test_while_the_rate_api_is_down_an_airline_is_priced_from_its_own_portal_rat
         assert Decimal(o["total"].split()[0]) == (live[name] / 600 * 700).quantize(Decimal("0.01")) or \
             abs(Decimal(o["total"].split()[0]) - live[name] / 600 * 700) < Decimal("0.05")
         assert "unavailable" in o["carrier_note"]
+
+
+def test_a_booking_is_cancelled_with_5u_and_the_crm_says_so():
+    """5U's DELETE /v1/portal/bookings/{ref} (new, Sun): round 88 wrote six mails to an airline's quote desk instead,
+    the booking was never cancelled, -20. Cancelling is a tool; tracking then reads a cancelled shipment."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("petra@hof.example", "Quote", "320 kg FRA to ORD, cheapest")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(320, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}],
+            "insurance": None, "extra_charges": []}
+    opt = next(o["option"] for o in tools.get_offers(ctx, ship, "cheapest", 5)["options"] if o["source"] == "portal")
+    b = tools.book(ctx, opt)
+    ref = b["booking_reference"]
+    tracking = tools.Ctx(f, "session-x", "deal-x", 1, "tracking", None)
+    assert "error" in tools.cancel_booking(tracking, ref, ctx.deal_id)  # the tracking desk does not cancel
+    assert "error" in tools.cancel_booking(ctx, "BK-NOPE")
+    out = tools.cancel_booking(ctx, ref)
+    assert out["status"] == "cancelled"
+    assert store.get(f"booking-{rfq['id']}")["data"]["status"] == "cancelled"
+    assert store.get(ctx.deal_id)["status"] == "cancelled"
+    found = tools.crm(ctx, ref)["matches"][0]
+    assert "cancelled" in found["booking"]["expected_stage_now"]
+
+
+def test_an_airline_off_the_portal_for_this_lane_is_asked_by_mail_without_holding_the_quote():
+    """5U moves carriers between the portal and mail (Sun 01:40). An airline that sells on the portal elsewhere and
+    flies to the destination, but is not on the portal for this lane, was asked nowhere; a 404 had no fallback.
+    Both are now asked by mail, and not waited for (round 94: waiting for airlines that never wrote)."""
+    from app import tools
+    from app.forwarder import waiting_for
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    w = kit.world()
+    off = w.portal_airlines_off_lane("FRA", "ORD")
+    on = {a["name"] for a in w.portal.get(("FRA", "ORD"), [])}
+    assert all(c.name not in on for c in off)
+    rfq = api.customer("a@a.example", "Quote", "320 kg FRA to ORD")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(320, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}],
+            "insurance": None, "extra_charges": []}
+    tools.get_offers(ctx, ship, "cheapest", 0)
+    d = store.get(ctx.deal_id)["data"]
+    asked_mail = set(d["asked"].values())
+    assert {c.email for c in off} <= asked_mail  # asked
+    assert not ({c.email for c in off} & set(waiting_for({**d, "replied": []})))  # but not awaited
