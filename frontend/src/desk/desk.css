@@ -210,7 +210,7 @@ button.dk-it:hover { background: #fafafa; }
 }
 
 /* ---- it all belongs together: one easing, soft arrivals, nothing snaps ---- */
-.dk-app { --ease: cubic-bezier(.22, 1, .36, 1); --spring: cubic-bezier(.34, 1.56, .64, 1); }
+.dk-app { --ease: cubic-bezier(.22, 1, .36, 1); --spring: cubic-bezier(.16, 1, .3, 1); }
 .dk-win { animation: dk-open .8s var(--ease) both; } @keyframes dk-open { from { opacity: 0; transform: translateY(16px) scale(.985); } }
 .dk-ground { animation: dk-fade 1.4s ease both; } @keyframes dk-fade { from { opacity: 0; } }
 .dk-cont > * { animation: dk-arrive .55s var(--ease) both; } .dk-cont > :nth-child(2) { animation-delay: .06s; } .dk-cont > :nth-child(3) { animation-delay: .12s; } .dk-cont > :nth-child(4) { animation-delay: .18s; }
