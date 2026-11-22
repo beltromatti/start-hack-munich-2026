@@ -164,6 +164,9 @@ class Forwarder:
 
     def _wait(self, deal_id: str, wait: float) -> None:
         end = time.time() + max(0.0, float(wait))
+        by = quote_deadline(store.get(deal_id)["data"])
+        if by is not None:  # never wait past the time the quote must leave (round 94)
+            end = min(end, by)
         while time.time() < end and waiting_for(store.get(deal_id)["data"]):
             self.wait_step()
 
@@ -282,6 +285,9 @@ class Forwarder:
                 "why": "they fly this lane, the rate portal did not answer for them and neither they nor the rate "
                        "desk have replied yet. The fastest or the cheapest may be among them: a quote without them "
                        "can be far from the best price. get_offers with shipment null waits for them"}
+        by = quote_deadline(d)
+        if by is not None:  # how long the waiting may still go on before the quote has to leave
+            result["seconds_left_to_quote"] = max(0, round(by - time.time()))
         if d.get("not_asked"):  # the agent can still ask one of them (mail_carrier) when it judges it useful
             result["not_asked"] = [{"carrier": x["carrier"], "email": x["email"], "why": x["why"]}
                                    for x in d["not_asked"]]
@@ -645,6 +651,25 @@ class Forwarder:
 
 
 # ---- helpers -----------------------------------------------------------------------------------------------
+
+# A request expires six minutes after it arrives. Round 94 was answered after 499 s and lost as out_of_time.
+# Waiting for carriers ends four minutes in; the rest is for writing and sending the quote.
+EXPIRES_S = 360
+QUOTE_BY_S = 240
+
+
+def quote_deadline(d: dict) -> float | None:
+    """When waiting for carriers ends on this deal: QUOTE_BY_S after its first mail, while no quote is out and the
+    request has not expired. None means no limit (quoted already, expired, or the arrival unknown)."""
+    from datetime import datetime
+    if d.get("quote") or not d.get("received_at"):
+        return None
+    try:
+        arrived = datetime.fromisoformat(d["received_at"]).timestamp()
+    except ValueError:
+        return None
+    return arrived + QUOTE_BY_S if time.time() < arrived + EXPIRES_S else None
+
 
 def waiting_for(d: dict) -> list[str]:
     """Carriers that still owe an answer. Counted per request mail: a carrier asked at two weights answers twice."""

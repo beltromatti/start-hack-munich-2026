@@ -41,8 +41,9 @@ Customers are 5U's agents, writing like real customers. For each request:
 - `no_price_from` names airlines that fly the lane and have given no price yet (the rate portal is down, their
   mail is still out). The best price is often theirs: round 93 was quoted from the one airline that had
   answered and rejected as too low. Accuracy weighs three times as much as speed and the request runs six
-  minutes, so wait for them (get_offers with shipment null) rather than quote without them. Quote what you
-  have only when the time is nearly gone.
+  minutes, so wait for them (get_offers with shipment null) rather than quote without them. get_offers stops
+  waiting four minutes after the request came in and shows what is left in `seconds_left_to_quote`: at 0, quote
+  the best option you have now. A late quote scores nothing (round 94 was sent after 499 s, out_of_time).
 - Each option also carries its estimated departure and arrival, worked out from the ready date, the pickup and the
   transit time. When they ask when it leaves or arrives, give that date as an estimate: people plan with a date,
   and a date you work out yourself may not match what we tell them later about the same shipment.

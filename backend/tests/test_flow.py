@@ -740,3 +740,42 @@ def test_rate_api_down_asks_the_rate_desk_and_names_the_airlines_without_a_price
     out = f.collect_offers(deal_id, None, "cheapest", 0)
     assert "no_price_from" not in out and out["still_waiting_for"] == []
     assert any(o["airline"] == "Borealis Freight Airways" and o["total"] == "1171.20 EUR" for o in out["options"])
+
+
+def test_waiting_for_carriers_ends_four_minutes_after_the_request():
+    """Round 94: the quote went out after 499 s, out_of_time (a request expires after 360 s). get_offers stops
+    waiting QUOTE_BY_S after the request arrived and shows the agent what is left; after the quote, or once the
+    request has expired, there is nothing to hurry for."""
+    import time
+    from datetime import datetime, timedelta, timezone
+    from app import forwarder
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+
+    def deal(seconds_ago, **more):
+        at = (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).isoformat()
+        store.put("deal-t", "deal", "pricing", {"received_at": at, "asked": {"1": "air@x.example"}, "replied": [],
+                                                **more})
+
+    def waited(wait):
+        t = time.time()
+        f._wait("deal-t", wait)
+        return time.time() - t
+
+    deal(forwarder.QUOTE_BY_S + 5)
+    assert waited(90) < 1  # past the limit: no more waiting, an airline still owes its answer
+    deal(forwarder.QUOTE_BY_S - 1.5)
+    assert 0.5 < waited(90) < 3  # waits up to the limit, not the 90 s asked
+    deal(forwarder.QUOTE_BY_S + 5, quote={"amount": "1.00 EUR"})
+    assert waited(1) >= 1  # quoted already: no limit
+    deal(forwarder.EXPIRES_S + 5)
+    assert waited(1) >= 1  # expired: no limit
+
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    deal_id = f"deal-{rfq['id']}"
+    assert "seconds_left_to_quote" not in f.collect_offers(deal_id, None, "cheapest", 0)  # quoted: nothing shown
+    at = (datetime.now(timezone.utc) - timedelta(seconds=forwarder.QUOTE_BY_S + 10)).isoformat()
+    store.update(deal_id, lambda r: (r["status"], {**r["data"], "quote": None, "received_at": at}))
+    assert f.collect_offers(deal_id, None, "cheapest", 0)["seconds_left_to_quote"] == 0
