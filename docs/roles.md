@@ -36,7 +36,7 @@ per the brief, check timestamps from 16:00).
    simulation and learning. Most teams only look at their own results.
 5. **Jan's prediction engine as the watcher.** An asset no other team has. Caveat: trained on residual values;
    what it predicts here must be checked with Jan before we pitch it as the core.
-6. **Human mail and strong UX.** `human.md` tone (jury criterion + bonus) and a sessions UI built on Sempli patterns.
+6. **Human mail and strong UX.** `human.md` tone (jury criterion + bonus) and a sessions UI.
 
 Core sentence: *"How does an autonomous forwarder stay right at 2 a.m. when the world changes without warning?"*
 
@@ -46,7 +46,7 @@ Still open: wait for all carriers or send after a fixed time; what yellow and re
 
 | Who | Owns | Notes |
 | --- | --- | --- |
-| **Sam** | Product, design, UX/UI (Mobbin references, Sempli code reuse), sessions UI and dashboard, `human.md` tone | |
+| **Sam** | Product, design, UX/UI (Mobbin references), sessions UI and dashboard, `human.md` tone | |
 | **Jan** | Prediction engine (his own, trained on residual values) and how it feeds pricing, disruptions and outliers | Open questions below |
 | **Mattia** | _open_ | To agree with Mattia |
 

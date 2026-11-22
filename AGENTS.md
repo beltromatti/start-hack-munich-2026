@@ -10,7 +10,7 @@ that taught them, and what is still open. Keep it true: a decision that changes 
 ## The challenge
 
 **Allocated: 5U AI, "Build the Forwarder"** (confirmed in the Hack League app, Sat 21 Nov).
-Read `docs/challenges/5u.md` before building anything. The other challenge files are background only.
+Read `docs/challenges/5u.md` before building anything.
 How to reach 5U (mailbox, rate portal, LLM gateway, endpoints, `.env` names): `docs/challenges/5u-kit.md`.
 API spec: `docs/challenges/5u-api/openapi.json`. Rate sheets, carrier list, pickup zones: `docs/challenges/5u-kit/start-kit/`.
 Counted facts for decisions (lanes, rate limit, email-only airlines, weight breaks, trucker zones): `docs/challenges/5u-facts.md`.
@@ -24,7 +24,7 @@ the key. Forwarder vocabulary for the parse prompt: `backend/app/prompts/glossar
 
 ## Architecture (keep it this simple)
 
-One forwarder agent (SIEVER Mail harness, `reference/siever-mail/`): the model decides, the system guarantees.
+One forwarder agent (the SIEVER Mail way of building a harness): the model decides, the system guarantees.
 
 ```
 mail in -> register (SQLite) -> router (code, by sender/thread)

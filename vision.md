@@ -2,8 +2,8 @@
 
 The guiding document of our forwarder for the 5U AI challenge: what it is, how it works, why, and how we decide.
 Read it first: Sam, Jan, every AI assistant, and Claude after a context compaction. It continues the vision of
-SIEVER Mail, the harness Mattia built for an agent that runs a person's mail in production
-(`reference/siever-mail/vision.it.md`, English digest in its `README.md`), applied to a freight desk.
+SIEVER Mail, the harness Mattia built for an agent that runs a person's mail in production, applied to a
+freight desk.
 
 It is not a rulebook. It is how we think, with what really happened as the examples, so that a person or an
 assistant can reason the same way about a case nobody has seen yet. It must stay true: when the code and this file
@@ -417,7 +417,7 @@ Then:
   largest first message (round 57, with its packing list) 2,285. A real 30-page document (about 15,000 tokens) would
   cost about 0.002 USD at gpt-6-luna's 0.10 USD per million, and the agent sees all of it at once, which the
   document-wins rule needs. Only a pathological size breaks us: past the 1.05 million-token context the request is
-  refused and the round is lost. SIEVER's answer (§2.3, §13.6 of its vision) is pages the agent reads on demand;
+  refused and the round is lost. SIEVER Mail's answer is pages the agent reads on demand;
   not built, because for real documents it would add calls, not save them. Decide again if a document ever runs
   to more than a few dozen pages. (Since 22:43 pictures and scanned pages are read too: each is one gateway call,
   about 0.0004 USD.)
