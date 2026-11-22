@@ -148,7 +148,7 @@
 </div><p class="note">Lindqvist writes in Korean, in pounds and cubic feet, on top of an old thread about another shipment. Giulia answers in Korean, in euros, with the truck. The customer booked a minute later.</p></section>
 
 <!-- 6 AI first: Giulia acts, a person oversees. The three status lines are the Desk's own (Desk.tsx, Ground.tsx on main). -->
-<section class="st" data-o="6" hidden><div class="ts g loop">
+<section class="st bk" hidden><div class="ts g loop">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">AI first: Giulia acts. <i>You oversee.</i></h2>
   <div class="lane" style="top:16.6cqw">
@@ -175,7 +175,7 @@
 </div><p class="note">The judges work human in the loop. Our position: the person moves from inside every mail to above the desk. Giulia never waits for a person. In an odd case Giulia decides, tells the customer and leaves a note (amber) or a warning (red). If they attack "who is liable": every price, date and recipient is computed or checked by code, the next slide. If they attack "what when Giulia is wrong": red on the Desk, the person takes over that one shipment, and a sentence from a person overrides Giulia from then on.</p></section>
 
 <!-- 8 Giulia decides, code guarantees -->
-<section class="st" data-o="8" hidden><div class="ts g duo">
+<section class="st bk" hidden><div class="ts g duo">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Giulia decides. <i>Code guarantees.</i></h2>
   <div class="col l"><h3>Giulia decides</h3><ul>
@@ -251,7 +251,7 @@
 </div><p class="note">These eight lines are copied from the product's own setup page. An owner can read exactly what the agent may do.</p></section>
 
 <!-- 8 Memory -->
-<section class="st" data-o="9" hidden><div class="ts g mem">
+<section class="st" data-o="8" hidden><div class="ts g mem">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Giulia knows <i>every customer.</i></h2>
   <ul class="pts">
@@ -264,10 +264,19 @@
 </div><p class="note">Built today: notes per customer, shown on the Desk, taught in one sentence. This is the ground the vision slide stands on.</p></section>
 
 <!-- Backup: architecture -->
-<section class="st bk" hidden><div class="ts map">
+<section class="st" data-o="6" hidden><div class="ts map">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
-  <h2 class="tt">How Giulia works.</h2>
-  <p class="sm" style="left:4cqw;top:11.6cqw">The model decides. Every price, date and recipient is computed or checked by code.</p>
+  <h2 class="tt">AI first: one agent, eleven tools.</h2>
+  <p class="sm" style="left:4cqw;top:11.6cqw">Giulia reads the mail and acts through tools. Every price, date and recipient comes from code. You oversee.</p>
+  <div class="sig">
+    <em>You oversee</em>
+    <ul>
+      <li class="gr"><i></i>Runs on its own</li>
+      <li class="am"><i></i>A note waits for you</li>
+      <li class="rd"><i></i>You take over</li>
+    </ul>
+  </div>
+  <p class="won"><b>No human in the loop</b>The scored night ran that way. 166 of 187 quotes accepted, 1st of 15.</p>
   <div class="zone" style="left:13.5cqw;top:16cqw;width:13cqw;height:19cqw"><em>code</em></div>
   <div class="zone" style="left:28cqw;top:16cqw;width:35.5cqw;height:19cqw"><em>model, one session per thread</em></div>
   <div class="zone" style="left:65cqw;top:16cqw;width:14cqw;height:38.6cqw"><em>code</em></div>
@@ -281,10 +290,11 @@
     <path d="M68.8 47H55.4" marker-end="url(#ah)"/>
     <path class="q" d="M34 44V34.6" marker-end="url(#ahq)"/>
     <path class="q" d="M48.6 47H37.4" marker-start="url(#ahq)"/>
+    <path class="q" d="M27.6 47H30.8"/>
   </svg>
   <div class="nd" style="--x:7;--y:26"><i><svg class="ic"><use href="#i-mail"/></svg></i><b>Mail in</b><code>pdf xlsx audio</code></div>
   <div class="nd" style="--x:20;--y:26"><i><svg class="ic"><use href="#i-branch"/></svg></i><b>Router</b><code>by thread</code></div>
-  <div class="nd me" style="--x:34;--y:26"><i><svg class="ic" style="stroke:none"><use href="#mk"/></svg></i><b>Giulia</b><code>decides, calls tools</code></div>
+  <div class="nd av" style="--x:34;--y:26"><i><img src="../shots/giulia-avatar.jpg" alt=""></i><b>Giulia</b><code>decides, calls tools</code></div>
   <div class="tools" style="left:42.4cqw;top:20.2cqw;width:19.4cqw"><b>Tools</b><code>get_offers</code><code>send_mail</code><code>book</code><code>cancel_booking</code><code>crm</code><code>deal</code><code>mail_carrier</code><code>carrier_status</code><code>note</code><code>browser</code><code>no_reply</code></div>
   <div class="nd" style="--x:72;--y:26"><i><svg class="ic"><use href="#i-calc"/></svg></i><b>Engine</b><code>prices, bookings</code></div>
   <div class="nd" style="--x:90;--y:26"><i><svg class="ic"><use href="#i-send"/></svg></i><b>Mail out</b><code>customer, carriers</code></div>
@@ -296,10 +306,10 @@
   <span class="el" style="left:72cqw;top:40.4cqw">every step</span>
   <span class="el" style="left:62cqw;top:45.2cqw">reads</span>
   <span class="el q" style="left:34cqw;top:39.4cqw">after your yes</span>
-</div><p class="note">Routing is code. One agent session per mail thread. The agent only calls tools, and the engine behind them computes prices in code. The register is the memory and survives a restart.</p></section>
+</div><p class="note">This slide carries the AI approach in one picture, after the swarm and the product. Three sentences: one agent instead of a swarm, it acts through eleven tools, code does the sums. The person sits above it and sees green, amber or red. If they attack AI first: the organisers ran the scored night with no human in the loop, and this came first. Routing is code. One agent session per mail thread. The agent only calls tools, and the engine behind them computes prices in code. The register is the memory and survives a restart.</p></section>
 
 <!-- 9 Vision -->
-<section class="st" data-o="10" hidden><div class="ts g vis">
+<section class="st" data-o="9" hidden><div class="ts g vis">
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">Giulia gets better <i>with every customer.</i></h2>
   <ol class="steps">
@@ -316,7 +326,7 @@
 </div><p class="note">Vision. Today is built: notes per customer. Next and Then are the plan: Giulia learns step by step from each yes and no and adapts to each customer. Say "we are building this", never "it runs".</p></section>
 
 <!-- 10 Close -->
-<section class="st" data-o="11" hidden><div class="ts hero">
+<section class="st" data-o="10" hidden><div class="ts hero">
   <div class="img" style="inset:0;background-image:url(frames/r/hero-sea-day-1.jpg)"></div>
   <span class="lg"><svg><use href="#mk"/></svg>Milan Forwarding</span>
   <h2 class="tt">By morning,<br><i>Giulia has answered.</i></h2>
