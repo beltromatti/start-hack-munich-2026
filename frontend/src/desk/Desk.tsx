@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Board, Deal, DealRow, get, post } from "../api";
-import { DEMO } from "../demo";
+import { DEMO, recorded } from "../demo";
 import { DealView } from "../DealView";
 import { OperatorStrip } from "../Operator";
 import { BoardPane, DealList } from "../Side";
@@ -10,7 +10,7 @@ import { CarrierFacts, Seen, carrierFacts, context, customerExtra, expect, useKn
 import { Ground, Mark, Mood } from "./Ground";
 import { Icon } from "./icons";
 import { CITY, LANES, ORIGINS, REGION } from "./network";
-import { CustomerMap, insights, open as openWith } from "./CustomerMap";
+import { CustomerMap, NodeMap, airlineHubs, airlineInsights, insights, open as openWith } from "./CustomerMap";
 import { Jobs, Job } from "./Jobs";
 import { MatrixChart } from "./Matrix";
 import { Numbers } from "./Numbers";
@@ -221,7 +221,7 @@ function Home({ role, deals, list, seen, open, pick, seenIds, send }: { role: Ro
   }
   return (
     <>
-      <Lead role={role} title={needs.length ? needs.length + (needs.length === 1 ? " shipment is" : " shipments are") + " flagged for a look." : "Nothing is flagged."} sub={deals.length + " requests on the desk, " + quoted.length + " quoted" + (t != null && t >= 1 ? " after " + Math.round(t) + " s on a typical one" : "") + ", " + booked + " booked. Giulia handled all of them on her own."} send={send} />
+      <Lead role={role} title={needs.length ? needs.length + (needs.length === 1 ? " shipment is" : " shipments are") + " flagged for a look." : "Nothing is flagged."} sub={deals.length + " requests on the desk, " + quoted.length + " quoted" + (t != null && t >= 1 ? " after " + Math.round(t) + " s on a typical one" : "") + ", " + booked + " booked."} send={send} />
       <section className="dk-box">
         <div className="dk-bh"><h2>Flagged by Giulia</h2></div>
         <p className="dk-bs">She decided these herself and left a note. Read it, and say so if you see it differently.</p>
@@ -430,33 +430,48 @@ function Watch({ deals, open }: { deals: DealRow[]; open: (id: string) => void }
   );
 }
 
-function Carriers({ learned }: { learned: CarrierFacts[] }) {
-  const names = [...new Set(LANES.flatMap((l) => l[2].map((a) => a[0])))].sort();
+function Carriers({ learned, deals, seen }: { learned: CarrierFacts[]; deals: DealRow[]; seen: Seen[] }) {
+  const [air, setAir] = useState("");
+  const firstWord = (s: string) => s.toLowerCase().split(" ")[0];
+  const sheet = [...new Set(LANES.flatMap((l) => l[2].map((a) => a[0])))].sort();
+  const extra = learned.filter((c) => c.chosen && !sheet.some((n) => firstWord(n) === firstWord(c.airline))).map((c) => c.airline);
   const single = LANES.filter((l) => l[2].length === 1).length;
   return (
     <>
       <section style={{ display: "grid", gap: 14 }}>
-        <div className="dk-th"><h2>Airlines</h2><span style={{ color: "var(--d-muted)" }}>{names.length} with a rate sheet this month, {single} routes have only one of them</span></div>
+        <div className="dk-th"><h2>Airlines</h2><span style={{ color: "var(--d-muted)" }}>{sheet.length} with a rate sheet this month, {single} routes have only one of them{extra.length ? ". " + extra.length + " more we booked with" : ""}. Click one to see what we know.</span></div>
+        {air ? (
+          <div className="dk-cm">
+            <section className="dk-box dk-cmbox"><NodeMap name={air} hs={airlineHubs(air, deals, seen)} /></section>
+            <aside className="dk-cside">
+              <section className="dk-box dk-insight"><div className="dk-bh"><h2><Icon n="brain" size={16} />Insight</h2></div>
+                {airlineInsights(air, deals, seen).map((s) => <p key={s}>{s}</p>)}
+                <small>Counted from our bookings and this month's rate sheets.</small>
+                <button className="dk-btn" onClick={() => setAir("")}>Close</button>
+              </section>
+            </aside>
+          </div>
+        ) : null}
         <div className="dk-tw">
           <table>
             <thead><tr><th>Airline</th><th className="r">Routes</th><th className="r">Lowest price</th><th className="r">Offers to us</th><th className="r">Chosen</th><th>Answers by</th><th className="r">Typical reply</th></tr></thead>
             <tbody>
-              {names.map((n) => {
+              {[...sheet, ...extra].map((n) => {
                 const mine = LANES.filter((l) => l[2].some((a) => a[0] === n)), prices = mine.map((l) => l[2].find((a) => a[0] === n)![1]);
-                const k = learned.find((c) => c.airline.toLowerCase().startsWith(n.toLowerCase()));
+                const k = learned.find((c) => firstWord(c.airline) === firstWord(n)), full = k?.airline ?? n;
                 return (
-                  <tr key={n} style={{ cursor: "default" }}>
-                    <td><span className="dk-who"><span className="dk-av" style={{ background: "#f0f0f0" }}>{n[0]}</span><span><b>{n}</b><small>Airline</small></span></span></td>
-                    <td className="r dk-num">{mine.length}</td><td className="r dk-num">{Math.min(...prices).toFixed(2)} EUR/kg</td>
-                    <td className="r dk-num">{k ? k.offers : "–"}</td><td className="r dk-num">{k ? k.chosen : "–"}</td>
-                    <td>{k ? [...k.via, ...k.files].slice(0, 3).join(", ") : <span style={{ color: "var(--d-faint)" }}>no offer yet</span>}</td><td className="r dk-num">{k?.reply != null ? k.reply + " s" : "–"}</td>
+                  <tr key={n} onClick={() => setAir(air === full ? "" : full)} aria-selected={air === full}>
+                    <td><span className="dk-who"><span className="dk-av" style={{ background: "#f0f0f0" }}>{n[0]}</span><span><b>{full}</b><small>{mine.length ? "Airline with a rate sheet" : "Airline"}</small></span></span></td>
+                    <td className="r dk-num">{mine.length || "–"}</td><td className="r dk-num">{prices.length ? Math.min(...prices).toFixed(2) + " EUR/kg" : "–"}</td>
+                    <td className="r dk-num">{k && k.offers ? k.offers : "–"}</td><td className="r dk-num">{k ? k.chosen : "–"}</td>
+                    <td>{k && [...k.via, ...k.files].length ? [...k.via, ...k.files].slice(0, 3).join(", ") : <span style={{ color: "var(--d-faint)" }}>not recorded</span>}</td><td className="r dk-num">{k?.reply != null ? k.reply + " s" : "–"}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        <p style={{ color: "var(--d-muted)", fontSize: 13 }}>Routes and prices are from this month's rate sheets, for 100 kg all in. The other columns are counted from the offers these airlines made on our shipments.</p>
+        <p style={{ color: "var(--d-muted)", fontSize: 13 }}>Routes and prices are from this month's rate sheets, for 100 kg all in. The other columns are counted from our shipments.</p>
       </section>
     </>
   );
@@ -722,7 +737,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
           {CAN.sessions ? nv("sess", "messagesSquare", "Sessions") : null}
           <button className={"dk-state " + (online && worker ? mood : "off")} aria-current={page === "setup" ? "page" : undefined} aria-label={"Giulia: " + stateLabel + ". Open her status and setup"} onClick={() => go("setup")}>
             <span className="dk-orb m" />
-            <span><b>{stateLabel}</b><small>{answered} of {deals.length} on its own</small></span>
+            <span><b>{stateLabel}</b><small>{answered} of {deals.length} answered</small></span>
             <Icon n="chevronRight" size={15} />
           </button>
         </aside>
@@ -730,7 +745,7 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
           <header className="dk-bar">
             <div><small>{greet}, <b>{ME}</b></small><h1>{TITLE[page]}</h1></div>
             <div className="dk-rt">
-              {DEMO ? <span className="dk-demo">Example data</span> : null}
+              {DEMO ? <span className="dk-demo">{recorded() ?? "Example data"}</span> : null}
               {page !== "ask" ? <button className="dk-btn" onClick={() => go("ask")}><Icon n="search" size={15} />Ask<kbd>⌘K</kbd></button> : turns.length ? <button className="dk-btn" onClick={() => setTurns([])}>New question</button> : null}
 <div className="dk-acct">
                 <button className="dk-face-b" onClick={() => setMenu(!menu)} aria-label={"Signed in as " + me.name + ". Switch account"} aria-expanded={menu}><Face p={me} /></button>
@@ -761,11 +776,11 @@ export function Desk({ deals, online, worker, board, selected, select, deal, rel
               {page === "home" ? <Home role={me.role} deals={deals} list={list} seen={seen} open={show} pick={(email) => { setPage("cust"); setCust(email); }} seenIds={seenIds} send={send} /> : null}
               {page === "ship" ? <Shipments deals={deals} open={show} /> : null}
               {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} ask={send} /> : <Customers deals={deals} pick={setCust} />) : null}
-              {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} /></> : null}
+              {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} deals={deals} seen={seen} /></> : null}
               {page === "help" ? <Help /> : null}
               {page === "eff" ? <Numbers deals={deals} board={board} /> : null}
               {page === "jobs" ? <Jobs jobs={jobs} deals={deals} run={runJob} remove={(id) => saveJobs((x) => x.filter((j) => j.id !== id))} ask={() => go("ask")} /> : null}
-              {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "Giulia is stopped." : mood === "calm" ? "Giulia is running on her own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered without a person.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
+              {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "Giulia is stopped." : mood === "calm" ? "Giulia is running on her own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
                 people={people} roles={rolesAll} setRole={setRole} rights={Object.fromEntries(people.map((p) => [p.id, rightsOf(p)]))} setRight={setRight} add={addPerson} remove={removePerson} meId={me.id}
                 face={(id) => <Face p={people.find((p) => p.id === id) ?? PEOPLE[0]} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}

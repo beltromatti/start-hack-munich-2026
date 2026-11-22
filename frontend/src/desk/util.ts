@@ -41,7 +41,8 @@ export type Cust = { email: string; name: string; deals: DealRow[]; value: numbe
 export function customers(deals: DealRow[]): Cust[] {
   const m = new Map<string, Cust>();
   for (const d of deals) {
-    const email = d.customer ?? "unknown";
+    if (!d.customer) continue; // a request we hold no mail for has no customer to file it under
+    const email = d.customer;
     const c = m.get(email) ?? { email, name: who(d.customer), deals: [], value: 0, booked: 0, quoted: 0, last: 0, needs: false };
     c.deals.push(d); c.value += amount(d.quote) ?? 0; c.booked += d.booking || d.status === "booked" ? 1 : 0; c.quoted += d.quote ? 1 : 0;
     c.last = Math.max(c.last, d.updated_at); c.needs = c.needs || groupOf(d) === "needs"; m.set(email, c);

@@ -22,7 +22,7 @@ export function hubs(c: Cust, seen: Seen[]): Hub[] {
   const from = tally(c.deals.map((d) => ends(d)?.[0]).filter((x): x is string => !!x)), to = tally(c.deals.map((d) => ends(d)?.[1]).filter((x): x is string => !!x));
   if (to.length) out.push({ id: "routes", icon: "mapPin", title: "Routes", sub: from.length ? "from " + city(from[0][0]) : to.length + " destinations", leaves: to.slice(0, 3).map(([code, k]) => "to " + city(code) + (k > 1 ? ", " + k + " times" : "")) });
   const kgs = c.deals.map((d) => Number(d.weight_kg)).filter((x) => x > 0), quotes = c.deals.map((d) => amount(d.quote)).filter((x): x is number => x != null);
-  if (kgs.length) out.push({ id: "freight", icon: "package", title: "Freight", sub: Math.round(median(kgs)!).toLocaleString("en-US") + " kg typical", leaves: [quotes.length ? "around " + money(median(quotes)).replace(/\.\d\d$/, "") + " a shipment" : "", kgs.length > 1 ? "largest " + Math.round(Math.max(...kgs)).toLocaleString("en-US") + " kg" : "", c.value ? money(c.value).replace(/\.\d\d$/, "") + " quoted in all" : ""].filter(Boolean) });
+  if (kgs.length) out.push({ id: "freight", icon: "package", title: "Freight", sub: Math.round(median(kgs)!).toLocaleString("en-US") + " kg typical", leaves: [quotes.length ? "around " + money(median(quotes)).replace(/\.\d\d$/, "") + " a shipment" : "", kgs.length > 1 ? "largest " + Math.round(Math.max(...kgs)).toLocaleString("en-US") + " kg" : "", c.value && quotes.length === c.quoted ? money(c.value).replace(/\.\d\d$/, "") + " quoted in all" : ""].filter(Boolean) });
   const prefs = tally(c.deals.map((d) => d.preference).filter((x): x is string => !!x));
   if (prefs.length) out.push({ id: "asks", icon: "tag", title: "Asks for", sub: "the " + prefs[0][0], leaves: prefs.slice(0, 2).map(([p, k]) => cap(p) + ", " + k + " of " + n) });
   const yes = median(mine.map((s) => s.yesAfter).filter((x): x is number => x != null)), t = median(c.deals.map((d) => d.response_seconds).filter((x): x is number => x != null && x >= 1));
@@ -56,12 +56,15 @@ export function insights(c: Cust, seen: Seen[]): string[] {
 }
 
 const W = 1000, H = 560, CX = 500, CY = 280;
-export function CustomerMap({ c, seen }: { c: Cust; seen: Seen[] }) {
-  const hs = hubs(c, seen), left = hs.filter((_, i) => i % 2 === 0), right = hs.filter((_, i) => i % 2 === 1);
+export function CustomerMap({ c, seen }: { c: Cust; seen: Seen[] }) { return <NodeMap name={c.name} hs={hubs(c, seen)} />; }
+
+/** The same picture for anything with a name and branches: a customer, an airline. */
+export function NodeMap({ name, hs }: { name: string; hs: Hub[] }) {
+  const left = hs.filter((_, i) => i % 2 === 0), right = hs.filter((_, i) => i % 2 === 1);
   const place = (side: Hub[], dir: 1 | -1) => side.map((h, i) => { const a = (i - (side.length - 1) / 2) * 0.74, x = CX + dir * 262 * Math.cos(a), y = CY + 205 * Math.sin(a); return { h, x, y, dir }; });
   const nodes = [...place(left, -1), ...place(right, 1)];
   return (
-    <svg className="dk-cmap" viewBox={"0 0 " + W + " " + H} role="img" aria-label={"What the record says about " + c.name + ". " + hs.map((h) => h.title + ": " + h.sub + (h.leaves.length ? ", " + h.leaves.join(", ") : "")).join(". ")}>
+    <svg className="dk-cmap" viewBox={"0 0 " + W + " " + H} role="img" aria-label={"What the record says about " + name + ". " + hs.map((h) => h.title + ": " + h.sub + (h.leaves.length ? ", " + h.leaves.join(", ") : "")).join(". ")}>
       <defs><filter id="cm-soft" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="9" floodColor="#1e281e" floodOpacity="0.1" /></filter></defs>
       <ellipse cx={CX} cy={CY} rx="262" ry="205" className="orbit" />
       {nodes.map(({ h, x, y, dir }, i) => (
@@ -83,10 +86,46 @@ export function CustomerMap({ c, seen }: { c: Cust; seen: Seen[] }) {
       <g className="me">
         <circle cx={CX} cy={CY} r="62" className="hub" filter="url(#cm-soft)" />
         <circle cx={CX} cy={CY} r="50" className="face" />
-        <text x={CX} y={CY + 13} textAnchor="middle" className="ini">{c.name[0]}</text>
+        <text x={CX} y={CY + 13} textAnchor="middle" className="ini">{name[0]}</text>
       </g>
     </svg>
   );
+}
+
+const first = (s: string) => s.toLowerCase().split(" ")[0];
+const flownWith = (airline: string, deals: DealRow[], seen: Seen[]) => { const ids = new Set(seen.filter((s) => s.chosen && first(s.chosen) === first(airline)).map((s) => s.id)); return deals.filter((d) => ids.has(d.id)); };
+const sheetOf = (airline: string) => LANES.filter((l) => l[2].some((a) => first(a[0]) === first(airline)));
+
+/** An airline at a glance: what we booked with them, and what this month's rate sheets say about them. */
+export function airlineHubs(airline: string, deals: DealRow[], seen: Seen[]): Hub[] {
+  const mine = flownWith(airline, deals, seen), all = seen.filter((s) => s.chosen).length, out: Hub[] = [];
+  if (mine.length) {
+    const kgs = mine.reduce((s, d) => s + (Number(d.weight_kg) || 0), 0), last = Math.max(...mine.map((d) => ms(d.updated_at)));
+    out.push({ id: "booked", icon: "plane", title: "Booked", sub: mine.length + (mine.length === 1 ? " time" : " times"), leaves: [kgs ? Math.round(kgs).toLocaleString("en-US") + " kg in all" : "", all ? Math.round(mine.length / all * 100) + " % of our bookings" : "", "last on " + dayOf(last)].filter(Boolean) });
+    const to = tally(mine.map((d) => ends(d)?.[1]).filter((x): x is string => !!x)), from = tally(mine.map((d) => ends(d)?.[0]).filter((x): x is string => !!x));
+    if (to.length) out.push({ id: "to", icon: "mapPin", title: "Flies to", sub: to.length + (to.length === 1 ? " city" : " cities"), leaves: to.slice(0, 3).map(([c, k]) => city(c) + (k > 1 ? ", " + k + " times" : "")) });
+    if (from.length) out.push({ id: "from", icon: "package", title: "From", sub: city(from[0][0]), leaves: from.slice(0, 3).map(([c, k]) => city(c) + ", " + k + (k === 1 ? " time" : " times")) });
+    const who = tally(mine.map((d) => d.customer).filter((x): x is string => !!x));
+    if (who.length) out.push({ id: "who", icon: "users", title: "Customers", sub: who.length + " we know", leaves: who.slice(0, 3).map(([e, k]) => cut(e.split("@")[0].split(/[-._]+/).map(cap).join(" "), 19) + ", " + k + (k === 1 ? " time" : " times")) });
+  }
+  const sheet = sheetOf(airline);
+  if (sheet.length) {
+    const prices = sheet.map((l) => l[2].find((a) => first(a[0]) === first(airline))![1]), cheapest = sheet.filter((l) => first(l[2][0][0]) === first(airline)).length, alone = sheet.filter((l) => l[2].length === 1).length;
+    out.push({ id: "sheet", icon: "tag", title: "Rate sheet", sub: sheet.length + " routes", leaves: ["cheapest on " + cheapest + " of them", alone ? "only airline on " + alone : "", "from " + Math.min(...prices).toFixed(2) + " EUR/kg"].filter(Boolean) });
+  }
+  return out;
+}
+
+export function airlineInsights(airline: string, deals: DealRow[], seen: Seen[]): string[] {
+  const mine = flownWith(airline, deals, seen), counts = tally(seen.map((s) => s.chosen).filter((x): x is string => !!x).map(first)), all = counts.reduce((s, x) => s + x[1], 0), out: string[] = [];
+  if (!mine.length) out.push("We have not booked with " + airline + " yet.");
+  else if (counts[0] && counts[0][0] === first(airline) && counts.length > 1) out.push(airline + " carried more of our bookings than any other airline: " + mine.length + " of " + all + ".");
+  else out.push(airline + " carried " + mine.length + " of our " + all + " bookings.");
+  const from = tally(mine.map((d) => ends(d)?.[0]).filter((x): x is string => !!x));
+  if (mine.length >= 3 && from.length === 1) out.push("Every booking with them left from " + city(from[0][0]) + ".");
+  const alone = sheetOf(airline).filter((l) => l[2].length === 1).length;
+  if (alone) out.push("They are the only airline on " + alone + " routes of our rate sheets. A price rise there has no second offer behind it.");
+  return out.slice(0, 3);
 }
 
 export function open(c: Cust): DealRow[] { return c.deals.filter((d) => ["needs", "working", "quoted"].includes(groupOf(d))).slice(0, 3); }

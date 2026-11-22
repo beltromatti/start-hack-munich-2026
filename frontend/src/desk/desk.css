@@ -252,6 +252,7 @@ button.dk-aiw { width: 100%; text-align: left; border-radius: var(--r-ctl); padd
 .dk-nd { background: rgba(255,255,255,.7) radial-gradient(rgba(0,0,0,.09) 1px, transparent 1.2px) 0 0 / 18px 18px; border-color: rgba(0,0,0,.06); }
 .dk-np { animation: none; } .dk-np > * { animation: dk-arrive .4s var(--ease) both; }
 @media (prefers-reduced-motion: reduce) { .dk-lk { animation: none; stroke-dashoffset: 0; } }
+.dk-tw tr[aria-selected="true"] td { background: #f6f6f4; } .dk-tw tr[aria-selected] { cursor: pointer; }
 /* one customer at a glance: the map, and beside it what is open and what stands out */
 .dk-cm { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: stretch; } .dk-cside { display: grid; gap: 16px; align-content: start; }
 .dk-cmbox { padding: 6px; display: grid; align-items: center; background: #fff radial-gradient(rgba(0,0,0,.055) 1px, transparent 1.2px) 0 0 / 20px 20px; } .dk-cmfacts { display: none; }

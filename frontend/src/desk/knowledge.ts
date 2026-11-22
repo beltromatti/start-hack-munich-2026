@@ -41,7 +41,7 @@ export function useKnowledge(deals: DealRow[]): { seen: Seen[]; ready: boolean }
   const cache = useRef(new Map<string, { at: number; seen: Seen }>());
   const busy = useRef(false);
   const [tick, setTick] = useState(0);
-  const want = deals.slice(0, 80);
+  const want = deals.slice(0, 400);
   const stale = want.filter((d) => cache.current.get(d.id)?.at !== d.updated_at);
   useEffect(() => {
     if (busy.current || !stale.length) return;
