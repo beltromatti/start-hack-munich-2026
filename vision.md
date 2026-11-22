@@ -225,6 +225,12 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   labels (the page changes), and asks a person; the page shows live in the deal's conversation, an alarm opens the
   deal, and the person does only what is theirs (the check, their team key from their own browser, send). The tool
   turns the result into a price by code. With nobody at the desk (operator mode off) the agent quotes with what it has.
+- **Suspicion is the model's, protection is the tool's.** Impostors write from lookalike addresses seconds after a
+  real request ("my mailbox is down, send it here", rounds 105-107). What protects is a guarantee: a conversation
+  sees only its own sender's deals, so nothing of a customer reaches anyone else, whatever the agent answers. A code
+  check that named an address "an imitation" made the agent decline the real customer in round 107 (the impostor
+  had become "on file"); it is gone. The prompt says, with its reason, be wary of moving a customer's offers
+  elsewhere, and quote a new address: declining a real customer loses the request.
 - **What the customer adds to the price is priced by code too.** Cargo insurance on their terms (round 91: value,
   share insured, premium rate) is a field of the shipment, and get_offers adds the premium to every total; several
   shipments in one mail are several quotes, each option carrying its own shipment, each booking its own reference
