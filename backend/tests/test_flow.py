@@ -1014,6 +1014,28 @@ def test_an_airline_the_rate_api_turned_away_is_waited_for_minutes_not_seconds()
     assert Forwarder.PORTAL_RETRY[1] + 30 < 360
 
 
+def test_a_mail_goes_to_several_people_of_the_thread_and_never_outside_it():
+    """A customs broker joins a customer's thread (5U's CEO: 'a customs broker joining a thread halfway'): a revised
+    offer goes to the customer and the broker, one mail each (5U's mail has one recipient); nobody outside the
+    thread gets it."""
+    from app import tools
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("ute@werk.example", "Quote", "300 kg STR to ORD")
+    broker = api.customer("marco@zoll.example", "Re: Quote", "we are the broker, add our fee", in_reply_to=rfq["id"])
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer",
+                    next(x for x in store.thread(rfq["id"]) if x["id"] == broker["id"]))
+    out = tools.send_mail(ctx, "reply", "Hello Ute and Marco", None, "ute@werk.example, marco@zoll.example")
+    assert len(out["sent"]) == 2
+    got = {m["to"]: m["in_reply_to"] for m in api.outbox}
+    assert got == {"ute@werk.example": rfq["id"], "marco@zoll.example": broker["id"]}
+    assert "error" in tools.send_mail(ctx, "reply", "x", None, "ute@werk.example, eve@other.example")
+    assert len(api.outbox) == 2
+
+
 def test_while_the_rate_api_is_down_an_airline_is_priced_from_its_own_portal_rate():
     """Rounds 93-94: the rate API answered 503 for minutes and the portal airlines answer no mail; quoted without
     them, 'too low' (0 of 13 teams accepted round 93). A portal price is a rate per kg per airline, lane and weight

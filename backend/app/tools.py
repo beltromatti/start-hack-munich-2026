@@ -105,7 +105,8 @@ TOOLS = [
     fn("send_mail",
        "Send a mail. By default it answers the person who wrote the mail you are handling, in this thread. "
        "kind says what it is; for a quote give option_id, so the CRM records exactly that option and total "
-       "(5U scores only the first quote of a thread). `to` only to write to someone else in this thread's deal.",
+       "(5U scores only the first quote of a thread). `to` only to write to someone else in this thread, or to "
+       "several of them (addresses separated by commas: each gets the same mail).",
        {"kind": {"type": "string", "enum": ["quote", "question", "reply", "booking_confirmation", "tracking_answer",
                                             "decline", "other"]},
         "body": {"type": "string", "description": "the whole mail body, plain text"},
@@ -224,21 +225,27 @@ def send_mail(ctx: Ctx, kind: str, body: str, option_id: str | None, to: str | N
     m = ctx.mail or _last_inbound(ctx.root)
     if m is None:
         return {"error": "no mail in this thread to answer"}
-    to = (to or m["sender"]).strip().lower()
+    # one address, or several people in this thread (a customer and the broker they brought in): 5U's mail has one
+    # recipient, so each gets the same mail as a reply to their own last mail
+    people = [x for x in re.split(r"[,;\s]+", (to or m["sender"]).strip().lower()) if x]
     allowed = {x["sender"].lower() for x in store.thread(ctx.root) if x["direction"] == "in"} | {TRACKING, RATEDESK}
-    if to not in allowed and not kit.world().carrier_by_email(to):
-        return {"error": f"{to} is not part of this thread; 5U only delivers to customers who wrote to us, "
-                         f"carriers on our list, the rate desk and the tracking desk"}
-    parent = next((x for x in reversed(store.thread(ctx.root)) if x["direction"] == "in" and x["sender"].lower() == to),
-                  m)
-    subject = parent["subject"] or "Your shipment"
-    subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
-    sent = ctx.fw.api.send(to, subject, body, in_reply_to=parent["id"], attachments=attachments)
-    store.save_mail(sent, "out", kind, handled=True)
+    for t in people:
+        if t not in allowed and not kit.world().carrier_by_email(t):
+            return {"error": f"{t} is not part of this thread; 5U only delivers to customers who wrote to us, "
+                             f"carriers on our list, the rate desk and the tracking desk"}
+    sent_all = []
+    for t in dict.fromkeys(people):
+        parent = next((x for x in reversed(store.thread(ctx.root)) if x["direction"] == "in" and x["sender"].lower() == t),
+                      m)
+        subject = parent["subject"] or "Your shipment"
+        subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+        sent_all.append(ctx.fw.api.send(t, subject, body, in_reply_to=parent["id"], attachments=attachments))
+        store.save_mail(sent_all[-1], "out", kind, handled=True)
+        store.log("forwarder", "mail_out", f"{kind} to {t}: {body[:140]}", {"mail": sent_all[-1]["id"], "body": body,
+                                                                              "option": option_id}, run_id=ctx.deal_id)
+    sent, to = sent_all[0], ", ".join(dict.fromkeys(people))
     ctx.outcome.append(kind)
-    store.log("forwarder", "mail_out", f"{kind} to {to}: {body[:140]}", {"mail": sent["id"], "body": body,
-                                                                           "option": option_id}, run_id=ctx.deal_id)
-    result: dict[str, Any] = {"sent": sent["id"], "to": to}
+    result: dict[str, Any] = {"sent": sent["id"] if len(sent_all) == 1 else [x["id"] for x in sent_all], "to": to}
     if kind == "question" and store.get(ctx.deal_id):
         store.update(ctx.deal_id, lambda r: ("waiting_customer" if r["status"] in ("new", "pricing") else r["status"],
                                              r["data"]))

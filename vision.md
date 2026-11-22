@@ -122,9 +122,11 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
   truckers of the pickup zone. An airline that told us its lanes in the last two hours ("We fly ...") is not asked
   for a lane outside them; the agent sees who was skipped (`not_asked`) and can still ask. Unknown is always asked.
   5U moves airlines between portal and mail, so a portal airline off the portal for this lane (or a 404) is asked
-  by mail too; when the rate API fails, the portal is retried for 20 s, the rate desk is asked, and a portal rate
-  we saw tonight on that lane and break prices the airline (`portal_memory`). Asks that may never be answered are
-  sent but not awaited: the quote does not wait for them (round 94 waited 499 s).
+  by mail too; when the rate API turns an airline away (503), it is retried every 20 s for about 4 minutes and
+  awaited (`portal_retrying`: in rounds 93-100 it was always the airline the answer needed, and the teams that
+  waited 83-358 s for it won those rounds), the rate desk is asked, and a portal rate we saw tonight on that lane
+  and break prices the airline (`portal_memory`). Asks that may never be answered (mails to portal airlines, the
+  rate desk) are sent but not awaited: the quote does not wait for them (round 94 waited 499 s).
 - **Pricing:** chargeable weight = max(kg, cbm x 167); also price the break above when it can be cheaper (299 kg
   cost more than 300 kg); minimum on freight; surcharges per billed kg; exact weights in every request (116.9, not
   117). A bid quoted per kg or itemised gets its total from code. A live bid beats the sheet; a carrier that
@@ -181,7 +183,8 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 - **No caps on steps, tokens or output.** The model decides how much a deal needs. A cheap model (`gpt-6-luna`, low
   effort) for the agent, `gpt-5-nano` for reading bids. One stop only, for spinning: 10 turns without progress.
 - **What stays are the limits the model cannot keep itself,** each with its reason: the 2-minute clock (the agent
-  sees `seconds_since_request`; a person is awaited at most 95 s after the mail, the portal 20 s); not spamming a
+  sees `seconds_since_request`; a person is awaited at most 95 s after the mail, the portal about 230 s, inside the
+  6-minute close: a right quote at four minutes beats a fast wrong one); not spamming a
   counterpart (two mails to one carrier per deal in ten minutes: round 88 sent six and lost 20 points); a hung
   gateway costs 45 s a try before OpenAI direct.
 - **The one system constraint is the required outcome:** the mail being handled gets an answer or a reasoned
@@ -333,7 +336,11 @@ Then:
 19. A person is a tool: `ask_person` interrupts the team when one is at the desk; the browser goes to 5U's sites
     only; keys and checks are theirs.
 20. Suspicion is the model's, protection is the tool's: no code judges a sender; a thread sees only its own deals.
+    Someone new inside a customer's thread (their broker) is helped like the customer; a mail may go to several
+    people of the thread, one mail each, never outside it.
 21. The limits that stay are those the model cannot keep: the 2-minute clock and not spamming a counterpart.
+22. A source that turned us away is waited for as long as it can still change the answer: the 6-minute close, not
+    the 2-minute best, bounds it (rounds 93-100). A yes with an open question is answered before booking (round 108).
 
 ## 13. Open, and known limits
 
