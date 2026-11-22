@@ -1,6 +1,8 @@
 # Air freight forwarding: how the trade works, what 5U has tested, what comes next
 
 Written Sun 22 Nov 2026, 02:00 CET, after round 93. For Sam, Mattia and Jan.
+Updated 02:35 after round 102: section 5 runs to round 102. The scored predictions and the ranked next waves
+(sections 6 and 8) moved to `docs/likely-changes.md`, the one list we keep current.
 Sources: four web research runs (50 URLs, 31 of them tier 1: zoll.de, LBA, BAFA, ICAO, IATA, ADSp, DHL and
 handler price lists), our mailbox backup (1115 mails in, 947 out) and the board. Speculation is marked.
 
@@ -115,8 +117,9 @@ Each stage has a way to fail:
 | Cancelled by the airline | CNL | Rebook on the next best option |
 | Booking changed late | Handler fee | Munich: "Surcharge confirmation less than 2 days: 25%" |
 
-We have seen none of these from 5U. Our tracking scored 5 instead of 10 on rounds 7, 32 and 59 with no reason
-given. Speculation: the key holds a status we did not have.
+We have seen none of these from 5U. Our tracking scored 5 instead of 10 on rounds 7, 32, 59 and 65, and 0 on
+rounds 62 and 88 (88 was the cancelled booking), with no reason given. Speculation: the key holds a status we
+did not have.
 
 ## 5. What 5U actually tested, in order
 
@@ -127,37 +130,31 @@ given. Speculation: the key holds a status we did not have.
 | Sat ~17:30 | 15, 20 | Pickup town in the signature, no postcode | R20 lost |
 | Sat 18:38 | 27 | Rate API down | Survived, airlines answered by mail |
 | Sat ~19:30 | 33 | Packing list contradicts the mail | R33 lost |
-| Sat ~20:15 | 42 | "Do not offer Zephyr, now or in future" | R42 lost, corrected by 5U |
+| Sat 20:09 | 42 | "Do not offer Zephyr, now or in future" | R42 lost, corrected by 5U |
 | Sat 20:29 | 45 to 50 | Booking API down, airline books 10 % higher | Adjustments of -10 to -32.5 |
 | Sat 22:17 | 63, 65 | Offers as PDF, Word, voice message | R63 lost |
-| Sun ~00:00 | 76 | A formal offer document demanded | R76 lost |
-| Sun ~00:37 | 86, 87 | Customer changes the shipment after the quote | No round lost |
-| Sun ~00:45 | 88 | Cancellation | No round lost |
-| Sun ~00:50 | 89, 90 | Several shipments in one mail | No round lost |
-| Sun ~01:00 | 91, 92 | Insurance inside the all-in price | R91 lost, 10 of 11 teams lost |
+| Sat 23:36 | 76, 81 | The offer demanded as a PDF | R76 lost, 2 of 13 teams accepted. R81 accepted |
+| Sun 00:12 | 82 | Weight in lb, volume in cubic feet | No round lost |
+| Sun 00:18 | 83 to 85 | A deadline: "must arrive no later than", price decides among the options in time | No round lost |
+| Sun 00:37 | 86, 87 | Customer changes the shipment after the quote | No round lost |
+| Sun 00:49 | 88 | Cancellation after the booking | Tracking 0 and an adjustment of -20 |
+| Sun 00:55 | 89, 90 | Two shipments in one mail, "book the first now, we will confirm the second later" | No round lost. The second is still open |
+| Sun 01:07 | 91, 92 | Insurance inside the all-in price | R91 lost, 10 of 11 teams lost |
 | Sun 01:19 | 93 | Rate API down and its airlines silent | R93 lost, 13 of 13 teams lost |
+| Sun 01:25 | 94 to 100 | "Fastest" requests while the lane's portal airline had no price | All seven lost: R94 `out_of_time` (499 s), R95 to R99 `too_low`, R100 `declined_in_scope`. 1 to 6 teams accepted per round |
+| Sun 02:08 | 101 | "Another forwarder has already offered us about 1620 EUR all-in" | No round lost, 14 of 14 accepted |
 
-Eight rounds lost of 93, and each was the first or second round of a new kind. We lose the first one and hold
-the next. That is the cost of learning from the verdict. Times with ~ are approximate.
+Fifteen rounds lost of 102. Up to round 93 each was the first or second round of a new kind: we lost the first one
+and held the next. Rounds 94 to 100 broke that: one kind, seven rounds in a row, because the fix was not live.
+Since round 76 a new kind has come every one to three rounds; before that, about one an hour. Times with ~ are
+approximate.
 
 ## 6. Our predictions against what came
 
-`docs/likely-changes.md` listed 14 changes on Saturday afternoon, read from the API spec.
+The scored lists (Saturday afternoon, Sat 21:40, Sun 00:30, Sun 02:00) are in `docs/likely-changes.md`, section 3.
 
-| Predicted | Came | Note |
-| --- | --- | --- |
-| Portal down (3) | Yes, R27 and R93 | R93 added the twist we did not predict: the mail fallback was dead too |
-| Booking API down (4) | Yes, R45 | Built before it came |
-| Carriers need more facts (9) | Yes | |
-| Per kg instead of a total (10) | Yes | |
-| Customers write differently (12) | Yes, far beyond the guess | Attachments, voice, contradictions |
-| Mail that tries to steer us (14) | Yes, mildly | |
-| New tariff, tariff not valid yet (1, 2) | Not yet | `dataset_version` still `v1` |
-| Other currency (7) | Not yet | `fx_eur_per_usd` unused for 10 hours |
-| Lower limit, shorter validity (5, 6) | No | |
-| Insurance, change after quote, cancellation, multi-shipment, offer document | Came, not predicted | |
-
-**Why we missed five.** We read the API for levers. The API only describes the price sources. Everything that
+**Why the first list missed five kinds** (insurance, a change after the quote, cancellation, two shipments, the
+offer document). We read the API for levers. The API only describes the price sources. Everything that
 came unpredicted lives in the customer's mail, and comes from the trade, where a deal has a life after the
 quote. The API tells us how 5U breaks a source. The trade tells us what the customer asks next.
 
@@ -180,6 +177,9 @@ Three moves repeat, and each new wave is one of them applied to the next stage o
    harder than the last: first the API, then the booking, then the API plus the mail fallback.
 3. **Widen the deal.** One more thing a real customer expects inside the answer (pickup, an offer document,
    insurance, several shipments).
+4. **Plant a line, collect it later** (added 02:35, a guess: only R42 has been collected so far, by its own
+   round). "For any of our future inquiries" (R42), "we will confirm the second later" (R89, R90), "on the terms
+   of our frame agreement" (R91, R92). Each is a fact that a later mail can lean on without repeating it.
 
 **Why it gets harder.** The moves now combine. Round 93 was a source outage on a "fastest" request, where the
 missing airlines are the ones that win. A combined wave has no second round to learn from, because the field
@@ -187,22 +187,8 @@ verdict (0 of 13) says only that everyone failed.
 
 ## 8. What comes next, ranked
 
-Likelihood is our estimate. Each row names the earliest signal and what holds it.
-
-| # | Wave | Why we expect it | Earliest signal | What holds it |
-| --- | --- | --- | --- | --- |
-| 1 | More lines inside "all-in": export declaration, X-ray, dangerous goods fee, delivery at destination | Insurance opened the door one hour ago. The trade has 20 such lines | "all-in including", "DAP", "door", a fee with an amount | `charges` takes any line with stated terms. Add a minimum to its form |
-| 2 | The expired surcharge, tariff v2 | Named by 5U's CEO. `dataset_version` and sheet validity dates exist | A carrier mail with a file and no thread, `dataset_version` not `v1` | Sheets keep validity dates (built). Test it once on the fake 5U |
-| 3 | Zephyr's return | Round 42: "for any of our future inquiries". A planted line with no payoff yet | A mail from Meyer Industrietechnik on a lane where Zephyr is cheapest | The note in the CRM (built). Check that it reaches a new thread |
-| 4 | A third party joins the thread | Named by 5U's CEO | A new sender in a customer thread | Tools mail only people in the thread. Decide who counts |
-| 5 | Events after booking: re-weigh, offload, cancel | Cargo iQ stages. Tracking scored 5 of 10 three times | An airline mail in a booked thread that is no confirmation | Carrier replies wake the agent only for a confirmation today |
-| 6 | Reconciliation: the airline's invoice differs from the booked rate | A 5U product line. Booking at +10 % was the first step | A mail with "invoice" from a carrier | Nothing built |
-| 7 | Another currency | Fields in the API for 10 hours | `currency` not EUR | `pricing.to_eur` (built) |
-| 8 | The right answer is no | Verdict `voided` exists. Lithium alone on a passenger flight, a listed consignee | UN3480, a sanctioned destination | The agent may decline with a reason. No rule built |
-| 9 | Haggling | 5U said at 15:15 a counter-offer "can happen at some point" | "Your competitor offers" | Prompt: we do not negotiate, the price stands |
-
-**Our one bet.** Wave 1 comes first and combined with a source outage, because both were introduced in the
-last hour and 5U combines its newest moves.
+Moved to `docs/likely-changes.md`, section 4: the nine waves written here at 02:00, what has come of them since
+(the competitor's price in R101, the outage in R94 to R100), four more, and for each where its fix is today.
 
 ## 9. How to change the system
 
