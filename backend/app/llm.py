@@ -212,3 +212,31 @@ def strict(properties: dict, required: list[str] | None = None) -> dict:
     """Schema helper: an object where every property is required (OpenAI strict mode), nullables via type lists."""
     return {"type": "object", "additionalProperties": False, "properties": properties,
             "required": required or list(properties)}
+
+
+_own: OpenAI | None = None
+
+
+def structured_direct(name: str, system: str, user: str, schema: dict, *, model: str = "gpt-6-luna") -> dict:
+    """A structured call to OpenAI with our own key, never through the gateway: for the desk's ask field, which a
+    person at the desk uses and which is no part of a quote (so it must not count as spend on one). No key: an error
+    the caller turns into "not available"."""
+    global _own
+    if _fake is not None:
+        return _fake(name, system, user, schema)
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("no OpenAI key for the desk's ask field")
+    if _own is None:
+        _own = OpenAI(api_key=key, timeout=30, max_retries=1)
+    args: dict[str, Any] = {
+        "model": model, "max_completion_tokens": 900,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}},
+    }
+    if model.startswith(("gpt-5", "gpt-6")):
+        args["reasoning_effort"] = "low"
+    t = time.time()
+    res = _own.chat.completions.create(**args)
+    store.log("desk", "llm", f"{model} [{name}] {time.time() - t:.1f}s DIRECT, not gateway")
+    return json.loads(res.choices[0].message.content or "{}")

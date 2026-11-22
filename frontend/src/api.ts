@@ -1,3 +1,5 @@
+import { DEMO, demo } from "./demo";
+
 export type BrowserActivity = { since: number; updated_at: number; active: boolean; action: string; airline: string | null; note: string };
 
 export type DealRow = {
@@ -65,12 +67,14 @@ export type Health = { ok: boolean; worker: boolean; llm: string; models: { agen
 export type Usage = { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };
 
 export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  if (DEMO) return demo<T>(path);
   const r = await fetch(path, { signal });
   if (!r.ok) throw new Error(`${r.status} ${path}`);
   return r.json();
 }
 
 export async function post<T>(path: string, body: unknown): Promise<T> {
+  if (DEMO) return demo<T>(path, body);
   const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
