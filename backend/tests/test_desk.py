@@ -45,7 +45,7 @@ def test_it_reads_the_register_with_its_tools_before_it_answers(monkeypatch):
                     call("read_shipment", shipment_id="deal-1"), reply())
     out = desk.answer("What do we know about Acme?", {}, [{"q": "Hi", "a": "Hello"}])
     found = json.loads(seen[1]["output"])
-    assert [x["id"] for x in found] == ["deal-1"] and found[0]["quote_eur"] == "5655.55"
+    assert [x["id"] for x in found["shipments"]] == ["deal-1"] and found["quoted_total_eur"] == "5655.55"
     assert json.loads(seen[2]["output"])["notes"][0]["text"] == "Wants pickup on Tuesdays."
     assert out["rows"] == ["deal-1"] and out["customer"] == "ops@acme.example" and out["page"] == "cust"
 

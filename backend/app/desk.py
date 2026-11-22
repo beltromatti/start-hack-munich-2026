@@ -44,8 +44,10 @@ def _fn(name: str, description: str, properties: dict) -> dict:
 S, N = {"type": ["string", "null"]}, {"type": ["integer", "null"]}
 TOOLS = [
     _fn("find_shipments", "Shipments in the register, newest first: status, customer, route, weight, the quote, the "
-        "booking, Giulia's flag. Filter by words (customer, city or airport code, subject, booking reference) and by "
-        "status, or leave both null for all of them.", {"text": S, "status": S, "limit": N}),
+        "booking, Giulia's flag; with their count and the sum of their quotes. Filter by words (customer, city or "
+        "airport code, subject, booking reference) and by status (new, pricing, waiting_customer, quoted, booked, cancelled), "
+        "or leave both null for all of them. A count or total you give comes from here.",
+        {"text": S, "status": S, "limit": N}),
     _fn("read_shipment", "One shipment in full: the request as Giulia read it, the priced options, the quote, the "
         "booking, her notes, the customer's mails and what the carriers wrote.", {"shipment_id": {"type": "string"}}),
     _fn("customers", "Every customer on record: shipments, bookings, quoted value, the latest request, and the notes "
@@ -78,12 +80,16 @@ def _clip(s, n: int) -> str:
     return " ".join(str(s or "").split())[:n]
 
 
-def _find(text: str | None, status: str | None, limit: int | None) -> list[dict]:
+def _find(text: str | None, status: str | None, limit: int | None) -> dict:
+    """The matching shipments, with their count and the sum of their quotes computed here, so a total the
+    assistant gives is code's arithmetic, never the model's."""
     words = [w for w in (text or "").lower().split() if w]
     rows = [_row(r) for r in store.records("deal", limit=5000)]
     rows = [x for x in rows if (not status or x["status"] == status)
             and all(w in json.dumps(x, ensure_ascii=False).lower() for w in words)]
-    return rows[: limit or len(rows)]
+    quoted = [Decimal(str(x["quote_eur"])) for x in rows if x["quote_eur"]]
+    return {"count": len(rows), "quoted": len(quoted), "quoted_total_eur": str(sum(quoted, Decimal(0))),
+            "shipments": rows[: limit or len(rows)]}
 
 
 def _shipment(shipment_id: str) -> dict:
