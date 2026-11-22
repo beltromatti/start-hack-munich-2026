@@ -8,6 +8,16 @@ const PAGE = { width: 720, height: 860 };
 export function PortalView({ dealId, note, airline }: { dealId: string; note: string; airline: string | null }) {
   const [tick, setTick] = useState(0);
   const [text, setText] = useState("");
+  // the person's team key stays in their own browser and is typed only when they click (like a password manager)
+  const [saved, setSaved] = useState<string | null>(() => { try { return localStorage.getItem("fiveu_team_key"); } catch { return null; } });
+  const [draft, setDraft] = useState("");
+  const [keyMsg, setKeyMsg] = useState("");
+  const typeKey = () => {
+    if (!saved) return;
+    post<{ ok?: boolean; error?: string }>(`/api/portal/${dealId}/type`, { into: "key", text: saved })
+      .then((r) => setKeyMsg(r.error ?? "key typed"));
+    setTimeout(() => setTick((x) => x + 1), 200);
+  };
   const img = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 600);
@@ -32,13 +42,23 @@ export function PortalView({ dealId, note, airline }: { dealId: string; note: st
       </div>
       <img ref={img} className="portal-shot" src={`/api/portal/${dealId}/shot?t=${tick}`} onClick={click} alt="5U portal page" />
       <div className="portal-keys">
-        <input autoFocus placeholder="click a field above, then type here (the check, the team key)" value={text}
+        {saved ? <>
+          <button className="primary" onClick={typeKey}>Type my key</button>
+          <button onClick={() => { try { localStorage.removeItem("fiveu_team_key"); } catch { /* none */ } setSaved(null); }}>forget key</button>
+          {keyMsg ? <span className="muted">{keyMsg}</span> : null}
+        </> : <>
+          <input type="password" placeholder="team key: saved in this browser only" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <button onClick={() => { try { localStorage.setItem("fiveu_team_key", draft); } catch { /* none */ } setSaved(draft); setDraft(""); }}>Save key</button>
+        </>}
+      </div>
+      <div className="portal-keys">
+        <input autoFocus placeholder="click the check's field above, type the answer here, press Type" value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { send(); } }} />
         <button onClick={() => send()}>Type</button>
         <button onClick={() => send("Tab")}>Tab</button>
         <button className="primary" onClick={() => send("Enter")}>Enter</button>
       </div>
-      <div className="muted portal-hint">Click a field in the page, type here, press Type; then click the page's send button. The agent reads the result and goes on.</div>
+      <div className="muted portal-hint">Type my key fills the key field; click the check's field, type the answer, press Type; then press the page's send button. The agent reads the result and goes on.</div>
     </div>
   );
 }

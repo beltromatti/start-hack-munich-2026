@@ -125,6 +125,13 @@ async def click(deal: str, body: dict) -> dict:
 async def type_(deal: str, body: dict) -> dict:
     """The person types in the live view (into the field they clicked); key: Enter, Tab, Backspace."""
     p = page(deal)
+    if body.get("into") == "key":  # the person's own key, from their browser, on their click: into the key field
+        form = await p.evaluate(FORM_JS)
+        f = next((x for x in form if x["tag"] == "input" and "key" in x["label"].lower()), None)
+        if f is None:
+            return {"error": "no key field on the page"}
+        await p.evaluate(FILL_JS, [f["i"], str(body.get("text") or "")])
+        return {"ok": True}
     if body.get("key"):
         await p.keyboard.press(body["key"])
     if body.get("text"):
