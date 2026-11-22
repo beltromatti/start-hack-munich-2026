@@ -27,7 +27,8 @@ deterministic ground. Everything below follows from this split.
 - Per accepted quote, up to 100 points: accuracy 45 (full at the best price, zero at 10 % above it), LLM cost 40
   (`40 x (1 - spend / 0.10 USD)`, spend = gateway spend per accepted quote over the board's cost window: the hour
   at first, 18 minutes in the board's rules at 21:00), time 15 (full within 2 minutes). A quote is accepted within
-  5 % of the best price. Only the first quote of a thread counts.
+  5 % of the best price. One quote per request is judged, normally the first: when the customer changes the goods
+  after it (rounds 86-87), the quote for the new goods is the one, timed from the original request.
 - +10 for a correct tracking answer (only a booked shipment gets the question), +10 humanity from the jury (one
   pick per round). The `booking` points field is always 0 by design. 5U can correct a round by hand (`adjustment`).
 - From round 84, a round only 1, 2 or 3 teams get right multiplies their accuracy, time and cost points (board
@@ -49,6 +50,7 @@ deterministic ground. Everything below follows from this split.
 | how to read an odd carrier answer, a conflict, a trap | the thread a reply goes into, the first quote recorded with its option |
 | what to ask, and whether to ask at all | that an amount read from a carrier mail is in that mail |
 | how to write to a person | that a restart loses nothing and answers nothing twice |
+| when a person must step in, and what to ask them | the browser opens 5U's sites only; keys and checks stay with the person |
 
 We never make the model do the system's job (it would invent a price), and never make the code do the model's job
 (it would break on the first mail nobody wrote a rule for).
@@ -98,10 +100,12 @@ the world (a mail, an airline's news) and a person start work, never the agent's
 | Tool | What the agent does with it | What it guarantees |
 | --- | --- | --- |
 | `get_offers` | ask for priced options for a shipment as the customer wrote it | carriers asked, prices by code, dates, the option per preference, why there are none |
-| `send_mail` | write a quote, a question, a reply, a confirmation | recipient and thread; first quote recorded with its option; `done` ends the turn |
-| `book` | book the option the customer accepted | by rate id on the portal, a fresh rate if expired, by mail if the API is down; the total follows the airline's booking price (`price_changed`) |
+| `send_mail` | write a quote, a question, a reply, a confirmation | recipient and thread; first quote recorded with its option; the offer as a PDF made from the option (`offer_pdf`); `done` ends the turn |
+| `book`, `cancel_booking` | book the option the customer accepted; cancel a booking they withdraw | by rate id on the portal, a fresh rate if expired, by mail if the API is down; the total follows the airline's booking price (`price_changed`); each booking of a deal its own reference; cancelled with 5U's DELETE, the CRM says so |
 | `crm`, `deal` | find shipments and deals | a customer's thread sees only that customer's deals; tracking sees all |
-| `mail_carrier`, `carrier_status` | ask a carrier something | only carriers on the list; the answer comes back to this deal |
+| `mail_carrier`, `carrier_status` | ask a carrier something | only carriers on the list, at most two mails to one carrier per deal in ten minutes; the answer comes back to this deal |
+| `browser` | open, read, fill and press on a page the team sees live (today 5U's portal page) | 5U's sites only (https); a key is marked `{team_key}` and typed by the person; a rate on the page is read by code |
+| `ask_person` | interrupt the team for what only a person can do: a check on the page, or an answer in words | only while someone is at the desk (operator mode); an alarm opens the deal; a page rate becomes a price by code; inside the 2-minute clock |
 | `note` | leave a flag or a fact for the team (and for later threads) | it stays on the deal |
 | `no_reply` | decide nothing needs sending, with the reason | the required outcome is met; `done` ends the turn |
 
@@ -117,6 +121,10 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
 - **Who is asked:** the rate portal (airlines on the lane), every email airline that serves the destination, the
   truckers of the pickup zone. An airline that told us its lanes in the last two hours ("We fly ...") is not asked
   for a lane outside them; the agent sees who was skipped (`not_asked`) and can still ask. Unknown is always asked.
+  5U moves airlines between portal and mail, so a portal airline off the portal for this lane (or a 404) is asked
+  by mail too; when the rate API fails, the portal is retried for 20 s, the rate desk is asked, and a portal rate
+  we saw tonight on that lane and break prices the airline (`portal_memory`). Asks that may never be answered are
+  sent but not awaited: the quote does not wait for them (round 94 waited 499 s).
 - **Pricing:** chargeable weight = max(kg, cbm x 167); also price the break above when it can be cheaper (299 kg
   cost more than 300 kg); minimum on freight; surcharges per billed kg; exact weights in every request (116.9, not
   117). A bid quoted per kg or itemised gets its total from code. A live bid beats the sheet; a carrier that
@@ -127,12 +135,17 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
 - **A town is enough for a pickup:** it is its zone. Truckers price by zone but answer only a request with a 5-digit
   postcode, so a named town is asked with a real postcode of that town (`kit.ZONE_POSTCODE`). A city is its airport
   in our network ("New Delhi" is DEL): the tool knows, the agent never asks which airport.
+- **An option id names one option for the life of a deal:** a changed or second shipment prices as B1, B2..., and
+  each option carries its own shipment, so a booking takes the route and goods of what was quoted (round 89).
+- **What the customer adds on their own terms** (cargo insurance, a broker's fee, a handling fee) is a field of the
+  shipment, added by code to every total.
 - **Dates:** one function (`pricing.schedule`): the goods leave when ready (09:00 of the ready date) plus the pickup
   time and arrive transit days later. The quote, the booking and the tracking answer say the same dates.
 - **Numbers read by a model are checked against their source:** an amount the bid reader returns must appear in the
   carrier's mail; if not, it is read again, then left out (a trucker's "94.08 EUR" once came back as 9408).
 - **The airline's booking price is what it charges.** For an hour (rounds 48-50) the portal booked the quoted rate
-  at 10 % more (5655.55 became 6221.11). The booking total is recomputed by code from the airline's price plus the pickup,
+  at 10 % more (5655.55 became 6221.11). The booking total is recomputed by code from the airline's price plus the rest
+  of the all-in (pickup, insurance, charges: round 92 told a customer a total without its insurance),
   `book` returns `price_changed` with both totals, and the agent says it in the confirmation (round 50: "letting me
   know about the change before invoicing", the customer wrote back). An airline's own mail about the booking is read
   the same way: code says whether its price is the flight price we booked (so the all-in total stays) or another
@@ -141,7 +154,8 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
 ## 6. How the agent writes (and how we write prompts)
 
 Like a good human forwarder who likes the job: warm, quick, competent. One mail, one option, one total, exactly as
-the tool gives it. The prompts (`backend/app/prompts/`) say what a good outcome is and why, and leave the how to the
+the tool gives it; several shipments in one request are several quotes, one total line each; the customer's own
+figures (a budget, a competitor's price) stay out, said in words (round 102). The prompts (`backend/app/prompts/`) say what a good outcome is and why, and leave the how to the
 model: no procedures, no word lists, no "never" without a reason. A model reads a reason and applies it to cases the
 sentence did not mention; it reads a rule and applies it literally, also where it is wrong.
 
@@ -166,6 +180,10 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 
 - **No caps on steps, tokens or output.** The model decides how much a deal needs. A cheap model (`gpt-6-luna`, low
   effort) for the agent, `gpt-5-nano` for reading bids. One stop only, for spinning: 10 turns without progress.
+- **What stays are the limits the model cannot keep itself,** each with its reason: the 2-minute clock (the agent
+  sees `seconds_since_request`; a person is awaited at most 95 s after the mail, the portal 20 s); not spamming a
+  counterpart (two mails to one carrier per deal in ten minutes: round 88 sent six and lost 20 points); a hung
+  gateway costs 45 s a try before OpenAI direct.
 - **The one system constraint is the required outcome:** the mail being handled gets an answer or a reasoned
   `no_reply`; if the model stops before, the system tells it once.
 - **Cost is 40 % of the score, so we measure it.** A whole deal (quote, booking, tracking) costs a few tenths of a
@@ -178,7 +196,8 @@ sentence did not mention; it reads a rule and applies it literally, also where i
 
 - **The stack** (5U, the network, the gateway): transient errors are waited out and the call retried, never the
   whole run; a request whose outcome is unknown is never resent blindly. Seen and handled: portal rates 503 (the
-  airlines by mail); booking API 503 (booking by mail with the airline's reference); `/ports` 503 at a restart
+  airlines by mail, the rate desk, remembered rates, a person on 5U's portal page); one mail that cannot go out
+  never stops the others; booking API 503 (booking by mail with the airline's reference); `/ports` 503 at a restart
   (start anyway); the mailbox allows one poll per 5 seconds per team key (we poll every 5.5 s, and a failed poll
   is never retried sooner: a retry is a second poll).
 - **The agent:** a run that cannot finish ends and is logged; the next mail in the thread is new work.
@@ -221,10 +240,11 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   and lets the rate API answer 503 (Sun from 00:19, rounds 93-100 lost; one team won round 95 alone, x10). The
   engine asks wherever an airline may sell (portal, mail, the rate desk, a remembered portal rate) without holding
   the quote for whom does not answer. What is left is 5U's portal page, which shows those rates to people who pass
-  its check: the agent opens it with `portal_page` in a browser shared with the team, reads and fills it by its
-  labels (the page changes), and asks a person; the page shows live in the deal's conversation, an alarm opens the
-  deal, and the person does only what is theirs (the check, their team key from their own browser, send). The tool
-  turns the result into a price by code. With nobody at the desk (operator mode off) the agent quotes with what it has.
+  its check: the agent opens it with `browser` (5U's sites only), reads and fills it by its labels (the page
+  changes), marks where the team key goes, and calls `ask_person`; the page shows live in the deal's conversation,
+  an alarm opens the deal, and the person does only what is theirs (the check, the key on their click, send). The
+  tool turns the result into a price by code. With nobody at the desk (operator mode off) the agent quotes with what
+  it has. `ask_person` serves any other thing only a person can settle (kind answer), like SIEVER's `avvisa`.
 - **Suspicion is the model's, protection is the tool's.** Impostors write from lookalike addresses seconds after a
   real request ("my mailbox is down, send it here", rounds 105-107). What protects is a guarantee: a conversation
   sees only its own sender's deals, so nothing of a customer reaches anyone else, whatever the agent answers. A code
@@ -274,7 +294,8 @@ Before a change, ask:
 
 Then:
 - **Walk the change through the real threads it touches before it goes live** (the 17:29 postcode rule lost round
-  20 because nobody checked the customers who only had a town). Replay key mails in the sim when wording matters.
+  20 because nobody checked the customers who only had a town; a lookalike-address check lost round 107 because
+  nobody walked it through a customer writing again after an impostor). Replay key mails in the sim when wording matters.
 - `make test` stays green; anything touching money or sending gets a test. Commit messages say what happened (round,
   mail, number), what kind of change it is, and how it was checked.
 - Deploy only in a quiet window (after a round's quote and booking settle). One machine runs production.
@@ -307,6 +328,12 @@ Then:
 15. Cost is measured and cut only where nothing is lost.
 16. Monitoring is a person reading every round in full; scripts only wake.
 17. One production machine (the Mac: the AMD notebook's egress proxy blocks 5U's API); the team key only in `.env`.
+18. Prices live where 5U puts them: portal, mail, rate desk, remembered rates, 5U's portal page with a person; asks
+    that may go unanswered never hold the quote.
+19. A person is a tool: `ask_person` interrupts the team when one is at the desk; the browser goes to 5U's sites
+    only; keys and checks are theirs.
+20. Suspicion is the model's, protection is the tool's: no code judges a sender; a thread sees only its own deals.
+21. The limits that stay are those the model cannot keep: the 2-minute clock and not spamming a counterpart.
 
 ## 13. Open, and known limits
 
@@ -319,8 +346,8 @@ Then:
   seconds, not a mail; whoever reads the mailbox besides production should stop or use the UI.
 - No replay engine yet over the real threads before a prompt change (planned; meanwhile, walk the change through
   the threads by hand and replay key mails in the sim).
-- Cancellations and changes asked by a customer have no tool of their own: the agent can write to the airline
-  (`mail_carrier`) and the airline's answer reaches the deal, but the booking status does not change by itself.
+- **5U's portal page needs a person** at the desk: overnight, with nobody there, a rate-API outage still costs
+  the rounds whose airlines are only there. The rate desk has been silent since Sat 13:53.
 - Notes carried to a customer's next thread are every note of their earlier deals, routine ones included: the
   agent judges them, but they are noise next to the one wish that matters.
 - **Untrusted input has no size bound:** a mail body (5U allows 200,000 characters) and its attachments (5 of 10
