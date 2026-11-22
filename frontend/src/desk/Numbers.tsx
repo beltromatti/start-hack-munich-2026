@@ -42,29 +42,17 @@ export function Bars({ data, name }: { data: Bar[]; name: string }) {
   );
 }
 
-// The money, from economics.py: what customers pay, what the carriers charge, what is passed on, what we keep.
-function Money() {
-  const [e, setE] = useState<Economics | null>(null);
-  useEffect(() => { const load = () => get<Economics>("/api/economics").then(setE).catch(() => undefined); load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
-  if (!e || !e.bookings) return null;
-  const eur = (x: string | null) => x == null ? "–" : money(x);
-  const zero = Number(e.margin_eur) === 0;
+// Where the money of the bookings goes (economics.py): a quiet row at the end of the page.
+function Flow({ e, perQuote }: { e: Economics; perQuote: number | null }) {
   return (
-    <section className="dk-econ">
-      <section className="dk-lead">
-        <h2>{money(e.revenue_eur)} booked, {eur(e.margin_eur)} margin{e.margin_percent != null ? " (" + e.margin_percent + " %)" : ""}.</h2>
-        <p>{zero ? "Giulia quotes what the carriers charge, so every booking passes their price through: today the margin is zero by design, because the challenge rewards the best price. " : ""}Computed per booking from the register, with the room a margin could take below.</p>
-      </section>
-      <div className="dk-flow" role="table" aria-label="Where the money of the bookings goes">
+    <section className="dk-box">
+      <div className="dk-bh"><h2>Where the money goes</h2></div>
+      <div className="dk-flow" style={{ margin: "0 14px 8px" }} role="table" aria-label="Where the money of the bookings goes">
         <div><small>Customers pay</small><b>{money(e.revenue_eur)}</b><small>{e.bookings} bookings</small></div>
         <div><small>Carriers charge</small><b>{money(e.carrier_cost_eur)}</b><small>airlines and truckers</small></div>
-        <div><small>Passed on</small><b>{money(e.passed_on_eur)}</b><small>insurance and the customer's own charges</small></div>
-        <div><small>We keep</small><b>{eur(e.margin_eur)}</b><small>{e.margin_percent != null ? e.margin_percent + " % of revenue" : ""}</small></div>
-      </div>
-      <div className="dk-kpis">
-        <section className="dk-box dk-kpi"><small>Room to the next option</small><b>{money(e.room_eur)}</b><span>{e.room_percent} % of revenue on {e.room_bookings} of {e.bookings} bookings: a margin up to here keeps every quote below the customer's next priced option</span></section>
-        <section className="dk-box dk-kpi"><small>Revenue per booking</small><b>{eur(e.revenue_per_booking_eur)}</b><span>{e.quoted} quotes from {e.requests} requests</span></section>
-        <section className="dk-box dk-kpi"><small>AI cost per booking</small><b>{e.ai_cost_per_booking_usd != null ? "$" + e.ai_cost_per_booking_usd.toFixed(4) : "–"}</b><span>${e.ai_cost_usd.toFixed(2)} for all {e.requests} requests, ${(e.ai_cost_per_request_usd ?? 0).toFixed(4)} each</span></section>
+        <div><small>Passed on</small><b>{money(e.passed_on_eur)}</b><small>insurance and charges</small></div>
+        <div><small>We keep</small><b>{money(e.margin_eur)}</b><small>{e.margin_percent} %</small></div>
+        {perQuote != null ? <div><small>Model cost per quote</small><b>${perQuote.toFixed(4)}</b><small>${e.ai_cost_usd.toFixed(2)} in all</small></div> : null}
       </div>
     </section>
   );
@@ -75,17 +63,13 @@ function Kept() {
   const [pins, setPins] = useState<Chart[] | null>(null);
   const load = () => get<Chart[]>("/api/pins").then(setPins).catch(() => setPins([]));
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
-  if (pins === null) return null;
-  return (
-    <section className="dk-box">
-      <div className="dk-bh"><h2>Your charts</h2></div>
-      {pins.length ? <div style={{ padding: "0 14px 6px" }}>{pins.map((c) => <ChartView key={c.id} c={c} drop={() => post("/api/pins/" + c.id + "/remove", {}).then(load)} />)}</div>
-        : <div className="dk-empty"><b>Ask for any chart</b>In Ask, say what you want to see, such as revenue by airline or requests per hour, then keep it here. It stays up to date.</div>}
-    </section>
-  );
+  if (!pins?.length) return null;
+  return <div className="dk-two even dk-kept">{pins.map((c) => <section key={c.id} className="dk-box"><ChartView c={c} drop={() => post("/api/pins/" + c.id + "/remove", {}).then(load)} /></section>)}</div>;
 }
 
 export function Numbers({ deals }: { deals: DealRow[] }) {
+  const [e, setE] = useState<Economics | null>(null);
+  useEffect(() => { const load = () => get<Economics>("/api/economics").then(setE).catch(() => undefined); load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
   const total = deals.length, quoted = deals.filter((d) => d.quote), booked = deals.filter(isBooked);
   const times = quoted.map((d) => d.response_seconds).filter((x): x is number => x != null && x >= 1);
   const med = median(times), fast = times.filter((x) => x <= 120).length;
@@ -110,6 +94,8 @@ export function Numbers({ deals }: { deals: DealRow[] }) {
     ["Booked", String(booked.length), pct(booked.length, quoted.length) + " of the quotes became a booking"],
     ["Freight booked", weight ? Math.round(weight).toLocaleString("en-US") + " kg" : "–", !booked.length ? "No booking yet" : priced === booked.length ? money(value) + " in booked quotes" : priced ? money(value) + " in the " + priced + " bookings with a recorded price" : booked.length + " bookings"],
   ];
+  if (e?.bookings) tiles.push(["Margin", money(e.margin_eur), e.margin_percent + " % of booked quotes, " + money(e.room_eur).replace(/\.\d\d$/, "") + " room to the next option"]);
+  const cost = deals.reduce((s, d) => s + (d.cost_usd || 0), 0);
   return (
     <>
       <section className="dk-lead">
@@ -117,18 +103,18 @@ export function Numbers({ deals }: { deals: DealRow[] }) {
         <p>Counted from the shipments on this desk. {flaggedN ? flaggedN + (flaggedN === 1 ? " of them carries" : " of them carry") + " a note from Giulia." : "None of them carries a note from Giulia."}</p>
       </section>
       <div className="dk-kpis">{tiles.map(([label, big, sub]) => <section key={label} className="dk-box dk-kpi"><small>{label}</small><b>{big}</b><span>{sub}</span></section>)}</div>
-      <Money />
-      <Kept />
       <div className="dk-two even">
         <section className="dk-box"><div className="dk-bh"><h2>Shipments per day</h2></div><p className="dk-bs">The last 14 days, by the day of a shipment's last step.</p><Bars data={days} name="Shipments per day" /></section>
         <section className="dk-box"><div className="dk-bh"><h2>Time from request to quote</h2></div><p className="dk-bs">How many quotes left in each span of time.</p><Bars data={speed} name="Time from request to quote" /></section>
       </div>
+      <Kept />
       <section className="dk-box">
         <div className="dk-bh"><h2>Busiest routes</h2></div>
         <table className="dk-nt"><thead><tr><th>Route</th><th>Requests</th><th>Booked</th><th>Typical answer</th><th>Quoted</th></tr></thead>
           <tbody>{routes.map((r) => <tr key={r.k}><td>{r.k}</td><td>{r.n}</td><td>{r.booked}</td><td>{secs(r.med)}</td><td>{r.value ? money(r.value) : "–"}</td></tr>)}</tbody></table>
         {!routes.length ? <div className="dk-empty"><b>No routes yet</b>They appear with the first request that names an origin and a destination.</div> : null}
       </section>
+      {e?.bookings ? <Flow e={e} perQuote={cost > 0 && quoted.length ? cost / quoted.length : null} /> : null}
     </>
   );
 }
