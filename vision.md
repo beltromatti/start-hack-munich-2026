@@ -253,7 +253,12 @@ sentence did not mention; it reads a rule and applies it literally, also where i
   its check: the agent opens it with `browser` (5U's sites only), reads and fills it by its labels (the page
   changes), marks where the team key goes, and calls `ask_person`; the page shows live in the deal's conversation,
   an alarm opens the deal, and the person does only what is theirs (the check, the key on their click, send). The
-  tool turns the result into a price by code. With nobody at the desk (operator mode off) the agent quotes with what
+  tool turns the result into a price by code. Round 120 exposed that the shared browser was headless, launched
+  with automation defaults, and discarded its profile. It now starts the installed desktop Chrome directly,
+  with a dedicated persistent profile, and attaches the chat view without browser or device overrides. The
+  person's card opens it when needed; remounting the card preserves the page and unfinished form. Cloudflare
+  may still reject a connected browser: the card keeps the person's own-browser link and pasted-rate path.
+  With nobody at the desk (operator mode off) the agent quotes with what
   it has. `ask_person` serves any other thing only a person can settle (kind answer), like SIEVER's `avvisa`.
   In rounds 93-100 the turned-away airline was always the one the answer needed, and the teams that won booked it
   83-358 s after the request: people on the page (5U's brief: "a browser page behind a bot challenge"; slide 2:

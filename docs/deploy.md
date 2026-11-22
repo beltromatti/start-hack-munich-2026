@@ -16,6 +16,20 @@ curl localhost:8000/api/health  # {"ok": true, "worker": true, ...}
 
 UI: `http://<server>:8000`. Behind a firewall: `ssh -L 8000:localhost:8000 <server>` and open `localhost:8000`.
 
+## Shared portal browser on the desk's Mac
+
+Run `cd backend && uv run python -m app.browser` alongside the existing server. It listens only on
+`127.0.0.1:8010`; it never polls or sends mail. The operator's card opens the installed desktop Chrome and
+shares its page, keyboard, paste and scroll controls in the conversation. "Show on desktop" brings the same
+tab forward for direct interaction. The check and team key remain the person's responsibility.
+
+Chrome uses `backend/data/portal-chrome/`, a private, gitignored profile whose cookies survive sidecar restarts.
+It is launched directly, without headless mode, automation launcher flags, or device emulation. Playwright
+attaches through a loopback CDP port with `no_defaults=True`. Keep the profile and CDP port private. Optional
+`PORTAL_CHROME_PATH` and `PORTAL_BROWSER_PROFILE` override the executable and dedicated profile; never point it
+at a personal browser profile. This needs a desktop session; a headless Docker server cannot provide it.
+If Chrome cannot start or Cloudflare still refuses the check, the card retains the external-browser/paste path.
+
 ## Moving production between the Mac and a server over SSH (keeps every deal and session)
 
 `deploy/push.sh` does it, from the repo root on the Mac (key `~/.ssh/amd_forwarder`):

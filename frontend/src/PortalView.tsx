@@ -39,10 +39,85 @@ function Copy({ label, value }: { label: string; value: string | null | undefine
   return <button className="chip" onClick={copy} title="copy">{label} <b className="mono">{value}</b>{done ? " ✓" : ""}</button>;
 }
 
-// 5U's portal page sits behind Cloudflare's check for people, which a browser driven by a program never passes
-// (round 120). So the person uses their own Chrome: the data to type, ready to copy; the page in a new tab of their
-// browser; and the result pasted back here, read by code (total, days, R-...) and added to the deal. The agent,
-// waiting in ask_person, goes on the moment the price is in.
+// A real desktop Chrome is shared into the conversation. The external-browser path stays available when
+// Cloudflare or the desktop session refuses it; either path feeds the same rate reader and waiting agent.
+function SharedBrowser({ dealId }: { dealId: string }) {
+  const [src, setSrc] = useState("");
+  const [error, setError] = useState("");
+  const [restart, setRestart] = useState(0);
+  const [text, setText] = useState("");
+  const [key, setKey] = useState("");
+  const img = useRef<HTMLImageElement>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const input = (action: string, payload: Record<string, unknown>) => {
+    queue.current = queue.current.then(() => post<{ error?: string }>(`/api/portal/${dealId}/${action}`, payload))
+      .then((r) => { if (r.error) throw new Error(r.error); setError(""); })
+      .catch((e) => setError(String(e)));
+  };
+  useEffect(() => {
+    let active = true, url = "", timer: number | undefined;
+    const abort = new AbortController();
+    const poll = async () => {
+      try {
+        const r = await fetch(`/api/portal/${dealId}/shot`, { signal: abort.signal, cache: "no-store" });
+        if (!r.ok) throw new Error(`Shared browser unavailable (${r.status}). Retry or use the link below.`);
+        const blob = await r.blob();
+        if (!active) return;
+        const next = URL.createObjectURL(blob);
+        if (url) URL.revokeObjectURL(url);
+        url = next; setSrc(next);
+      } catch (e) { if (active) setError(String(e)); }
+      if (active) timer = window.setTimeout(poll, 700);
+    };
+    setSrc(""); setError("");
+    post(`/api/portal/${dealId}/open`, {}).then(() => { if (active) void poll(); })
+      .catch((e) => { if (active) setError(String(e)); });
+    return () => { active = false; abort.abort(); window.clearTimeout(timer); if (url) URL.revokeObjectURL(url); };
+  }, [dealId, restart]);
+  const send = () => { if (text) { input("type", { text }); setText(""); } };
+  return <div className="portal-live">
+    <div className="portal-keys">
+      <button onClick={() => setRestart((n) => n + 1)}>Reconnect view</button>
+      <button onClick={() => input("focus", {})}>Show on desktop</button>
+      <button onClick={() => input("open", { reload: true })}>Reload portal</button>
+    </div>
+    {error ? <div role="alert" className="portal-hint">{error}</div> : null}
+    {!src && !error ? <div className="muted">Opening shared Chrome…</div> : null}
+    {src ? <img ref={img} className="portal-shot" src={src} alt="Live 5U portal. Click to focus, then type or paste."
+      tabIndex={0} draggable={false}
+      onClick={(e) => {
+        e.currentTarget.focus();
+        const r = e.currentTarget.getBoundingClientRect();
+        input("click", { x: (e.clientX - r.left) * e.currentTarget.naturalWidth / r.width,
+          y: (e.clientY - r.top) * e.currentTarget.naturalHeight / r.height });
+      }}
+      onPaste={(e) => { e.preventDefault(); input("type", { text: e.clipboardData.getData("text") }); }}
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && ["v", "c", "x"].includes(e.key.toLowerCase())) return;
+        if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault(); input("type", { text: e.key });
+        } else if (["Enter", "Tab", "Backspace", "Delete", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(e.key)
+          || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a")) {
+          e.preventDefault(); input("type", { key: `${e.metaKey || e.ctrlKey ? "ControlOrMeta+" : ""}${e.shiftKey ? "Shift+" : ""}${e.key}` });
+        }
+      }} /> : null}
+    <div className="portal-keys">
+      <input aria-label="Text for the selected portal field" placeholder="Click a field above, then type or paste here" value={text}
+        onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
+      <button onClick={send}>Type</button>
+      <button onClick={() => input("type", { key: "Tab" })}>Tab</button>
+      <button onClick={() => input("type", { key: "Enter" })}>Enter</button>
+      <button onClick={() => input("scroll", { y: -500 })}>Scroll up</button>
+      <button onClick={() => input("scroll", { y: 500 })}>Scroll down</button>
+    </div>
+    <div className="portal-keys">
+      <input aria-label="Team key" type="password" autoComplete="off" placeholder="Your team key" value={key} onChange={(e) => setKey(e.target.value)} />
+      <button disabled={!key} onClick={() => { input("type", { into: "key", text: key }); setKey(""); }}>Type my key</button>
+    </div>
+    <div className="muted portal-hint">Complete the check and submit the form. The agent reads the resulting rate automatically.</div>
+  </div>;
+}
+
 export function PortalView({ dealId, note, airline }: { dealId: string; note: string; airline: string | null }) {
   const [need, setNeed] = useState<Needed | null>(null);
   const [pasted, setPasted] = useState("");
@@ -74,6 +149,14 @@ export function PortalView({ dealId, note, airline }: { dealId: string; note: st
         {airline ? <span className="mono">{airline}</span> : null}
       </div>
       <div className="muted">{note}</div>
+      <div className="portal-chips">
+        <Copy label="from" value={need?.origin} /><Copy label="to" value={need?.destination} />
+        <Copy label="kg" value={need?.gross_kg} /><Copy label="cbm" value={need?.volume_cbm} />
+        {airlines.map((a) => <Copy key={a.name} label="airline" value={a.code ? `${a.name} (${a.code})` : a.name} />)}
+      </div>
+      <SharedBrowser key={dealId} dealId={dealId} />
+      <details>
+      <summary>Check still blocked? Use your own browser and paste the result</summary>
       <div className="portal-steps">
         <div className="portal-step"><b>1</b> In your Chrome: <a className="primary-link" href={PORTAL} target="_blank" rel="noopener noreferrer">open 5U's portal ↗</a> (pass the check, close any pop-up)</div>
         <div className="portal-step"><b>2</b> Type these (click to copy):
@@ -87,7 +170,7 @@ export function PortalView({ dealId, note, airline }: { dealId: string; note: st
         </div>
         <div className="portal-step"><b>3</b> Copy the page's result (select all, copy) and paste it here:</div>
       </div>
-      <textarea className="portal-paste" autoFocus rows={4} placeholder="paste the rate the page shows: total EUR, transit days, R-… reference"
+      <textarea className="portal-paste" rows={4} placeholder="paste the rate the page shows: total EUR, transit days, R-… reference"
         value={pasted} onChange={(e) => onPaste(e.target.value)} />
       {read ? (
         <div className="portal-read">
@@ -98,6 +181,7 @@ export function PortalView({ dealId, note, airline }: { dealId: string; note: st
         </div>
       ) : null}
       {msg ? <div className="muted">{msg}</div> : null}
+      </details>
     </div>
   );
 }

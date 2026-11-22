@@ -1,7 +1,7 @@
 """A browser the agent and a person share, for 5U's portal page (the one place its rates live when the rate API
 answers 503, behind a check meant for people).
 
-One page per deal, in a headless Chrome on the desk's Mac. The agent reads and fills it through the `browser`
+One page per deal, in the installed desktop Chrome with a dedicated persistent profile. The agent reads and fills it through the `browser`
 tool (by the labels a person sees, so the page may change its field names every load); the person sees it live in
 the deal's conversation in our UI and does what only a person may do there: the check, the team key, a banner if
 the agent cannot. Runs beside production, so a browser problem never stops the forwarder:
@@ -9,15 +9,83 @@ the agent cannot. Runs beside production, so a browser problem never stops the f
     cd backend && uv run python -m app.browser        (listens on 127.0.0.1:8010)
 """
 import asyncio
+import os
+import shutil
+import socket
+import subprocess
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.parse import urlparse
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from playwright.async_api import async_playwright
 
 PORT = 8010
-app = FastAPI()
-state: dict = {"pw": None, "ctx": None, "pages": {}}
+PROFILE = Path(os.environ.get("PORTAL_BROWSER_PROFILE", Path(__file__).resolve().parents[1] / "data" / "portal-chrome"))
+PORTAL = "https://start-hack.5u.ai/portal/ui"
+state: dict = {"pw": None, "ctx": None, "browser": None, "pages": {}}
+start_lock = asyncio.Lock()
 SIZE = {"width": 720, "height": 860}
+
+
+@asynccontextmanager
+async def lifespan(_):
+    yield
+    if state["pw"]:
+        # Disconnect only: Chrome and its cookies survive a sidecar restart.
+        await state["pw"].stop()
+    state.update(pw=None, ctx=None, browser=None, pages={})
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+def chrome_command(port: int) -> list[str]:
+    executable = os.environ.get("PORTAL_CHROME_PATH") or (
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" if sys.platform == "darwin"
+        else shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser"))
+    if not executable or not Path(executable).is_file():
+        raise HTTPException(503, "Install Google Chrome or set PORTAL_CHROME_PATH")
+    # Start Chrome itself, not Playwright's automation launcher. No headless mode, automation switches,
+    # fingerprint patches or emulated device. CDP only connects the person's shared view and input.
+    return [executable, f"--user-data-dir={PROFILE.resolve()}", f"--remote-debugging-port={port}",
+            "--remote-debugging-address=127.0.0.1", "--no-first-run", "--no-default-browser-check",
+            f"--window-size={SIZE['width']},{SIZE['height'] + 100}", "about:blank"]
+
+
+async def chrome_endpoint() -> str:
+    PROFILE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    port_file = PROFILE / "shared-browser-port"
+    async with httpx.AsyncClient(timeout=0.5, trust_env=False) as client:
+        async def ready(port):
+            try:
+                r = await client.get(f"http://127.0.0.1:{port}/json/version")
+                return r.status_code == 200 and bool(r.json().get("webSocketDebuggerUrl"))
+            except (httpx.HTTPError, ValueError):
+                return False
+        if port_file.exists():
+            try:
+                port = int(port_file.read_text())
+                if await ready(port):
+                    return f"http://127.0.0.1:{port}"
+            except ValueError:
+                pass
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]  # A nonzero port; port 0 opts Chrome into automation mode.
+        with (PROFILE / "chrome.log").open("ab") as log:
+            process = subprocess.Popen(chrome_command(port), stdout=log, stderr=log, start_new_session=True)
+        for _ in range(60):
+            if await ready(port):
+                port_file.write_text(str(port))
+                return f"http://127.0.0.1:{port}"
+            if process.poll() is not None:
+                break
+            await asyncio.sleep(0.2)
+        raise HTTPException(503, "Desktop Chrome could not start; check portal-chrome/chrome.log and the desktop session")
 
 FORM_JS = """() => [...document.querySelectorAll('input, select, textarea, button')]
   .filter(e => e.offsetParent !== null)
@@ -38,11 +106,14 @@ CLICK_JS = """(i) => { const els = [...document.querySelectorAll('input, select,
 
 
 async def browser():
-    if state["ctx"] is None:
-        state["pw"] = await async_playwright().start()
-        b = await state["pw"].chromium.launch(channel="chrome", headless=True)
-        state["ctx"] = await b.new_context(viewport=SIZE)
-    return state["ctx"]
+    async with start_lock:
+        if state["browser"] is None or not state["browser"].is_connected():
+            if state["pw"] is None:
+                state["pw"] = await async_playwright().start()
+            endpoint = await chrome_endpoint()
+            b = await state["pw"].chromium.connect_over_cdp(endpoint, no_defaults=True)
+            state.update(browser=b, ctx=b.contexts[0], pages={})
+        return state["ctx"]
 
 
 def page(deal: str):
@@ -57,6 +128,12 @@ async def view(p) -> dict:
     try:
         form = await p.evaluate(FORM_JS)
         text = await p.inner_text("body")
+        marked = next((state.get("key_field", {}).get(deal) for deal, current in state["pages"].items() if current is p), None)
+        for field in form:
+            if field.get("value") and (field["i"] == marked or field.get("type") == "password" or
+                    any(word in field["label"].lower() for word in ("key", "password", "token", "secret"))):
+                text = text.replace(field["value"], "{team_key}")
+                field["value"] = "{team_key}"
     except Exception as e:
         return {"error": repr(e)[:200]}
     return {"url": p.url, "form": form, "text": text[:3000]}
@@ -64,14 +141,21 @@ async def view(p) -> dict:
 
 @app.post("/pages/{deal}")
 async def open_page(deal: str, body: dict) -> dict:
+    target = body.get("url") or PORTAL
+    parsed = urlparse(target)
+    if parsed.scheme != "https" or not (parsed.hostname == "5u.ai" or (parsed.hostname or "").endswith(".5u.ai")):
+        raise HTTPException(400, "the browser opens 5U's sites only (https, *.5u.ai)")
     ctx = await browser()
     old = state["pages"].get(deal)
     if old and not old.is_closed():
-        await old.close()
+        if not body.get("reload") and ("url" not in body or old.url == target):
+            return await view(old)  # UI remounts must not reset a person's challenge or unfinished form.
+        state.get("key_field", {}).pop(deal, None)
+        await old.goto(target, wait_until="domcontentloaded")
+        return await view(old)
     p = await ctx.new_page()
     state["pages"][deal] = p
-    await p.goto(body["url"], wait_until="domcontentloaded")
-    await asyncio.sleep(1.0)
+    await p.goto(target, wait_until="domcontentloaded")
     return await view(p)
 
 
@@ -115,13 +199,26 @@ async def press(deal: str, body: dict) -> dict:
 
 @app.get("/pages/{deal}/shot")
 async def shot(deal: str) -> Response:
-    return Response(await page(deal).screenshot(type="jpeg", quality=70), media_type="image/jpeg")
+    return Response(await page(deal).screenshot(type="jpeg", quality=70, scale="css"), media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
 
 
 @app.post("/pages/{deal}/click")
 async def click(deal: str, body: dict) -> dict:
     """The person clicks in the live view (x, y in the page's own pixels)."""
     await page(deal).mouse.click(float(body["x"]), float(body["y"]))
+    return {"ok": True}
+
+
+@app.post("/pages/{deal}/scroll")
+async def scroll(deal: str, body: dict) -> dict:
+    await page(deal).mouse.wheel(float(body.get("x", 0)), float(body.get("y", 0)))
+    return {"ok": True}
+
+
+@app.post("/pages/{deal}/focus")
+async def focus(deal: str, body: dict) -> dict:
+    await page(deal).bring_to_front()
     return {"ok": True}
 
 
@@ -142,7 +239,7 @@ async def type_(deal: str, body: dict) -> dict:
     if body.get("key"):
         await p.keyboard.press(body["key"])
     if body.get("text"):
-        await p.keyboard.type(str(body["text"]))
+        await p.keyboard.insert_text(str(body["text"]))
     return {"ok": True}
 
 

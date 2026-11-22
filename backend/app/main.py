@@ -221,14 +221,23 @@ def portal_shot(deal_id: str) -> Response:
 
 @app.post("/api/portal/{deal_id}/{what}")
 def portal_input(deal_id: str, what: str, payload: dict) -> dict:
-    """The person's click or typing in the live view (what: click | type)."""
+    """The person's shared page and input. Opening it never exposes an arbitrary URL proxy."""
     import httpx
-    if what not in ("click", "type"):
+    if what not in ("open", "click", "type", "scroll", "focus"):
         raise HTTPException(404)
+    if not store.get(deal_id):
+        raise HTTPException(404, "no such deal")
+    path = f"/pages/{deal_id}" if what == "open" else f"/pages/{deal_id}/{what}"
+    if what == "open":
+        payload = {"reload": bool(payload.get("reload"))}
     try:
-        return httpx.post(f"http://127.0.0.1:8010/pages/{deal_id}/{what}", json=payload, timeout=10).json()
-    except Exception:
+        r = httpx.post(f"http://127.0.0.1:8010{path}", json=payload, timeout=30, trust_env=False)
+    except httpx.HTTPError:
         raise HTTPException(503, "the shared browser is not running")
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text[:200])
+    # The UI needs no page text here; the agent reads rates through its existing browser tool.
+    return {"ok": True} if what == "open" else r.json()
 
 
 @app.post("/api/deals/{deal_id}/person_answer")

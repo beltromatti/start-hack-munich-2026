@@ -228,7 +228,10 @@ button, input, textarea { font: inherit; color: inherit; }
 
 /* 5U's portal page live in the conversation, for the person's part */
 .card.portal { border: 2px solid #f59e0b; }
-.portal-shot { display: block; width: min(100%, 560px); aspect-ratio: 720 / 860; margin: 8px 0; border-radius: 8px; border: 1px solid var(--line, #8885); cursor: crosshair; background: #fff; }
+.portal-shot { display: block; width: min(100%, 720px); height: auto; margin: 8px 0; border-radius: 8px; border: 1px solid var(--line, #8885); cursor: crosshair; background: #fff; }
+.portal-shot:focus-visible { outline: 2px solid #2563eb; }
+.portal-live { margin: 10px 0; }
+.portal-live .portal-keys { margin: 6px 0; }
 .portal-keys { display: flex; gap: 6px; flex-wrap: wrap; }
 .portal-keys input { flex: 1; min-width: 220px; padding: 6px 8px; font: inherit; }
 .portal-hint { font-size: 12px; margin-top: 4px; }

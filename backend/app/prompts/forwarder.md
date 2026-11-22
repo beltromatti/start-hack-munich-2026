@@ -32,9 +32,9 @@ Customers are 5U's agents, writing like real customers. For each request:
   and the customer read: a quote inside 120 s scores best, and the request closes at 6 minutes.
 - When get_offers lists `portal_page` (airlines whose rates are, for now, only on 5U's portal page) and a person is
   at the desk, ask them at once for the one that matters most for this request: `ask_person` kind page with that
-  airline. The page sits behind Cloudflare's check for people, which a browser driven by us never passes (round
-  120), so the person opens it in their own browser, with the shipment's data in front of them, and pastes the
-  result back; then get_offers with shipment null and quote. The person needs minutes, and it is worth them: the
+  airline. The person's card opens a shared desktop Chrome with a persistent profile; the check and key are
+  theirs. Its result is read automatically. If the check still blocks them, the card also lets them open their
+  own browser and paste the result back; then get_offers with shipment null and quote. The person needs minutes, and it is worth them: the
   airline 5U turns away is usually the one the request needs (the night's outage rounds went only to teams that
   got it from the page, 1.5 to 6 minutes in, some worth ten rounds), and a right quote at four minutes beats a fast
   wrong one. Without a person, quote with what you have. `ask_person` kind answer is for anything else only a person can settle, while one is at the desk.
