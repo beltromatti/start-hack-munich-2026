@@ -186,6 +186,12 @@ html,body{margin:0;height:100%;background:#101210;overflow:hidden;font-family:va
 .steps span{display:block;margin-top:.25cqw;font:400 1.3cqw/1.4 var(--sans);color:var(--ink2)}
 
 /* team photo: full bleed, no words */
+/* Giulia's face above the three principles: the picked portrait (3), round, with the name under it */
+.face{position:absolute;left:50%;top:3.2cqw;margin:0;transform:translateX(-50%);text-align:center}
+.face img{display:block;width:8cqw;height:8cqw;border-radius:50%;object-fit:cover;box-shadow:0 0 0 .3cqw #fff,0 0 0 .5cqw var(--green),0 .8cqw 2.2cqw rgba(20,40,25,.22)}
+.face figcaption{margin-top:.8cqw;font:600 1.5cqw/1 var(--sans);letter-spacing:-.01em}
+.prin:has(.face) .tt{top:15.6cqw}
+.prin:has(.face) .pb{top:26.5cqw}
 /* the title is night: the painting is multiplied with a deep green, the words turn light */
 .night .img{background-color:#294845;background-blend-mode:multiply}
 .night .img::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 20%,transparent 40%,rgba(6,22,16,.45))}
