@@ -122,16 +122,20 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
   truckers of the pickup zone. An airline that told us its lanes in the last two hours ("We fly ...") is not asked
   for a lane outside them; the agent sees who was skipped (`not_asked`) and can still ask. Unknown is always asked.
   5U moves airlines between portal and mail, so a portal airline off the portal for this lane (or a 404) is asked
-  by mail too; when the rate API turns an airline away (503), it is retried for 20 s, the rate desk is asked, a
-  portal rate we saw tonight on that lane and break prices the airline (`portal_memory`), and with a person at the
-  desk `get_offers` says so at once, so the person starts on 5U's portal page while the carriers answer. Asks that
-  may never be answered (mails to portal airlines, the rate desk) are sent but not awaited: the quote does not wait
-  for them (round 94 waited 499 s).
+  by mail too; when the rate API turns an airline away (503), it is retried for 20 s, 5U's rate desk is asked and
+  awaited like a carrier (it answers the carriers' own request, "Rate request FRA-ORD 320 kg", in about 60 s with a
+  bookable rate_id; the outage's asks, titled like its replies, got nothing), a portal rate we saw tonight on that
+  lane and break prices the airline (`portal_memory`), and with a person at the desk `get_offers` says so at once,
+  so the person starts on 5U's portal page while the carriers answer; whichever channel prices the airline first
+  lets the person go. Asks that may never be answered (mails to portal airlines) are sent but not awaited (round 94
+  waited 499 s).
 - **Pricing:** chargeable weight = max(kg, cbm x 167); also price the break above when it can be cheaper (299 kg
   cost more than 300 kg); minimum on freight; surcharges per billed kg; exact weights in every request (116.9, not
   117). A bid quoted per kg or itemised gets its total from code. A live bid beats the sheet; a carrier that
   declines loses its sheet price; tariffs keep their validity and the one valid on the ready date prices (a
-  December tariff mailed in November does not reprice November).
+  December tariff mailed in November does not reprice November; Wayzata's 2025 one never prices). A carrier writing
+  unprompted is sending its tariff: Elbflug's monthly update (15 % cheaper, in the mail body) went unread for five
+  hours when only an attachment or the word "tariff" made a tariff.
 - **The trucker** in a door-to-port total is the 50/50 pick (price / cheapest + time / fastest), the only rule that
   matched 5U's best in both of the first scored rounds. The airline follows the customer's preference.
 - **A town is enough for a pickup:** it is its zone. Truckers price by zone but answer only a request with a 5-digit
@@ -149,7 +153,9 @@ right. Permissions are per task: the same catalogue, each tool knows what the ta
   at 10 % more (5655.55 became 6221.11). The booking total is recomputed by code from the airline's price plus the rest
   of the all-in (pickup, insurance, charges: round 92 told a customer a total without its insurance),
   `book` returns `price_changed` with both totals, and the agent says it in the confirmation (round 50: "letting me
-  know about the change before invoicing", the customer wrote back). An airline's own mail about the booking is read
+  know about the change before invoicing", the customer wrote back). When nothing changed `book` says so, with the
+  customer's all-in total next to the airline's flight-only price (round 118 told a customer the flight price as a
+  new total). An airline's own mail about the booking is read
   the same way: code says whether its price is the flight price we booked (so the all-in total stays) or another
   one (round 51: the agent took the flight price for a change of the all-in total).
 
@@ -361,8 +367,8 @@ Then:
   seconds, not a mail; whoever reads the mailbox besides production should stop or use the UI.
 - No replay engine yet over the real threads before a prompt change (planned; meanwhile, walk the change through
   the threads by hand and replay key mails in the sim).
-- **5U's portal page needs a person** at the desk: overnight, with nobody there, a rate-API outage still costs
-  the rounds whose airlines are only there. The rate desk has been silent since Sat 13:53.
+- **5U's portal page needs a person** at the desk; the rate desk now answers within a minute (probe Sun 02:54),
+  but whether it also answers during an outage is unproven: the outage's three asks were in the wrong form.
 - Notes carried to a customer's next thread are every note of their earlier deals, routine ones included: the
   agent judges them, but they are noise next to the one wish that matters.
 - **Untrusted input has no size bound:** a mail body (5U allows 200,000 characters) and its attachments (5 of 10
