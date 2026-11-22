@@ -267,14 +267,18 @@ class Forwarder:
         if failed:  # the rate API turned airlines away: 5U's rate desk (one of the portal's three forms, with the
             # API and the page) answers by mail in about 60 s with every portal airline of the lane, total, transit
             # and a bookable rate_id. It answers the request a carrier gets ("Rate request FRA-ORD 320 kg", probe Sun
-            # 02:54, 61 s); the three asks of the outage, titled like its own replies, got none. Awaited like a
-            # carrier, at the weight and at the break above.
+            # 02:54, 61 s), but not during an outage: rounds 120-123 asked it the right way four times and it
+            # never wrote. So it is asked, at the weight and at the break above, and used if it answers in time;
+            # never awaited: awaited, it held a quote whose missing price was already in (test bench Sun 05:50:
+            # page price after 6 s, quote after 111-121 s).
             nb = max((pricing.next_break(w.brackets.get(a["code"], []), cw) or 0
                       for a in w.portal.get((o, d), []) if a["name"] in failed), default=0)
             desk = kit.Carrier("Rate Desk", "desk", RATEDESK, [])
             for wt in [cw] + ([Decimal(nb)] if nb and Decimal(nb) / cw < Decimal("1.5") else []):
                 try:
-                    asked[str(self.ask_airline(deal_id, desk, o, d, wt, cbm, req))] = RATEDESK
+                    mid = str(self.ask_airline(deal_id, desk, o, d, wt, cbm, req))
+                    asked[mid] = RATEDESK
+                    fallback.append(mid)
                 except Exception as e:
                     store.log("bids", "error", f"could not ask the rate desk: {e!r}"[:300], run_id=deal_id)
         # airlines that may have moved from the portal to mail: off the portal for this lane, or a 404 for it
@@ -1018,7 +1022,9 @@ def waiting_for(d: dict) -> list[str]:
     owed = sorted(email for email, n in asked.items() if replied[email] < n)
     pr = d.get("portal_retry") or {}
     if pr.get("names") and time.time() - pr.get("since", 0) <= Forwarder.PORTAL_RETRY[1]:
-        owed += [f"portal: {n}" for n in pr["names"]]  # a portal outage is waited out, like a carrier's answer
+        live = {o.get("carrier") for o in d.get("offers", []) if o.get("source") in ("portal", "ratedesk", "portal_page")}
+        # a portal outage is waited out like a carrier's answer, unless the airline is already priced (its page)
+        owed += [f"portal: {n}" for n in pr["names"] if n not in live]
     return owed
 
 

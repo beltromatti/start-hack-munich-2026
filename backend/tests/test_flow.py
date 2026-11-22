@@ -1407,10 +1407,12 @@ def test_portal_fallback_is_immediate_without_an_operator_and_prices_by_code():
     assert "fully autonomous" in tools.ask_person(ctx, "page", "pass the check", missing[0], 30)["error"]
 
 
-def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_airlines_away():
+def test_the_rate_desk_is_asked_as_it_answers_but_never_holds_the_quote():
     """5U's rate desk is one of the portal's three forms (brief). It answered "Rate request FRA-ORD 320 kg" in 61 s with
-    a bookable rate_id (probe Sun 02:54); the outage's asks, titled "Portal rates ...", got nothing. Now it gets the
-    carrier request, is awaited like a carrier, and a browser fallback is unnecessary once it has priced the airline."""
+    a bookable rate_id (probe Sun 02:54), but never during an outage (rounds 120-123: asked four times, no answer).
+    So it is asked in that form and used if it answers, never awaited; and an airline already priced on its page is
+    no longer waited for either (test bench: page price at 6 s, quote at 111-121 s)."""
+    import time as _t
     from app import tools
     from app.forwarder import waiting_for
     from app.kit import RATEDESK
@@ -1431,7 +1433,10 @@ def test_the_rate_desk_is_asked_as_it_answers_and_awaited_when_the_api_turns_air
     desk = [m for m in api.outbox if m["to"] == RATEDESK]
     assert desk and desk[0]["subject"] == "Rate request FRA-ORD 320 kg" and "Total weight: 320 kg" in desk[0]["body"]
     d = store.get(ctx.deal_id)["data"]
-    assert RATEDESK in waiting_for(d)  # awaited like a carrier, not a fallback
+    assert RATEDESK not in waiting_for(d)  # asked, used if it answers; never awaited (silent in rounds 120-123)
+    priced = {"portal_retry": {"names": ["Borealis Freight Airways"], "since": _t.time()},
+              "offers": [{"carrier": "Borealis Freight Airways", "source": "portal_page"}]}
+    assert not waiting_for(priced)  # its page price is in: nothing left to wait for
     missing = d["portal_missing"]["airlines"][0]["name"]
     store.update(ctx.deal_id, lambda r: (r["status"], {**r["data"], "offers": r["data"]["offers"] + [
         {"kind": "air", "carrier": missing, "total": "1171.20", "days": "1", "source": "ratedesk",
