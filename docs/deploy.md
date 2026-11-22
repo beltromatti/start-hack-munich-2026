@@ -44,8 +44,8 @@ BACK=1 deploy/push.sh user@host 22     # the reverse: stop the server, bring the
 ```
 
 Switch right after a round's quote and booking (rounds come every 6 minutes). The server continues from the same
-`since_id`: nothing is answered twice, and a mail that was mid-work is picked up again. With `UI_PASSWORD` in
-`.env` the UI and API ask for the team password (any user name); `/api/health` stays open.
+`since_id`: nothing is answered twice, and a mail that was mid-work is picked up again. The desk asks for a
+sign-in once the register holds an account (`python -m app.accounts add`); `/api/health` stays open.
 
 ## Update to the latest main
 

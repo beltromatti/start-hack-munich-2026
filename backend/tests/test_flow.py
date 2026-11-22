@@ -278,18 +278,6 @@ def test_a_bid_quoted_per_kg_gets_its_total_from_code():
     assert str(off.total) == "982.00"  # 300 x 2.42 + 300 x 0.77 + 25
 
 
-def test_the_server_asks_for_the_team_password(monkeypatch):
-    import base64
-    from fastapi.testclient import TestClient
-    from app import main
-    monkeypatch.setattr(main, "_PASSWORD", "s3cret")
-    c = TestClient(main.app)
-    assert c.get("/api/health").status_code == 200
-    assert c.get("/api/deals").status_code == 401
-    ok = {"Authorization": "Basic " + base64.b64encode(b"team:s3cret").decode()}
-    assert c.get("/api/deals", headers=ok).status_code == 200
-
-
 def test_no_options_says_why_with_what_the_carriers_wrote():
     """Live round 15: the truckers asked for the postcode, the bid reader called it a no, and get_offers returned an
     empty list with nothing else; the agent told the customer no airline flew the route. Empty now says why."""

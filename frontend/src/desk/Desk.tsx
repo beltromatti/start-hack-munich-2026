@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Board, Deal, DealRow, get, post } from "../api";
+import { Account, Deal, DealRow, get, post } from "../api";
 import { DEMO, recorded } from "../demo";
 import { DealView } from "../DealView";
 import { OperatorStrip } from "../Operator";
-import { BoardPane, DealList } from "../Side";
+import { DealList } from "../Side";
 import { who } from "../format";
 import { Act, Answer, TRY, answer, askModel } from "./ask";
 import { CarrierFacts, Seen, carrierFacts, context, customerExtra, expect, useKnowledge } from "./knowledge";
@@ -15,7 +15,7 @@ import { Jobs, Job } from "./Jobs";
 import { MatrixChart } from "./Matrix";
 import { Numbers } from "./Numbers";
 import { matrix, wantsJob, wantsMatrix } from "./analysis";
-import { Rights, ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
+import { ROLE_NAME, ROLE_SEES, Setup } from "./Setup";
 import { Step, languageOf, timeline } from "./timeline";
 import { Cust, Group, LABEL, amount, city, flagNote, customers, ends, groupOf, kg, known, lane, median, money, name, since, when, why } from "./util";
 import "./desk.css";
@@ -25,21 +25,15 @@ import "./desk.css";
 // It reads the API the sessions view reads and keeps nothing of its own on the server.
 
 type Page = "home" | "ship" | "cust" | "net" | "sess" | "help" | "ask" | "setup" | "eff" | "jobs";
-// Three people run this company, and each opens the desk on what they care about.
+// Each person opens the desk on what their role cares about; the role is kept with their account.
 type Role = "ops" | "sales" | "carriers";
-type Person = { id: string; name: string; role: Role; title: string; cares: string; photo?: boolean; added?: boolean };
-const PEOPLE: Person[] = [
-  { id: "sam", name: "Sam", role: "ops", title: "Operations", cares: "What Giulia flagged", photo: true },
-  { id: "jan", name: "Jan", role: "sales", title: "Sales", cares: "Customers and open quotes", photo: true },
-  { id: "mattia", name: "Mattia", role: "carriers", title: "Carriers and rates", cares: "Airlines, routes and prices", photo: true },
-];
-let ME = "Sam";
-// what the person signed in may do in this desk (set in Desk, read where something is written)
-let CAN: Rights = { tell: true, sessions: true, setup: true };
+type Person = { id: string; name: string; role: Role };
+// the person signed in, for the greeting (set in Desk; the server records changes under the account itself)
+let ME = "";
 
 function Face({ p, size = 36 }: { p: Person; size?: number }) {
   const [missing, setMissing] = useState("");
-  return <span className="dk-face" style={{ width: size, height: size }}>{p.name[0]}{p.photo && missing !== p.id ? <img key={p.id} src={"/people/" + p.id + ".png"} alt="" onError={() => setMissing(p.id)} /> : null}</span>;
+  return <span className="dk-face" style={{ width: size, height: size }}>{p.name[0]}{missing !== p.id ? <img key={p.id} src={"/people/" + p.id + ".png"} alt="" onError={() => setMissing(p.id)} /> : null}</span>;
 }
 
 // A wheel that eases in and out: the page follows the hand a moment later, never abruptly.
@@ -66,7 +60,6 @@ function useSoftScroll() {
   }, []);
 }
 const thinOnes = (deals: DealRow[]) => deals.filter((d) => ["needs", "working", "quoted"].includes(groupOf(d)) && ends(d)).map((d) => { const e = ends(d)!, l = LANES.find((x) => x[0] === e[0] && x[1] === e[1]); return { d, n: l ? l[2].length : 0, only: l && l[2].length === 1 ? l[2][0][0] : null }; }).filter((x) => x.n < 2);
-const TEAM = "start-milan";
 const AVC: [string, string][] = [["#e8eefc", "#2b4a9b"], ["#fde9e0", "#b4441c"], ["#e6f4ec", "#1b6b43"], ["#f3eafc", "#6a3aa8"], ["#fdf2d8", "#8a5a07"], ["#e3f3f6", "#1c6470"]];
 const hash = (s: string) => [...s].reduce((t, c) => (t * 31 + c.charCodeAt(0)) >>> 0, 7);
 const ago = (ts: number | string | null | undefined) => { const s = since(ts); return s ? s + " ago" : ""; };
@@ -390,7 +383,7 @@ function CustomerPage({ c, seen, open, back, teach, ask }: { c: Cust; seen: Seen
         </section>
         <section className="dk-box"><div className="dk-bh"><h2>Remembered</h2></div>
           {notes.length ? <ul className="dk-notes">{notes.map((n) => <li key={n}><Icon n="brain" size={14} />{n}</li>)}</ul> : <p className="dk-bs">Nothing yet. Tell her what to keep in mind for this customer.</p>}
-          {CAN.tell ? <div className="dk-tell in"><Composer line hint="Teach her something" send={add} /></div> : null}
+          <div className="dk-tell in"><Composer line hint="Teach her something" send={add} /></div>
           {told ? <p className="dk-bs"><span className="dk-done"><Icon n="circleCheck" />Passed on. She keeps it for their next request.</span></p> : null}
         </section>
       </div>
@@ -595,7 +588,7 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
   const flag = g === "needs" ? (mine?.data.notes ?? []).filter((n) => n.flag === "red" || n.flag === "yellow").map((n) => n.text).pop() ?? flagNote(row) : null;
   const steps = useMemo(() => mine ? timeline(mine) : [], [mine]);
   const [passed, setPassed] = useState("");
-  const tell = (text: string) => { if (!mine || busy) return; setBusy(true); setPassed(""); post("/api/sessions/session-" + mine.data.root + "/message", { text, who: ME }).then(() => { setPassed("Passed on. Giulia reads it on her next step."); reload(); }).catch(() => setPassed("That did not go through. Try again.")).finally(() => setBusy(false)); };
+  const tell = (text: string) => { if (!mine || busy) return; setBusy(true); setPassed(""); post("/api/sessions/session-" + mine.data.root + "/message", { text }).then(() => { setPassed("Passed on. Giulia reads it on her next step."); reload(); }).catch(() => setPassed("That did not go through. Try again.")).finally(() => setBusy(false)); };
   useEffect(() => { setFull(false); setPassed(""); }, [row.id]);
   const changed = mine?.data.booking?.price_changed;
   return (
@@ -624,7 +617,7 @@ function Sheet({ row, deal, hint, reload, close, seen, markSeen }: { row: DealRo
           {!mine ? <p style={{ color: "var(--d-muted)" }}>Loading the record.</p> : full ? <div className="dk-mt rec"><DealView deal={mine} onSent={reload} /></div> : (
             <>
               <Timeline steps={steps} />
-              {CAN.tell ? <div className="dk-tell"><Composer line hint="Tell Giulia something about this shipment" send={tell} />{passed ? <p className="dk-fine" style={{ textAlign: "left", marginTop: 8 }}>{passed}</p> : null}</div> : <p className="dk-fine" style={{ textAlign: "left" }}>Writing to Giulia is switched off for you.</p>}
+              <div className="dk-tell"><Composer line hint="Tell Giulia something about this shipment" send={tell} />{passed ? <p className="dk-fine" style={{ textAlign: "left", marginTop: 8 }}>{passed}</p> : null}</div>
             </>
           )}
         </div>
@@ -639,8 +632,8 @@ const EMBED = new URLSearchParams(location.search).get("embed");
 type Forced = "calm" | "watch" | "alert";
 const forcedDeals = (deals: DealRow[], f: Forced | null) => f === "calm" ? deals.map((d) => ({ ...d, flag: null })) : f === "watch" ? deals.filter((d) => d.flag !== "red") : deals;
 
-export function Desk({ deals: given, online, worker, board, selected, select, deal, reload }: {
-  deals: DealRow[]; online: boolean; worker: boolean; board: Board | null; selected: string | null; select: (id: string | null) => void; deal: Deal | null; reload: () => void;
+export function Desk({ account, signOut, deals: given, online, worker, selected, select, deal, reload }: {
+  account: Account | null; signOut: (() => void) | null; deals: DealRow[]; online: boolean; worker: boolean; selected: string | null; select: (id: string | null) => void; deal: Deal | null; reload: () => void;
 }) {
   const [forced, setForced] = useState<Forced | null>(DEMO && EMBED !== null ? (["watch", "alert"].includes(EMBED) ? EMBED as Forced : "calm") : null);
   useEffect(() => {
@@ -652,7 +645,6 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
   const initial = (location.hash.slice(1) || "home") as Page;
   const [page, setPage] = useState<Page>(["home", "ship", "cust", "net", "sess", "help", "setup", "eff", "jobs"].includes(initial) ? initial : "home");
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [who, setWho] = useState(() => { try { return localStorage.getItem("desk_me") ?? "sam"; } catch { return "sam"; } });
   const [menu, setMenu] = useState(false);
   useEffect(() => { // the account menu closes on a click anywhere else, and on Escape
     if (!menu) return;
@@ -661,21 +653,10 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
     document.addEventListener("pointerdown", out); document.addEventListener("keydown", key);
     return () => { document.removeEventListener("pointerdown", out); document.removeEventListener("keydown", key); };
   }, [menu]);
-  const [roles, setRoles] = useState<Record<string, Role>>(() => { const d = Object.fromEntries(PEOPLE.map((p) => [p.id, p.role])); try { return { ...d, ...JSON.parse(localStorage.getItem("desk_roles") ?? "{}") }; } catch { return d; } });
-  const setRole = (id: string, r: Role) => setRoles((x) => { const n = { ...x, [id]: r }; try { localStorage.setItem("desk_roles", JSON.stringify(n)); } catch { /* this browser keeps nothing */ } return n; });
-  // people added here and everyone's rights are kept in this browser: a draft, there is no sign-in
+  // the account signed in (null on a laptop without accounts: the desk is open, as before)
+  const me: Person = account ? { id: account.username, name: account.name, role: account.role } : { id: "you", name: "there", role: "ops" };
+  ME = me.name.split(" ")[0];
   const keep = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* this browser keeps nothing */ } };
-  const [added, setAdded] = useState<Person[]>(() => { try { return (JSON.parse(localStorage.getItem("desk_people") ?? "[]") as Person[]).filter((p) => p && p.id && p.name).map((p) => ({ ...p, added: true, photo: false })); } catch { return []; } });
-  const [rights, setRights] = useState<Record<string, Partial<Rights>>>(() => { try { return JSON.parse(localStorage.getItem("desk_rights") ?? "{}"); } catch { return {}; } });
-  const people = [...PEOPLE, ...added];
-  const rightsOf = (p: Person): Rights => ({ tell: true, sessions: !p.added, setup: !p.added, ...rights[p.id] });
-  const setRight = (id: string, k: keyof Rights, v: boolean) => setRights((x) => { const n = { ...x, [id]: { ...x[id], [k]: v } }; keep("desk_rights", n); return n; });
-  const addPerson = (name: string, role: Role) => setAdded((x) => { const n = [...x, { id: "p" + Date.now().toString(36), name, role, title: ROLE_NAME[role], cares: "", added: true }]; keep("desk_people", n); return n; });
-  const removePerson = (id: string) => { setAdded((x) => { const n = x.filter((p) => p.id !== id); keep("desk_people", n); return n; }); if (who === id) setWho("sam"); };
-  const rolesAll = Object.fromEntries(people.map((p) => [p.id, roles[p.id] ?? p.role])) as Record<string, Role>;
-  const base = people.find((p) => p.id === who) ?? PEOPLE[0];
-  const me = { ...base, role: rolesAll[base.id] };
-  ME = me.name; CAN = rightsOf(base);
   // analyses the assistant repeats: made in the chat, kept in this browser, run while the desk is open
   const [jobs, setJobs] = useState<Job[]>(() => { try { return JSON.parse(localStorage.getItem("desk_jobs") ?? "[]") as Job[]; } catch { return []; } });
   const saveJobs = (f: (x: Job[]) => Job[]) => setJobs((x) => { const n = f(x); keep("desk_jobs", n); return n; });
@@ -697,7 +678,6 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
   const [toast, setToast] = useState("");
   const go = (p: Page) => { setPage(p); setOpen(false); if (p !== "cust") setCust(null); try { history.replaceState(null, "", "#" + p); } catch { /* none */ } };
   const show = (id: string) => { select(id); setOpen(true); };
-  useEffect(() => { if (page === "sess" && !CAN.sessions) go("home"); });
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2800); return () => clearTimeout(t); }, [toast]);
   const needs = deals.filter((d) => groupOf(d) === "needs" && !seenIds.has(d.id));
   const row = deals.find((d) => d.id === selected) ?? null;
@@ -709,7 +689,7 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
   const nv = (p: Page, icon: string, label: string, count?: number) => (
     <button className="dk-nv" aria-current={page === p ? "page" : undefined} onClick={() => { go(p); setCust(null); }}><Icon n={icon} size={17} />{label}{count ? <b>{count}</b> : null}</button>
   );
-  const tell = (a: Act): Promise<string> => post("/api/sessions/" + a.deal.replace(/^deal-/, "session-") + "/message", { text: a.text, who: ME }).then(() => { reload(); return "Passed on to Giulia."; });
+  const tell = (a: Act): Promise<string> => post("/api/sessions/" + a.deal.replace(/^deal-/, "session-") + "/message", { text: a.text }).then(() => { reload(); return "Passed on to Giulia."; });
   const send = (q: string) => {
     const earlier = turns.filter((t) => t.a).slice(-3).map((t) => ({ q: t.q, a: t.a!.text }));
     setTurns((ts) => [...ts, { q, a: null }]);
@@ -729,7 +709,7 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
     askModel(q, deals, context(deals, seen), earlier).catch(() => ({ ...answer(q, deals), via: "record" as const }))
       .then((a) => setTurns((ts) => { const i = ts.findIndex((t) => t.q === q && !t.a); return i < 0 ? ts : ts.map((t, k) => k === i ? { ...t, a } : t); }));
   };
-  const runTurn = (i: number) => { const a = turns[i]?.a?.act; if (a && CAN.tell) tell(a).then((done) => setTurns((ts) => ts.map((t, k) => k === i ? { ...t, done } : t))); };
+  const runTurn = (i: number) => { const a = turns[i]?.a?.act; if (a) tell(a).then((done) => setTurns((ts) => ts.map((t, k) => k === i ? { ...t, done } : t))); };
   useEffect(() => { const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPage("ask"); setOpen(false); } }; window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key); }, []);
   // the ground says how the desk is doing: green while it runs alone, warmer with notes to read, dusk when something is wrong
   const mood: Mood = !online || !worker || needs.some((d) => d.flag === "red") ? "alert" : needs.length ? "watch" : "calm";
@@ -747,7 +727,7 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
           {nv("net", "network", "Network")}
           {nv("eff", "chartColumn", "Efficiency")}
           {jobs.length ? nv("jobs", "repeat", "Jobs") : null}
-          {CAN.sessions ? nv("sess", "messagesSquare", "Sessions") : null}
+          {nv("sess", "messagesSquare", "Sessions")}
           <button className={"dk-state " + (online && worker ? mood : "off")} aria-current={page === "setup" ? "page" : undefined} aria-label={"Giulia: " + stateLabel + ". Open her status and setup"} onClick={() => go("setup")}>
             <span className="dk-orb m" />
             <span><b>{stateLabel}</b><small>{answered} of {deals.length} answered</small></span>
@@ -761,15 +741,12 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
               {DEMO ? <span className="dk-demo">{recorded() ?? "Example data"}</span> : null}
               {page !== "ask" ? <button className="dk-btn" onClick={() => go("ask")}><Icon n="search" size={15} />Ask<kbd>⌘K</kbd></button> : turns.length ? <button className="dk-btn" onClick={() => setTurns([])}>New question</button> : null}
 <div className="dk-acct">
-                <button className="dk-face-b" onClick={() => setMenu(!menu)} aria-label={"Signed in as " + me.name + ". Switch account"} aria-expanded={menu}><Face p={me} /></button>
+                <button className="dk-face-b" onClick={() => setMenu(!menu)} aria-label={"Signed in as " + me.name + ". Open the account menu"} aria-expanded={menu}><Face p={me} /></button>
                 {menu ? (
                   <div className="dk-menu" role="menu">
-                    {people.map((p) => (
-                      <button key={p.id} role="menuitem" onClick={() => { setWho(p.id); setMenu(false); try { localStorage.setItem("desk_me", p.id); } catch { /* this browser keeps nothing */ } go("home"); }}>
-                        <Face p={p} /><span><b>{p.name}</b><small>{ROLE_NAME[rolesAll[p.id]]} · {ROLE_SEES[rolesAll[p.id]]}</small></span>{p.id === me.id ? <Icon n="check" size={15} /> : null}
-                      </button>
-                    ))}
+                    {account ? <div className="dk-menu-me"><Face p={me} /><span><b>{me.name}</b><small>{ROLE_NAME[me.role]} · {ROLE_SEES[me.role]}</small></span></div> : null}
                     <button role="menuitem" className="plain" onClick={() => { setMenu(false); go("help"); }}><span className="dk-sq q"><Icon n="circleHelp" size={15} /></span><span><b>How it works</b></span></button>
+                    {signOut ? <button role="menuitem" className="plain" onClick={() => { setMenu(false); signOut(); }}><span className="dk-sq q"><Icon n="x" size={15} /></span><span><b>Sign out</b></span></button> : null}
                   </div>
                 ) : null}
               </div>
@@ -781,21 +758,19 @@ export function Desk({ deals: given, online, worker, board, selected, select, de
               <main className="grid">
                 <DealList deals={deals} selected={selected} onSelect={(id) => select(id)} />
                 {deal ? <DealView deal={deal} onSent={reload} /> : <section className="deal placeholder"><p>Pick a shipment on the left to read its mails and every step Giulia took.</p></section>}
-                <BoardPane board={board} team={TEAM} />
               </main>
             </div>
           ) : (
-            <div className={"dk-cont" + (page === "ask" ? " ask" : "")} data-soft key={page + (cust ?? "") + who}>
+            <div className={"dk-cont" + (page === "ask" ? " ask" : "")} data-soft key={page + (cust ?? "")}>
               {page === "home" ? <Home role={me.role} deals={deals} list={list} seen={seen} open={show} pick={(email) => { setPage("cust"); setCust(email); }} seenIds={seenIds} send={send} /> : null}
               {page === "ship" ? <Shipments deals={deals} open={show} /> : null}
               {page === "cust" ? (picked ? <CustomerPage c={picked} seen={seen} open={show} back={() => setCust(null)} teach={(deal, text) => tell({ label: "", kind: "tell", deal, text })} ask={send} /> : <Customers deals={deals} pick={setCust} />) : null}
               {page === "net" ? <><Watch deals={deals} open={show} /><Network deals={deals} /><Carriers learned={carrierFacts(seen)} deals={deals} seen={seen} /></> : null}
               {page === "help" ? <Help /> : null}
-              {page === "eff" ? <Numbers deals={deals} board={board} /> : null}
+              {page === "eff" ? <Numbers deals={deals} /> : null}
               {page === "jobs" ? <Jobs jobs={jobs} deals={deals} run={runJob} remove={(id) => saveJobs((x) => x.filter((j) => j.id !== id))} ask={() => go("ask")} /> : null}
               {page === "setup" ? <Setup status={{ mood: online && worker ? mood : "off", title: !online ? "No connection to the desk." : !worker ? "Giulia is stopped." : mood === "calm" ? "Giulia is running on her own." : mood === "alert" ? red + (red === 1 ? " shipment looks wrong." : " shipments look wrong.") : needs.length + (needs.length === 1 ? " note is waiting for you." : " notes are waiting for you."), sub: answered + " of " + deals.length + " requests answered.", flagged: needs.length, openFlagged: () => { const f = needs.find((x) => x.flag === "red") ?? needs[0]; if (f) show(f.id); } }}
-                people={people} roles={rolesAll} setRole={setRole} rights={Object.fromEntries(people.map((p) => [p.id, rightsOf(p)]))} setRight={setRight} add={addPerson} remove={removePerson} meId={me.id}
-                face={(id) => <Face p={people.find((p) => p.id === id) ?? PEOPLE[0]} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
+                meId={me.id} face={(p) => <Face p={p} />} notes={{ count: new Set(seen.flatMap((x) => x.notes.map((n) => x.customer + n))).size, customers: new Set(seen.filter((x) => x.notes.length).map((x) => x.customer)).size }} openCustomers={() => go("cust")} /> : null}
               {page === "ask" ? <AskPage role={me.role} turns={turns} send={send} open={show} go={go} pickCustomer={(email) => { setPage("cust"); setCust(email); }} run={runTurn} /> : null}
             </div>
           )}

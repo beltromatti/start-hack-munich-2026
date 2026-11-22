@@ -1,9 +1,10 @@
-// Example data for looking at the desk without a backend (VITE_DEMO=1 at build time, or ?demo in the address).
+// Example data for looking at the desk without a backend (VITE_DEMO=1 at build time, or ?demo in `npm run dev`).
 // It answers the same paths as backend/app/main.py with the same shapes, from memory, and changes nothing anywhere.
 // The agent in these examples works as the real one does: on its own, leaving a flagged note where a person may want to look.
 import type { Board, Deal, DealRow, Health, Item, Mail, Usage } from "./api";
 
-export const DEMO = import.meta.env.VITE_DEMO === "1" || new URLSearchParams(location.search).has("demo");
+// ?demo works only in a development build: the product never shows invented shipments next to real ones.
+export const DEMO = import.meta.env.VITE_DEMO === "1" || (import.meta.env.DEV && new URLSearchParams(location.search).has("demo"));
 
 type Seed = {
   n: number; who: string; from: string; to: string; kg: number; pcs: number; goods: string; pref: "cheapest" | "fastest";
@@ -138,6 +139,8 @@ export async function demo<T>(path: string, body?: unknown): Promise<T> {
   if (p === "/api/health") return out({ ok: true, worker: true, llm: "example data", models: { agent: "example", effort: "low" } } satisfies Health);
   if (p === "/api/usage") return out({ tokens_in: 612000, tokens_out: 48000, llm_calls: 351, cost_usd: 0.0447 } satisfies Usage);
   if (p === "/api/board") return out(real ? real.board : BOARD);
+  if (p === "/api/me") return out({ account: { username: "sam", name: "Sam", role: "ops" }, open: false });
+  if (p === "/api/accounts") return out([{ username: "sam", name: "Sam", role: "ops" }]);
   if (p === "/api/operator") { if (body) alerts = !!b.on; return out({ on: alerts, autonomous: true, needed: [] }); }
   if (one) {
     const d = DEALS.find((x) => x.id === one[1]);

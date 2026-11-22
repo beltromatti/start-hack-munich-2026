@@ -318,3 +318,23 @@ button.dk-aiw { width: 100%; text-align: left; border-radius: var(--r-ctl); padd
 .dk-three .dk-bh { padding-bottom: 8px; } .dk-three .dk-kv.pad div { padding: 8px 18px; grid-template-columns: minmax(96px, 42%) minmax(0, 1fr); } .dk-three .dk-tl li { padding-bottom: 13px; }
 @media (max-width: 1000px) { .dk-three { grid-template-columns: minmax(0, 1fr); } .dk-veil { padding: 0; } .dk-sheet { border-radius: 0; } }
 @media (prefers-reduced-motion: reduce) { .dk-win, .dk-ground, .dk-cont > *, .dk-veil, .dk-sheet, .dk-sb > *, .dk-menu, .dk-orb, .dk-orb::before { animation: none; } .dk-btn, .dk-it .dk-sq, .dk-nv .dk-ic, .dk-face-b { transition: none; } }
+
+/* sign-in */
+.dk-login { position: relative; z-index: 1; height: 100%; display: grid; place-items: center; padding: 16px; }
+.dk-login form { width: min(400px, 100%); background: rgba(255,255,255,.94); border-radius: var(--r-card); padding: 30px 28px 26px; animation: dk-open .8s var(--ease) both; display: grid; gap: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, .08); }
+.dk-login .dk-logo { margin-bottom: 6px; }
+.dk-login h1 { font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
+.dk-login p { color: var(--d-muted); font-size: 13.5px; line-height: 1.5; margin-top: -6px; }
+.dk-login label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--d-ink2); }
+.dk-login input { border: 1px solid var(--d-line2); border-radius: var(--r-tile); padding: 10px 12px; font: inherit; font-size: 14.5px; font-weight: 400; color: var(--d-ink); background: #fff; outline: none; }
+.dk-login input:focus { border-color: var(--d-ink); }
+.dk-login .dk-btn { justify-content: center; margin-top: 4px; }
+.dk-login-err { color: var(--d-red) !important; font-weight: 600; margin-top: 0 !important; }
+/* the challenge page: the live leaderboard, for the team only (/leaderboard/challenge) */
+.challenge { height: 100%; display: flex; flex-direction: column; }
+.challenge header { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-bottom: 1px solid var(--line); }
+.challenge header h1 { font-size: 18px; font-weight: 600; }
+.challenge header a { margin-left: auto; font-size: 13px; }
+.challenge .board { flex: 1; border-left: 0; max-width: 980px; width: 100%; margin: 0 auto; overflow: auto; }
+.dk-sess .grid { grid-template-columns: 340px minmax(0, 1fr); }
+.dk-menu-me { display: flex; gap: 11px; align-items: center; padding: 10px 10px 12px; border-bottom: 1px solid var(--d-line); margin-bottom: 4px; } .dk-menu-me b { display: block; font-weight: 600; font-size: 14px; } .dk-menu-me small { display: block; color: var(--d-muted); font-size: 12.5px; line-height: 1.35; }

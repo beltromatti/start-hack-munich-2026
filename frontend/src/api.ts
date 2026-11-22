@@ -66,17 +66,23 @@ export type Board = {
 export type Health = { ok: boolean; worker: boolean; llm: string; models: { agent: string; effort: string } };
 export type Usage = { tokens_in: number; tokens_out: number; llm_calls: number; cost_usd: number };
 
+export type Account = { username: string; name: string; role: "ops" | "sales" | "carriers" };
+export type Me = { account: Account | null; open: boolean };
+
+// A 401 means the session ended (signed out, expired): the app goes back to the sign-in.
+const gone = (r: Response) => { if (r.status === 401) window.dispatchEvent(new Event("desk:signed-out")); };
+
 export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (DEMO) return demo<T>(path);
-  const r = await fetch(path, { signal });
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
+  const r = await fetch(path, { signal, credentials: "same-origin" });
+  if (!r.ok) { gone(r); throw new Error(`${r.status} ${path}`); }
   return r.json();
 }
 
 export async function post<T>(path: string, body: unknown): Promise<T> {
   if (DEMO) return demo<T>(path, body);
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { if (path !== "/api/login") gone(r); throw new Error(`${r.status} ${await r.text()}`); }
   return r.json();
 }
 

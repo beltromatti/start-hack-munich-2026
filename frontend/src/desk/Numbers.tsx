@@ -1,11 +1,10 @@
 import { useState } from "react";
-import type { Board, DealRow } from "../api";
-import { DEMO, recorded } from "../demo";
+import type { DealRow } from "../api";
 import { amount, lane, median, money } from "./util";
 
 // How the desk is doing, counted from the same deals the other pages read: how much it answered on its own,
 // how fast, and how much was booked. Nothing here is stored or estimated. A number that the data cannot give
-// (the model cost when it is zero, the board when there is none or the data is only an example) is left out.
+// (the model cost when it is zero) is left out.
 const ms = (t: number) => (t < 1e12 ? t * 1000 : t);
 const day = (t: number) => { const d = new Date(ms(t)); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const short = (key: string) => new Date(key + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -42,7 +41,7 @@ function Bars({ data, name }: { data: Bar[]; name: string }) {
   );
 }
 
-export function Numbers({ deals, board }: { deals: DealRow[]; board: Board | null }) {
+export function Numbers({ deals }: { deals: DealRow[] }) {
   const total = deals.length, quoted = deals.filter((d) => d.quote), booked = deals.filter(isBooked);
   const times = quoted.map((d) => d.response_seconds).filter((x): x is number => x != null && x >= 1);
   const med = median(times), fast = times.filter((x) => x <= 120).length;
@@ -62,7 +61,6 @@ export function Numbers({ deals, board }: { deals: DealRow[]; board: Board | nul
   const routes = [...deals.reduce((m, d) => { const k = lane(d); if (k) m.set(k, [...(m.get(k) ?? []), d]); return m; }, new Map<string, DealRow[]>())]
     .map(([k, ds]) => ({ k, n: ds.length, booked: ds.filter(isBooked).length, med: median(ds.map((d) => d.response_seconds).filter((x): x is number => x != null && x >= 1)), value: ds.reduce((s, d) => s + (amount(d.quote) ?? 0), 0) }))
     .sort((a, b) => b.n - a.n || b.value - a.value).slice(0, 8);
-  const rank = board?.me?.rank, teams = board?.public?.ranking?.length ?? board?.public?.overview?.teams;
   const tiles: [string, string, string][] = [
     ["Answered", pct(quoted.length, total), quoted.length + " of " + total + " requests got a quote"],
     ["Typical answer", secs(med), times.length ? fast + " of " + times.length + " quotes left within 2 minutes" : "No quote has a time yet"],
@@ -70,7 +68,6 @@ export function Numbers({ deals, board }: { deals: DealRow[]; board: Board | nul
     ["Freight booked", weight ? Math.round(weight).toLocaleString("en-US") + " kg" : "–", !booked.length ? "No booking yet" : priced === booked.length ? money(value) + " in booked quotes" : priced ? money(value) + " in the " + priced + " bookings with a recorded price" : booked.length + " bookings"],
   ];
   if (cost > 0 && quoted.length) tiles.push(["Model cost per quote", "$" + (cost / quoted.length).toFixed(4), "$" + cost.toFixed(2) + " for all " + total + " requests"]);
-  if (rank && (!DEMO || recorded())) tiles.push(["On the board", "#" + rank, [teams ? "of " + teams + " teams" : "", board?.me?.total != null ? Math.round(board.me.total).toLocaleString("en-US") + " points" : "", recorded() ? "when this was recorded" : ""].filter(Boolean).join(", ") || "our rank right now"]);
   return (
     <>
       <section className="dk-lead">
