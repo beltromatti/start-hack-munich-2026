@@ -71,3 +71,16 @@ def test_a_message_is_recorded_under_the_signed_in_person():
     finally:
         agent.operator_message = real
     assert seen["who"] == "Mattia Beltrami"
+
+
+def test_this_machine_reads_freely_but_the_tunnel_does_not():
+    """The monitor and scripts on the Mac call localhost:8000; the Cloudflare tunnel also arrives on loopback, with
+    Cloudflare's headers, and must sign in."""
+    accounts.add("mattia", "a long secret 123", "Mattia")
+    here = TestClient(app, client=("127.0.0.1", 50000))
+    assert here.get("/api/deals").status_code == 200
+    assert here.get("/api/me").json() == {"account": None, "open": True}
+    for h in ({"cf-ray": "8f00-MXP", "cf-connecting-ip": "203.0.113.9"}, {"x-forwarded-for": "203.0.113.9"}):
+        assert here.get("/api/deals", headers=h).status_code == 401
+        assert here.get("/api/me", headers=h).status_code == 401
+    assert TestClient(app, client=("192.168.1.20", 50000)).get("/api/deals").status_code == 401

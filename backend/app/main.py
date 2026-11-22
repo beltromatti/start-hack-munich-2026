@@ -36,13 +36,22 @@ app = FastAPI(title="START Milan Forwarding", lifespan=lifespan)
 _OPEN = {"/api/health", "/api/login", "/api/me", "/api/logout"}
 
 
+def _here(request: Request) -> bool:
+    """A process on this machine (the monitor, a script, the browser on the Mac that runs the forwarder). What comes
+    through the Cloudflare tunnel also arrives on loopback, but always carries Cloudflare's headers."""
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1") and not any(
+        h in request.headers for h in ("cf-ray", "cf-connecting-ip", "x-forwarded-for", "forwarded"))
+
+
 @app.middleware("http")
 async def signed_in(request: Request, call_next):
-    """Every /api call needs a signed-in account once the register holds one (accounts.py). The page itself
-    loads for anyone and shows the sign-in. Nothing from 5U calls us (we poll), so nothing else stays open."""
+    """Every /api call from elsewhere needs a signed-in account once the register holds one (accounts.py); this
+    machine itself reads freely. The page loads for anyone and shows the sign-in. Nothing from 5U calls us (we poll),
+    so nothing else stays open."""
     path = request.url.path
     request.state.account = None
-    if path.startswith("/api/") and path not in _OPEN and accounts.any_():
+    if path.startswith("/api/") and path not in _OPEN and accounts.any_() and not _here(request):
         request.state.account = accounts.who(request.cookies.get(accounts.COOKIE))
         if not request.state.account:
             return JSONResponse({"detail": "sign in"}, status_code=401)
@@ -79,13 +88,13 @@ def logout(response: Response) -> dict:
 
 @app.get("/api/me")
 def me(request: Request) -> dict:
-    """The signed-in account; `open` while the register holds no account (a laptop: no sign-in)."""
-    if not accounts.any_():
+    """The signed-in account; `open` while the register holds no account, or on this machine itself."""
+    a = accounts.who(request.cookies.get(accounts.COOKIE)) if accounts.any_() else None
+    if a:
+        return {"account": a, "open": False}
+    if not accounts.any_() or _here(request):
         return {"account": None, "open": True}
-    a = accounts.who(request.cookies.get(accounts.COOKIE))
-    if not a:
-        raise HTTPException(401, "sign in")
-    return {"account": a, "open": False}
+    raise HTTPException(401, "sign in")
 
 
 @app.get("/api/accounts")
