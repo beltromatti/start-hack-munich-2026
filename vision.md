@@ -111,6 +111,8 @@ resumes it with everything before it.
   asked again on fresh data. It replaced a keyword regex that drew one fixed matrix. The money is `economics.py`:
   per booking, what the customer pays, what the carriers charge, what is passed on, and the margin left, which is
   zero today because Giulia quotes carrier prices as they are; the room to the next option is the margin we could take.
+  After the challenge (Sun 22 Nov, noon) the desk shows a demo margin of 6.5 % set in the register
+  (`margin_demo_percent`): the one figure on the desk that is not from the record, below the 7.4 % room.
 - **The public address is a Cloudflare Tunnel** (`deploy/tunnel.sh`): the Mac dials out, no port opens, and
   production stays where 5U's API is reachable (decision 17).
 

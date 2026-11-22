@@ -92,7 +92,7 @@ export function Numbers({ deals }: { deals: DealRow[] }) {
     ["Answered", pct(quoted.length, total), quoted.length + " of " + total + " requests got a quote"],
     ["Typical answer", secs(med), times.length ? fast + " of " + times.length + " quotes left within 2 minutes" : "No quote has a time yet"],
     ["Booked", String(booked.length), pct(booked.length, quoted.length) + " of the quotes became a booking"],
-    ["Freight booked", weight ? Math.round(weight).toLocaleString("en-US") + " kg" : "–", !booked.length ? "No booking yet" : priced === booked.length ? money(value) + " in booked quotes" : priced ? money(value) + " in the " + priced + " bookings with a recorded price" : booked.length + " bookings"],
+    ["Booked quotes", priced ? money(value) : "–", !booked.length ? "No booking yet" : (weight ? Math.round(weight).toLocaleString("en-US") + " kg of freight" : booked.length + " bookings") + (priced && priced < booked.length ? ", " + priced + " of " + booked.length + " bookings with a recorded price" : "")],
   ];
   if (e?.bookings) tiles.push(["Margin", money(e.margin_eur), e.margin_percent + " % of booked quotes, " + money(e.room_eur).replace(/\.\d\d$/, "") + " room to the next option"]);
   const cost = deals.reduce((s, d) => s + (d.cost_usd || 0), 0);

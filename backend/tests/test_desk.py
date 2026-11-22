@@ -111,3 +111,16 @@ def test_economics_margin_is_what_is_left_after_carriers_and_what_is_passed_on()
     assert e["bookings"] == 1 and e["revenue_eur"] == "1207.41" and e["passed_on_eur"] == "132.00"
     assert e["carrier_cost_eur"] == "1075.41" and e["margin_eur"] == "0.00"
     assert e["room_eur"] == "92.59", "up to the next option on the same shipment"
+
+
+def test_a_demo_margin_is_a_share_of_each_price_and_the_totals_still_add_up():
+    from app import economics
+    store.put("deal-3", "deal", "booked", {
+        "root": 3, "customer": "x@y.example", "options": {
+            "A1": {"total": "1207.41", "air": {"total": "1075.41"}, "pickup": None, "insurance": "132.00"}},
+        "booking": {"option": "A1", "amount": "1207.41 EUR", "airline": "X", "status": "confirmed"}})
+    assert economics.economics()["margin_eur"] == "0.00" and not economics.economics()["margin_demo"]
+    store.kv_set("margin_demo_percent", "6.5")
+    e = economics.economics()
+    assert e["margin_demo"] and e["margin_eur"] == "78.48" and e["margin_percent"] == "6.50"
+    assert e["carrier_cost_eur"] == "996.93" and e["passed_on_eur"] == "132.00" and e["revenue_eur"] == "1207.41"
