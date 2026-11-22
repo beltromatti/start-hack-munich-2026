@@ -15,6 +15,12 @@ type Needed = {
 type Op = { on: boolean; wait_seconds: number; needed: Needed[] };
 type Read = { total: string | null; days: string | null; rate_id: string | null; totals_seen: string[] };
 
+let portalTab: Window | null = null;
+function openPortal() {  // one tab for 5U's portal page, reused
+  if (portalTab && !portalTab.closed) { portalTab.focus(); return; }
+  portalTab = window.open(PORTAL, "five-u-portal");
+}
+
 function alarm(text: string) {
   try {
     const ctx = new AudioContext();
@@ -27,7 +33,10 @@ function alarm(text: string) {
     });
   } catch { /* no audio */ }
   try {
-    if ("Notification" in window && Notification.permission === "granted") new Notification("Portal price needed", { body: text });
+    if ("Notification" in window && Notification.permission === "granted") {
+      const n = new Notification("Portal price needed", { body: `${text} · click to open the portal`, requireInteraction: true });
+      n.onclick = () => { window.focus(); openPortal(); n.close(); };
+    }
   } catch { /* none */ }
 }
 
@@ -63,6 +72,16 @@ function Card({ n, left }: { n: Needed; left: number }) {
       setText("");
     } catch (e) { setLog((l) => [`✗ ${String(e)}`, ...l]); }
   }
+  const last = useRef("");
+  useEffect(() => {
+    const onFocus = () => {
+      navigator.clipboard?.readText?.().then((t) => {
+        if (t && t !== last.current && /\bR-[A-Za-z0-9_-]{6,}/.test(t) && /(EUR|€)/.test(t)) { last.current = t; paste(t); }
+      }).catch(() => undefined);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  });
   return (
     <div className="op-card">
       <div className="op-line">
@@ -76,9 +95,10 @@ function Card({ n, left }: { n: Needed; left: number }) {
         <Chip big label="Weight kg" value={kg} />
         {n.volume_cbm ? <Chip big label="Volume cbm" value={String(Number(n.volume_cbm))} /> : null}
         <span className="op-sep">Airline:</span>
-        {n.airlines.map((a) => <Chip key={a.name} value={a.code ?? a.name} active={current === a.name} onPick={() => setCurrent(a.name)} />)}
+        {n.airlines.map((a) => <Chip key={a.name} value={a.code ?? a.name} active={current === a.name}
+          onPick={() => { setCurrent(a.name); openPortal(); }} />)}
       </div>
-      <textarea className="op-paste" rows={2} value={text} placeholder="Paste the portal's result here: it is added at once"
+      <textarea className="op-paste" rows={2} value={text} placeholder="Copy the portal's result and come back to this tab: it is read and added at once (or paste it here)"
         onChange={(e) => paste(e.target.value)} />
       {log.length ? <div className="op-log">{log.slice(0, 4).map((x, i) => <div key={i} className={x.startsWith("✓") ? "ok" : "late"}>{x}</div>)}</div> : null}
     </div>
@@ -117,7 +137,7 @@ export function OperatorStrip() {
         <a className="op-link" href={PORTAL} target="_blank" rel="noreferrer">5U portal ↗</a>
         {"Notification" in window && Notification.permission !== "granted"
           ? <button className="chip" onClick={() => Notification.requestPermission()}>Allow alerts</button> : null}
-        <span className="muted op-hint">{op.on ? (live.length ? "copy → portal → pass the check → paste the result below" : "waiting: an alarm rings when a price is needed")
+        <span className="muted op-hint">{op.on ? (live.length ? "click the airline (copies it, opens the portal) → fill → pass the check → copy the result → come back here" : "waiting: an alarm rings when a price is needed")
           : "turn on when you are at the desk"}</span>
       </div>
       {live.map(({ n, left }) => <Card key={n.deal} n={n} left={left} />)}
