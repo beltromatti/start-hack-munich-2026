@@ -779,3 +779,29 @@ def test_waiting_for_carriers_ends_four_minutes_after_the_request():
     at = (datetime.now(timezone.utc) - timedelta(seconds=forwarder.QUOTE_BY_S + 10)).isoformat()
     store.update(deal_id, lambda r: (r["status"], {**r["data"], "quote": None, "received_at": at}))
     assert f.collect_offers(deal_id, None, "cheapest", 0)["seconds_left_to_quote"] == 0
+
+
+def test_an_airline_the_portal_failed_for_is_asked_again_while_we_wait(monkeypatch):
+    """Rounds 95-99 (Sun 00:31-01:02 UTC, all 'fastest'): the lane's fastest airline was a portal airline and missing
+    from our options; we quoted the next one and got too_low five times. At 01:10 UTC the portal priced all of them
+    (HAM-MEX Riverbend 1 day 6385.76, CGN-EZE Ultraviolet 2 days 5552.12). An outage passes: ask again while waiting."""
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    rfq = api.customer("anna@acme.example", "Quote FRA to ORD", "Hi, please quote 320 kg, 1.5 cbm, FRA to ORD, cheapest.")
+    run(f)
+    deal_id = f"deal-{rfq['id']}"
+    real = api.rate
+    monkeypatch.setattr(api, "rate", lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."})
+    store.update(deal_id, lambda r: ("pricing", r["data"]))
+    out = f.collect_offers(deal_id, _shipment(330, 1.5, []), "cheapest", 0)
+    assert out["no_price_from"]["airlines"] == ["Borealis Freight Airways"]
+
+    f.retry_portal(deal_id)  # still down: nothing changes
+    assert store.get(deal_id)["data"]["portal_failed"] == ["Borealis Freight Airways"]
+
+    monkeypatch.setattr(api, "rate", real)  # the portal is back
+    f.retry_portal(deal_id)
+    out = f.collect_offers(deal_id, None, "cheapest", 0)
+    assert "no_price_from" not in out and kit.RATEDESK not in out["still_waiting_for"]  # the rate desk owes us nothing
+    assert any(o["airline"] == "Borealis Freight Airways" for o in out["options"])

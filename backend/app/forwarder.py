@@ -167,8 +167,37 @@ class Forwarder:
         by = quote_deadline(store.get(deal_id)["data"])
         if by is not None:  # never wait past the time the quote must leave (round 94)
             end = min(end, by)
+        retry_at = time.time() + PORTAL_RETRY_S
         while time.time() < end and waiting_for(store.get(deal_id)["data"]):
+            if time.time() >= retry_at:
+                retry_at = time.time() + PORTAL_RETRY_S
+                self.retry_portal(deal_id)
             self.wait_step()
+
+    def retry_portal(self, deal_id: str) -> None:
+        """Airlines the rate portal failed for are asked again while we wait. Rounds 95-99: the lane's fastest airline
+        (Borealis, Riverbend, Tamarind, Ultraviolet, all portal) was missing from our quote, we quoted the next one and
+        got too_low; the winners booked exactly those airlines 83-228 s in, and minutes later the portal priced them."""
+        d = store.get(deal_id)["data"]
+        req, names = d.get("request"), set(d.get("portal_failed") or [])
+        if not req or not names or getattr(self.api, "_rate_left", None) == 0:  # never block on the rate limit
+            return
+        kg, cbm = Decimal(req["weight_kg"]), Decimal(req["volume_cbm"]) if req["volume_cbm"] else None
+        got, still = self.portal_offers(deal_id, req["origin"], req["destination"], kg, cbm,
+                                        Decimal(req["chargeable_kg"]), only=names)
+        priced = {x.carrier for x in got}
+        if not priced:
+            return
+        store.log("bids", "info", f"portal priced on retry: {', '.join(sorted(priced))}", run_id=deal_id)
+
+        def upd(r):
+            left = sorted((set(r["data"].get("portal_failed") or []) - priced) | still)
+            owed = RATEDESK in (r["data"].get("asked") or {}).values() and RATEDESK not in r["data"].get("replied", [])
+            return r["status"], {**r["data"], "portal_failed": left,
+                                 "offers": r["data"]["offers"] + [x.as_dict() for x in got],
+                                 # every airline priced: the rate desk owes us nothing any more
+                                 "replied": r["data"].get("replied", []) + ([RATEDESK] if owed and not left else [])}
+        store.update(deal_id, upd)
 
     def wait_step(self) -> None:
         """While a tool waits for carriers, the loop's other threads read their replies."""
@@ -343,10 +372,13 @@ class Forwarder:
         return sent["id"]
 
     def portal_offers(self, deal_id: str, o: str, d: str, kg: Decimal, cbm: Decimal | None,
-                      cw: Decimal) -> tuple[list[Offer], set[str]]:
-        """Portal prices at the chargeable weight and at the next break; airlines the portal failed for."""
+                      cw: Decimal, only: set[str] | None = None) -> tuple[list[Offer], set[str]]:
+        """Portal prices at the chargeable weight and at the next break; airlines the portal failed for.
+        only: just these airlines (by name), to ask again the ones it failed for."""
         w, out, failed = kit.world(), [], set()
         for a in w.portal.get((o, d), []):
+            if only is not None and a["name"] not in only:
+                continue
             weights = [kg]
             nb = pricing.next_break(w.brackets.get(a["code"], []), cw)
             if nb is not None and nb / cw < Decimal("1.5"):
@@ -656,6 +688,7 @@ class Forwarder:
 # Waiting for carriers ends four minutes in; the rest is for writing and sending the quote.
 EXPIRES_S = 360
 QUOTE_BY_S = 240
+PORTAL_RETRY_S = 20  # while waiting, airlines the portal failed for are asked again this often (10 rates a minute)
 
 
 def quote_deadline(d: dict) -> float | None:
