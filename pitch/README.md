@@ -30,6 +30,9 @@ Open `pitch/deck/index.html` in a browser. There is no build step.
 
 - A product fact on a slide comes from the code on `main`. A number comes from a named source or is labelled example data.
 - The agent is called Giulia on every slide, never "she".
-- Slide 10 is the vision. What is built says "today", the rest is said as the plan.
+- Ten slides are spoken: question, press, swarm, team photo, Auer, Lindqvist, product, memory, vision, close. A `<section class="st bk">` is backup and plays after the close, wherever it stands in the file.
+- Slides 5 and 6 quote real mails from the scored run word for word (ids 38215, 38231, 38270 and 39221, 39471). Times are CET.
+- The three numbers on the close are from the 5U board, Sunday 10:53. Refresh them and the time from the final board.
+- Slide 9 is the vision. What is built says "today", the rest is said as the plan.
 - Serif type appears only in the press clippings of slide 2.
 - Pull before you start and commit small.

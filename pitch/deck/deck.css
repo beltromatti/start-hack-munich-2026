@@ -164,6 +164,44 @@ html,body{margin:0;height:100%;background:#101210;overflow:hidden;font-family:va
 .steps b{display:block;font:600 1.5cqw/1.25 var(--sans);letter-spacing:-.012em}
 .steps span{display:block;margin-top:.25cqw;font:400 1.3cqw/1.4 var(--sans);color:var(--ink2)}
 
+/* team photo: full bleed, no words */
+.photo{background:#0b0d0c}
+.photo .img{inset:0}
+
+/* story slides: real mails from the scored run, quoted word for word */
+.story .tt{font-size:3.4cqw;top:7.6cqw;width:88cqw}
+.mc{padding:1.2cqw 1.6cqw 1.5cqw;background:#fff;border-radius:1.1cqw;box-shadow:0 1.4cqw 3.6cqw rgba(30,40,30,.14)}
+.mc .hd{display:flex;justify-content:space-between;align-items:baseline;gap:1cqw;padding-bottom:.7cqw;margin-bottom:.9cqw;border-bottom:1px solid var(--line)}
+.mc .hd b{font:600 1.35cqw/1.2 var(--sans);letter-spacing:-.01em}
+.mc .hd b small{display:block;margin-top:.15cqw;font:400 1.2cqw/1.3 var(--sans);color:var(--muted);letter-spacing:0}
+.mc .hd time{flex:none;font:400 1.2cqw var(--mono);color:var(--muted)}
+.mc p{margin:0;font:400 1.4cqw/1.5 var(--sans);color:var(--ink2)}
+.mc p+p{margin-top:.7cqw}
+.mc p.old{padding-top:.7cqw;border-top:1px dashed #c9cfc4;font-size:1.2cqw;color:#8a9188}
+.mc p.en{padding-top:.7cqw;border-top:1px solid var(--line);font-size:1.2cqw;color:var(--muted)}
+.mc :lang(ko){font-family:'Noto Sans KR',var(--sans)}
+.mc mark{padding:.05cqw .3cqw;border-radius:.3cqw;background:#fde2e3;color:#a3202a}
+.mc mark.ok{background:#d9f2df;color:#0f6b3a}
+.mc .att{display:inline-flex;align-items:center;gap:.5cqw;margin-top:1cqw;padding:.45cqw .8cqw;border-radius:.6cqw;background:#f3f5f0;font:400 1.2cqw var(--mono);color:var(--ink2)}
+.mc.me{box-shadow:0 1.4cqw 3.6cqw rgba(30,40,30,.14),inset 0 0 0 .14cqw var(--green)}
+.mc.me .hd b{display:flex;align-items:center;gap:.6cqw}
+.mc.me .hd b::before{content:"";width:1.3cqw;height:1.3cqw;border-radius:50%;background:radial-gradient(circle at 34% 30%,var(--orb1),var(--orb2) 55%,var(--orb3))}
+.story .sec{font:500 1.2cqw var(--mono);color:var(--green);white-space:nowrap;transform:translate(-50%,-50%)}
+.story .pay{left:4cqw;font:600 1.9cqw/1.25 var(--sans);letter-spacing:-.025em}
+.story .pay i{font-style:normal;color:#6c7469}
+.also b{flex-basis:100%;font-weight:500;color:var(--ink2)}
+.also{left:4cqw;display:flex;flex-wrap:wrap;align-items:center;gap:.8cqw;font:400 1.2cqw var(--sans);color:var(--muted)}
+.also span{display:inline-flex;align-items:center;gap:.5cqw;padding:.5cqw .9cqw;border-radius:99cqw;background:#fff;color:var(--ink2);box-shadow:0 .4cqw 1.2cqw rgba(30,40,30,.1)}
+.also svg{font-size:1.25cqw}
+
+/* close: the board numbers, once, big */
+.nums{left:6.5cqw;bottom:5cqw;display:flex;gap:4.2cqw;align-items:flex-end;margin:0;padding:1.6cqw 2.4cqw 1.5cqw;border-radius:1.2cqw;background:rgba(255,255,255,.82);box-shadow:0 1.6cqw 4.4cqw rgba(30,40,30,.16);-webkit-backdrop-filter:blur(1cqw);backdrop-filter:blur(1cqw)}
+.nums div{display:grid;gap:.3cqw}
+.nums dt{order:2;font:400 1.3cqw var(--sans);color:var(--ink2)}
+.nums dd{margin:0;font:600 5cqw/1 var(--sans);letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.nums dd sup{font-size:.42em;vertical-align:.95em;letter-spacing:0}
+.nums .src{align-self:flex-end;max-width:13cqw;font:400 1.2cqw/1.35 var(--sans);color:var(--muted)}
+
 /* chrome */
 .note{position:fixed;left:16px;bottom:12px;right:160px;margin:0;font:400 13px var(--sans);color:#a9ada6;opacity:0;transition:opacity .2s;z-index:9}
 body.notes .note{opacity:1}
