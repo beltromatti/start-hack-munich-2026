@@ -34,7 +34,7 @@ The challenge leaderboard is at `/leaderboard/challenge` for the team; the produ
 
 The machine dials out to Cloudflare, so no port is opened and production can stay on the Mac. Needs
 `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (Tunnel edit, DNS edit on the zone) in `.env`, and `cloudflared`
-(`brew install cloudflared`). `DESK_HOSTNAME` defaults to `milan.noesisai.it`.
+(`brew install cloudflared`). `DESK_HOSTNAME` defaults to `hackathon.noesisai.it`.
 
 ```sh
 deploy/tunnel.sh setup    # the tunnel and where it points (127.0.0.1:8000); writes TUNNEL_TOKEN to .env

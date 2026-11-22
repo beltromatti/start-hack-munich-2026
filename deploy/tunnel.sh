@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The desk on a public address through a Cloudflare Tunnel: the machine dials out to Cloudflare, so no port is
 # opened and the forwarder can stay on the Mac. Reads CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and DESK_HOSTNAME
-# (default milan.noesisai.it) from .env; writes TUNNEL_TOKEN there. Every step can run again safely.
+# (default hackathon.noesisai.it) from .env; writes TUNNEL_TOKEN there. Every step can run again safely.
 #
 #   deploy/tunnel.sh setup   # the tunnel and where it points (localhost:8000); nothing public yet
 #   deploy/tunnel.sh route   # DNS: the hostname to the tunnel (public once `run` is up)
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV="${DESK_ENV:-$ROOT/.env}"
 while IFS='=' read -r k v; do export "$k=$v"; done < <(grep -E '^(CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_API_TOKEN|DESK_HOSTNAME|TUNNEL_TOKEN|DESK_PORT)=' "$ENV" || true)
-HOST="${DESK_HOSTNAME:-milan.noesisai.it}"
+HOST="${DESK_HOSTNAME:-hackathon.noesisai.it}"
 ZONE_NAME="${HOST#*.}"
 NAME="milan-forwarding-desk"
 PORT="${DESK_PORT:-8000}"
