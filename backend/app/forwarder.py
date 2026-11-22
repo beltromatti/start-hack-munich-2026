@@ -918,7 +918,18 @@ def remembered_offer(a: dict, o: str, d: str, billed: Decimal, breaks: list | No
                                               f"fresh rate when the portal answers"})
 
 
-OPERATOR_WAIT = 80  # seconds after the customer's mail a person on the team may take to read the portal page
+OPERATOR_WAIT = 95  # seconds after the customer's mail a person may take to read 5U's portal page (quote < 120 s)
+
+
+def read_portal_page(text: str) -> dict:
+    """What a person copied from 5U's portal page result: the total in EUR, the transit days and the rate_id, read by
+    code (the person checks them before they are added)."""
+    t = text or ""
+    rid = re.search(r"\bR-[A-Za-z0-9_-]{6,}", t)
+    money = [a for tok in re.findall(r"(\d[\d.,' \u00a0]*\d|\d)\s*(?:EUR|€)", t) for a in amounts_in(tok)]
+    days = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:days?|Tage?n?|d\b)", t, re.I)
+    return {"total": str(money[0]) if len(money) == 1 else None, "totals_seen": [str(x) for x in money],
+            "days": days.group(1).replace(",", ".") if days else None, "rate_id": rid.group(0) if rid else None}
 
 
 def add_portal_page_rate(deal_id: str, airline: str, total: Any, days: Any, rate_id: str | None,

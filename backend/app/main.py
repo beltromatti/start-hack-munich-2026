@@ -166,11 +166,20 @@ def human_reply(deal_id: str, payload: dict) -> dict:
 def operator_mode() -> dict:
     """Operator mode: a person is at the desk and reads 5U's portal page when its rate API fails; the agent then
     waits up to 80 s after the customer's mail for their prices."""
-    return {"on": store.kv_get("operator_on") == "1",
-            "needed": [{"deal": r["id"], "subject": r["data"].get("subject"), "received_at": r["data"].get("received_at"),
-                        **(r["data"].get("portal_missing") or {})}
-                       for r in store.records("deal") if r["status"] in ("new", "pricing")
-                       and (r["data"].get("portal_missing") or {}).get("airlines")]}
+    from .forwarder import OPERATOR_WAIT
+    needed = []
+    for r in store.records("deal"):
+        pm = r["data"].get("portal_missing") or {}
+        if r["status"] not in ("new", "pricing") or not pm.get("airlines"):
+            continue
+        req = r["data"].get("request") or {}
+        needed.append({"deal": r["id"], "subject": r["data"].get("subject"), "customer": r["data"].get("customer"),
+                       "received_at": r["data"].get("received_at"), "preference": r["data"].get("preference"),
+                       # what 5U's portal form asks for, ready to copy: origin, destination, gross weight, volume
+                       "origin": req.get("origin"), "destination": req.get("destination"),
+                       "gross_kg": req.get("weight_kg"), "volume_cbm": req.get("volume_cbm"),
+                       "chargeable_kg": req.get("chargeable_kg"), **pm})
+    return {"on": store.kv_get("operator_on") == "1", "wait_seconds": OPERATOR_WAIT, "needed": needed}
 
 
 @app.post("/api/operator")
@@ -183,7 +192,12 @@ def set_operator_mode(payload: dict) -> dict:
 @app.post("/api/deals/{deal_id}/portal_rate")
 def portal_rate(deal_id: str, payload: dict) -> dict:
     """A person enters a rate they read on 5U's portal page (airline, total EUR, transit days, rate_id)."""
-    from .forwarder import add_portal_page_rate
+    from .forwarder import add_portal_page_rate, read_portal_page
+    if payload.get("pasted") is not None:  # the page's result as copied: read by code, shown back before it is added
+        read = read_portal_page(payload["pasted"])
+        if payload.get("dry"):
+            return {"read": read}
+        payload = {**payload, **{k: v for k, v in read.items() if v and not payload.get(k)}}
     out = add_portal_page_rate(deal_id, payload.get("airline") or "", payload.get("total"), payload.get("days"),
                                payload.get("rate_id"), payload.get("weight_kg"), payload.get("who") or "operator")
     if out.get("error"):
