@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Board, Deal, DealRow, Health, Usage, get } from "./api";
 import { DealView } from "./DealView";
 import { BoardPane, DealList } from "./Side";
+import { OperatorStrip } from "./Operator";
 import { usd } from "./format";
 
 const TEAM = "start-milan";
@@ -65,6 +66,7 @@ export default function App() {
           <small>{health ? `${health.models.agent} · ${health.models.effort}` : ""}</small>
         </div>
       </header>
+      <OperatorStrip />
       <main className="grid">
         <DealList deals={deals ?? []} selected={selected} onSelect={setSelected} />
         {deal ? <DealView deal={deal} onSent={reload} /> : (

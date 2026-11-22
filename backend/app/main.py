@@ -162,6 +162,35 @@ def human_reply(deal_id: str, payload: dict) -> dict:
     return out
 
 
+@app.get("/api/operator")
+def operator_mode() -> dict:
+    """Operator mode: a person is at the desk and reads 5U's portal page when its rate API fails; the agent then
+    waits up to 80 s after the customer's mail for their prices."""
+    return {"on": store.kv_get("operator_on") == "1",
+            "needed": [{"deal": r["id"], "subject": r["data"].get("subject"), "received_at": r["data"].get("received_at"),
+                        **(r["data"].get("portal_missing") or {})}
+                       for r in store.records("deal") if r["status"] in ("new", "pricing")
+                       and (r["data"].get("portal_missing") or {}).get("airlines")]}
+
+
+@app.post("/api/operator")
+def set_operator_mode(payload: dict) -> dict:
+    store.kv_set("operator_on", "1" if payload.get("on") else "0")
+    store.log("human", "decision", f"operator mode {'on' if payload.get('on') else 'off'}")
+    return operator_mode()
+
+
+@app.post("/api/deals/{deal_id}/portal_rate")
+def portal_rate(deal_id: str, payload: dict) -> dict:
+    """A person enters a rate they read on 5U's portal page (airline, total EUR, transit days, rate_id)."""
+    from .forwarder import add_portal_page_rate
+    out = add_portal_page_rate(deal_id, payload.get("airline") or "", payload.get("total"), payload.get("days"),
+                               payload.get("rate_id"), payload.get("weight_kg"), payload.get("who") or "operator")
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return out
+
+
 @app.get("/api/bookings")
 def bookings() -> list[dict]:
     return store.records("booking")

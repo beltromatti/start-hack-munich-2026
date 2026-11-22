@@ -1328,3 +1328,37 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     assert [s for s in said()][before:] == ["scoring: round 90 pays a multiple (3), 2 teams accepted; ours: rejected no_pdf_offer"]
     # a board in a shape nobody foresaw is compared as far as it goes and never raises into the watcher
     f.watch_scoring({"requests": ["row", r84], "frozen_at": None}, {"rules": "changed", "rounds": {"84": {}}, "ranking": None})
+
+
+def test_a_person_enters_a_portal_page_rate_while_the_rate_api_is_down():
+    """Rounds 93-98: the rate API answered 503 for some airlines; 5U's portal page still shows them, to people who
+    pass its check. With operator mode on, the agent waits for a person's price (up to 80 s after the mail); the
+    price joins the offers like a portal price, and every total is still computed by code."""
+    from decimal import Decimal
+    from app import tools
+    from app.forwarder import add_portal_page_rate, waiting_for
+    api = FakeFiveU()
+    kit.load(api)
+    f = Sync(api)
+    api.rate = lambda *a, **k: {"error": True, "status": 503, "detail": "The rate API is unavailable."}
+    store.kv_set("operator_on", "1")
+    rfq = api.customer("k@k.example", "Quote", "320 kg FRA to ORD")
+    for m in api.poll(0)[0]:
+        store.save_mail(m, "in", handled=True)
+    ctx = tools.Ctx(f, f"session-{rfq['id']}", f"deal-{rfq['id']}", rfq["id"], "customer", store.thread(rfq["id"])[0])
+    q = lambda v, u: {"value": v, "unit": u, "per_piece": False}
+    ship = {"origin_airport": "FRA", "pickup": None, "destination_airport": "ORD",
+            "cargo": {"commodity": "parts", "ready_date": "2026-11-26", "notes": None},
+            "lots": [{"pieces": 1, "weight": q(320, "kg"), "volume": q(1.0, "cbm"), "dimensions": None}],
+            "insurance": None, "extra_charges": []}
+    tools.get_offers(ctx, ship, "fastest", 0)
+    d = store.get(ctx.deal_id)["data"]
+    missing = [a["name"] for a in d["portal_missing"]["airlines"]]
+    assert missing and any(x.startswith("person:") for x in waiting_for(d))
+    out = add_portal_page_rate(ctx.deal_id, missing[0], "1696,00", 1, "R-page1")
+    assert out["ok"] and out["offer"]["source"] == "portal_page"
+    opts = tools.get_offers(ctx, None, "fastest", 0)["options"]
+    page = next(o for o in opts if o["airline"] == missing[0])
+    assert page["total"] == "1696.00 EUR" and page["bookable_reference"] == "R-page1"
+    store.kv_set("operator_on", "0")
+    assert not any(x.startswith("person:") for x in waiting_for(store.get(ctx.deal_id)["data"]))
