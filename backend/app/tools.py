@@ -316,7 +316,11 @@ def book(ctx: Ctx, option_id: str, deal_id: str | None = None) -> dict:
         rec = store.get(deal_id)
         if not rec or rec["type"] != "deal":
             return {"error": "no such deal"}
-        if not _visible(ctx, rec):
+        # seeing a deal is not the right to book it: only the customer the offer was made to, writing now, in a
+        # customer thread (the tracking desk sees every deal and books none)
+        writer = (ctx.mail or _last_inbound(ctx.root) or {}).get("sender")
+        owner = rec["data"].get("customer")
+        if ctx.task != "customer" or not owner or writer != owner or not _visible(ctx, rec):
             return {"error": "that deal belongs to another customer"}
         return ctx.fw.book_option(deal_id, option_id)
     out = ctx.fw.book_option(ctx.deal_id, option_id)

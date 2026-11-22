@@ -74,13 +74,22 @@ def text(filename: str, raw: bytes, run_id: str | None = None, depth: int = 0) -
             return "\n".join(rows + _inside(raw, "xl/media/", run_id))
         if name.endswith(".xls"):  # the old Excel format, on 5U's list of attachment types (Sam, Sun 00:33)
             import xlrd
+            if not raw.startswith(b"\xd0\xcf\x11\xe0"):  # a text or html export that was only named .xls
+                return _plain(filename, raw)
             wb = xlrd.open_workbook(file_contents=raw)
+
+            def shown(c) -> str:  # a cell as a person sees it: a date as a date, 320.0 as 320
+                if c.ctype == xlrd.XL_CELL_DATE:
+                    t = xlrd.xldate_as_datetime(c.value, wb.datemode)
+                    return t.strftime("%Y-%m-%d" if (t.hour, t.minute, t.second) == (0, 0, 0) else "%Y-%m-%d %H:%M")
+                if c.ctype == xlrd.XL_CELL_NUMBER and c.value == int(c.value):
+                    return str(int(c.value))
+                return "" if c.value in ("", None) else str(c.value)
             rows = []
             for ws in wb.sheets():
                 rows.append(f"# sheet {ws.name}")
                 for i in range(ws.nrows):
-                    cells = ["" if c in ("", None) else str(int(c)) if isinstance(c, float) and c == int(c) else str(c)
-                             for c in ws.row_values(i)]
+                    cells = [shown(c) for c in ws.row(i)]
                     if any(cells):
                         rows.append("\t".join(cells))
             return "\n".join(rows)

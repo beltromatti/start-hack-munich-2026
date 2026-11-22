@@ -764,6 +764,9 @@ def test_an_offer_accepted_in_a_new_thread_is_booked_on_its_own_deal():
     booked = tools.book(ctx, "A1", offer)
     assert booked["status"] in ("booked", "requested") and booked["deal"] == offer
     assert store.get(offer)["status"] == "booked" and store.get(f"booking-{rfq['id']}")
+    # the tracking desk sees every deal and may book none
+    desk = tools.Ctx(f, "session-900", "deal-900", 900, "tracking", None)
+    assert tools.book(desk, "A1", offer) == {"error": "that deal belongs to another customer"}
     other = api.customer("eve@other.example", "Hello", "Please book option A1 of that deal.")
     store.save_mail(other, "in")
     eve = tools.Ctx(f, f"session-{other['id']}", f"deal-{other['id']}", other["id"], "customer", store.mail(other["id"]))
@@ -776,6 +779,8 @@ def test_an_xls_is_read_like_an_xlsx():
     from app import docs
     xls = docs.text("Packing-List.XLS", (Path(__file__).parent / "data" / "packing-list.xls").read_bytes())
     assert "# sheet Packing list" in xls and "2\t120\t80\t95\t160.5" in xls and "Total gross weight kg\t356" in xls
+    assert "Ready for collection\t2026-11-24" in xls                              # a date cell, not its serial 46350
+    assert docs.text("export.xls", b"Weight kg\t320\nPickup\t24.11.2026") == "Weight kg\t320\nPickup\t24.11.2026"
 
 
 def test_an_airlines_answer_to_our_own_mail_after_the_booking_is_news():
@@ -1314,13 +1319,22 @@ def test_a_change_in_how_5u_scores_is_logged_once():
     assert any("points of 1 earlier results moved: round 40 accuracy 45.0 -> 40.5" in s for s in out)
     assert any("round 41 answered in 44 s took 9.5 of 25" in s and "round 40" not in s for s in out)
     # Sun 00:27: from round 84 a round few teams get right pays a multiple; a multiplied round we lost stands out
-    r84 = {"round_no": 84, "verdict": "rejected", "reason": "too_high", "points": {}, "multiplier": 3}
-    r85 = {"round_no": 85, "verdict": "accepted", "reason": None, "points": {}, "multiplier": 1}
+    r84 = {"round_no": 84, "verdict": "rejected", "reason": "too_high", "points": {}, "multiplier": 3, "closed": True}
+    r85 = {"round_no": 85, "verdict": "accepted", "reason": None, "points": {}, "multiplier": 1, "closed": True}
+    r86 = {"round_no": 86, "verdict": "pending", "reason": None, "points": {}, "multiplier": 5, "closed": False}
     board = {"rules": {**rules, "time_points": 25}, "frozen_at": "2026-11-22T09:00:00+00:00",
              "rounds": [{"round_no": 84, "accepted": 2, "multiplier": 3}, {"round_no": 85, "accepted": 9, "multiplier": 1}]}
-    f.watch_scoring({"requests": [r85, r84, r41, r40b]}, board)
-    f.watch_scoring({"requests": [r85, r84, r41, r40b]}, board)
+    f.watch_scoring({"requests": [r86, r85, r84, r41, r40b]}, board)
+    f.watch_scoring({"requests": [r86, r85, r84, r41, r40b]}, board)
     more = [s for s in said() if s not in out]
     assert len(more) == 3   # the multiplied round, the new fields, the reason code not seen before
     assert any("round 84 pays a multiple (3), 2 teams accepted; ours: rejected too_high" in s for s in more)
     assert any("new field on the board" in s and "requests.multiplier" in s and "rounds.multiplier" in s for s in more)
+    assert not any("round 86" in s for s in more)        # still open: its multiple and our verdict are not final
+    # deployed mid-game (no baseline yet): the multiplied rounds so far are said on the first look, nothing else is
+    store.kv_set("board_scoring", "null")
+    f.watch_scoring({"requests": [r86, r85, r84, r41, r40b]}, board)
+    again = said()
+    assert sum("round 84 pays a multiple" in s for s in again) == 2 and len(again) == len(out) + len(more) + 1
+    # a board in a shape nobody foresaw is compared as far as it goes and never raises into the watcher
+    f.watch_scoring({"requests": ["row", r84], "frozen_at": None}, {"rules": "changed", "rounds": {"84": {}}, "ranking": None})
