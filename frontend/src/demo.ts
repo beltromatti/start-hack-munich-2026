@@ -97,7 +97,7 @@ function past(s: Seed, k: number): Deal {
     own: undefined, after: undefined, flag: undefined, memo: undefined, changed: undefined });
 }
 
-const DEALS: Deal[] = SEEDS.flatMap((s) => [build(s), ...Array.from({ length: s.history ?? 0 }, (_, k) => past(s, k))]).sort((a, b) => b.updated_at - a.updated_at);
+let DEALS: Deal[] = SEEDS.flatMap((s) => [build(s), ...Array.from({ length: s.history ?? 0 }, (_, k) => past(s, k))]).sort((a, b) => b.updated_at - a.updated_at);
 
 function row(d: Deal): DealRow {
   const r = d.data.request ?? {};
@@ -113,20 +113,31 @@ let alerts = true;
 // One request arrives half a minute after the page opens (the lookalike sender), so the desk visibly reacts.
 const opened = Date.now(), LATE = "deal-2416";
 function arrived(): Deal[] {
+  if (real) return DEALS;
   if (Date.now() - opened < 30000) return DEALS.filter((d) => d.id !== LATE);
   const d = DEALS.find((x) => x.id === LATE);
   if (d && !(d as { shown?: boolean }).shown) { (d as { shown?: boolean }).shown = true; const t = Math.floor(Date.now() / 1000); d.updated_at = t - 4; d.data.received_at = new Date((t - 40) * 1000).toISOString(); d.mails.forEach((m, i) => { m.received_at = new Date((t - 40 + i * 22) * 1000).toISOString(); }); DEALS.sort((a, b) => b.updated_at - a.updated_at); }
   return DEALS;
 }
 
+// A recorded night instead of the examples, when the host serves one at /data/real.json (the repo ships none).
+// Add ?example to the address to see the examples anyway.
+let real: { label: string; deals: Deal[]; board: Board } | null = null;
+const ready: Promise<void> = DEMO && !new URLSearchParams(location.search).has("example")
+  ? fetch("/data/real.json").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && Array.isArray(j.deals) && j.deals.length) { real = j; DEALS = j.deals; } }).catch(() => undefined)
+  : Promise.resolve();
+/** What the data is, for the badge in the header: the label of a recorded night, or null for the examples. */
+export const recorded = (): string | null => real?.label ?? null;
+
 export async function demo<T>(path: string, body?: unknown): Promise<T> {
+  await ready;
   const p = path.split("?")[0], b = (body ?? {}) as Record<string, unknown>;
   const out = (x: unknown) => Promise.resolve(JSON.parse(JSON.stringify(x)) as T);
   const one = p.match(/^\/api\/deals\/([^/]+)(?:\/(\w+))?$/);
   if (p === "/api/deals" || p === "/api/rfqs") return out(arrived().map(row));
   if (p === "/api/health") return out({ ok: true, worker: true, llm: "example data", models: { agent: "example", effort: "low" } } satisfies Health);
   if (p === "/api/usage") return out({ tokens_in: 612000, tokens_out: 48000, llm_calls: 351, cost_usd: 0.0447 } satisfies Usage);
-  if (p === "/api/board") return out(BOARD);
+  if (p === "/api/board") return out(real ? real.board : BOARD);
   if (p === "/api/operator") { if (body) alerts = !!b.on; return out({ on: alerts, autonomous: true, needed: [] }); }
   if (one) {
     const d = DEALS.find((x) => x.id === one[1]);

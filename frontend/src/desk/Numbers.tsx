@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Board, DealRow } from "../api";
-import { DEMO } from "../demo";
+import { DEMO, recorded } from "../demo";
 import { amount, lane, median, money } from "./util";
 
 // How the desk is doing, counted from the same deals the other pages read: how much it answered on its own,
@@ -47,7 +47,7 @@ export function Numbers({ deals, board }: { deals: DealRow[]; board: Board | nul
   const times = quoted.map((d) => d.response_seconds).filter((x): x is number => x != null && x >= 1);
   const med = median(times), fast = times.filter((x) => x <= 120).length;
   const weight = booked.reduce((s, d) => s + (Number(d.weight_kg) || 0), 0);
-  const value = booked.reduce((s, d) => s + (amount(d.quote) ?? 0), 0);
+  const value = booked.reduce((s, d) => s + (amount(d.quote) ?? 0), 0), priced = booked.filter((d) => amount(d.quote) != null).length;
   const cost = deals.reduce((s, d) => s + (d.cost_usd || 0), 0);
   const flaggedN = deals.filter((d) => d.flag === "red" || d.flag === "yellow").length;
   const pct = (a: number, b: number) => b ? Math.round((a / b) * 100) + " %" : "–";
@@ -64,17 +64,17 @@ export function Numbers({ deals, board }: { deals: DealRow[]; board: Board | nul
     .sort((a, b) => b.n - a.n || b.value - a.value).slice(0, 8);
   const rank = board?.me?.rank, teams = board?.public?.ranking?.length ?? board?.public?.overview?.teams;
   const tiles: [string, string, string][] = [
-    ["Answered on its own", pct(quoted.length, total), quoted.length + " of " + total + " requests got a quote without a person"],
+    ["Answered", pct(quoted.length, total), quoted.length + " of " + total + " requests got a quote"],
     ["Typical answer", secs(med), times.length ? fast + " of " + times.length + " quotes left within 2 minutes" : "No quote has a time yet"],
     ["Booked", String(booked.length), pct(booked.length, quoted.length) + " of the quotes became a booking"],
-    ["Freight booked", weight ? Math.round(weight).toLocaleString("en-US") + " kg" : "–", value ? money(value) + " in booked quotes" : "No booking yet"],
+    ["Freight booked", weight ? Math.round(weight).toLocaleString("en-US") + " kg" : "–", !booked.length ? "No booking yet" : priced === booked.length ? money(value) + " in booked quotes" : priced ? money(value) + " in the " + priced + " bookings with a recorded price" : booked.length + " bookings"],
   ];
   if (cost > 0 && quoted.length) tiles.push(["Model cost per quote", "$" + (cost / quoted.length).toFixed(4), "$" + cost.toFixed(2) + " for all " + total + " requests"]);
-  if (rank && !DEMO) tiles.push(["On the board", "#" + rank, teams ? "of " + teams + " teams" + (board?.me?.total != null ? ", " + Math.round(board.me.total).toLocaleString("en-US") + " points" : "") : "our rank right now"]);
+  if (rank && (!DEMO || recorded())) tiles.push(["On the board", "#" + rank, [teams ? "of " + teams + " teams" : "", board?.me?.total != null ? Math.round(board.me.total).toLocaleString("en-US") + " points" : "", recorded() ? "when this was recorded" : ""].filter(Boolean).join(", ") || "our rank right now"]);
   return (
     <>
       <section className="dk-lead">
-        <h2>{total ? pct(quoted.length, total) + " of requests were answered without a person" + (med != null ? ", typically in " + secs(med) + "." : ".") : "No requests yet."}</h2>
+        <h2>{total ? pct(quoted.length, total) + " of requests got a quote" + (med != null ? ", typically in " + secs(med) + "." : ".") : "No requests yet."}</h2>
         <p>Counted from the shipments on this desk. {flaggedN ? flaggedN + (flaggedN === 1 ? " of them carries" : " of them carry") + " a note from Giulia." : "None of them carries a note from Giulia."}</p>
       </section>
       <div className="dk-kpis">{tiles.map(([label, big, sub]) => <section key={label} className="dk-box dk-kpi"><small>{label}</small><b>{big}</b><span>{sub}</span></section>)}</div>
