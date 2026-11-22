@@ -217,26 +217,28 @@ def strict(properties: dict, required: list[str] | None = None) -> dict:
 _own: OpenAI | None = None
 
 
-def structured_direct(name: str, system: str, user: str, schema: dict, *, model: str = "gpt-6-luna") -> dict:
-    """A structured call to OpenAI with our own key, never through the gateway: for the desk's ask field, which a
-    person at the desk uses and which is no part of a quote (so it must not count as spend on one). No key: an error
-    the caller turns into "not available"."""
+_fake_desk: Callable[..., list] | None = None
+
+
+def respond_direct(instructions: str, items: list[dict], tools: list[dict], *, schema: dict, name: str,
+                   model: str = "gpt-6-luna", effort: str = "low") -> list[dict]:
+    """One turn of the desk's assistant on the Responses API with our own OpenAI key, never through the gateway:
+    a person's tool at the desk, no part of a quote, so it must not count as spend on one. The final reply follows
+    `schema`. No key: an error the caller turns into "not available"."""
     global _own
-    if _fake is not None:
-        return _fake(name, system, user, schema)
+    if _fake_desk is not None:
+        return _fake_desk(items, tools)
     key = os.getenv("OPENAI_API_KEY")
     if not key:
-        raise RuntimeError("no OpenAI key for the desk's ask field")
+        raise RuntimeError("no OpenAI key for the desk's assistant")
     if _own is None:
-        _own = OpenAI(api_key=key, timeout=30, max_retries=1)
-    args: dict[str, Any] = {
-        "model": model, "max_completion_tokens": 900,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}},
-    }
-    if model.startswith(("gpt-5", "gpt-6")):
-        args["reasoning_effort"] = "low"
+        _own = OpenAI(api_key=key, timeout=90, max_retries=2)
     t = time.time()
-    res = _own.chat.completions.create(**args)
-    store.log("desk", "llm", f"{model} [{name}] {time.time() - t:.1f}s DIRECT, not gateway")
-    return json.loads(res.choices[0].message.content or "{}")
+    res = _own.responses.create(model=model, instructions=instructions, input=items, tools=tools, store=False,
+                                include=["reasoning.encrypted_content"], parallel_tool_calls=True,
+                                reasoning={"effort": effort},
+                                text={"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}})
+    u = res.usage
+    store.log("desk", "llm", f"{model} [{name}] {time.time() - t:.1f}s, {u.input_tokens} in, {u.output_tokens} out, "
+              "DIRECT, not gateway")
+    return [i.model_dump(exclude_none=True) for i in res.output]

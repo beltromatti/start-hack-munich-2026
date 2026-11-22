@@ -84,13 +84,14 @@ export function answer(question: string, deals: DealRow[]): Answer {
   return r.length ? { text: plural(r.length, "shipment matches", "shipments match") + ".", rows: r.slice(0, 8) } : { text: "Nothing on the desk matches that. Try a customer, a city, or ask what is flagged." };
 }
 
-/** The same question to the assistant behind /api/ask (our own model key, checked answers). Throws when there is none. */
+/** The same question to the assistant behind /api/ask: it reads the register with its own tools (our own model key,
+ * answers checked against the register). The page sends what it computed, which the assistant may read too. Throws when there is none. */
 export async function askModel(question: string, deals: DealRow[], desk: unknown, earlier: { q: string; a: string }[] = []): Promise<Answer> {
   const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, desk, earlier }) });
   if (r.status === 429) return { via: "assistant", text: "Too many questions for a minute. Try again shortly." };
   if (!r.ok) throw new Error(String(r.status));
   const j = await r.json() as { text: string; facts: [string, string][]; rows: string[]; customer: string | null; page: Answer["page"] | null; act: { kind: "tell"; deal: string; text: string } | null };
-  const list = customers(deals), c = j.customer ? list.find((x) => x.name === j.customer) : undefined;
+  const list = customers(deals), c = j.customer ? list.find((x) => x.email === j.customer || x.name === j.customer) : undefined;
   const label = j.act ? "Tell Giulia: " + j.act.text : "";
   return { via: "assistant", text: j.text, facts: j.facts?.length ? j.facts : undefined, rows: j.rows.map((id) => deals.find((d) => d.id === id)).filter((d): d is DealRow => !!d),
     customer: c?.email, page: j.page ?? undefined, act: j.act ? { label, ...j.act } : undefined };
