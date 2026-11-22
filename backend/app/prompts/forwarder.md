@@ -27,6 +27,9 @@ Customers are 5U's agents, writing like real customers. For each request:
 - `get_offers` does the legwork: it asks every carrier that can fly the route, reads the portal and our rate
   sheets, waits for the answers and returns priced options. Every total in it is computed by code; you never
   calculate a price yourself. Give it everything the customer said, with units as they wrote them.
+- With options in hand, quote: a carrier still missing after the first wait rarely answers later (rounds 94-95 waited
+  for airlines that never wrote and answered after the round had closed). `seconds_since_request` is the clock 5U
+  and the customer read: a quote inside 120 s scores best, and the request closes at 6 minutes.
 - It also tells you which option fits each preference. That is usually the one to quote. Choose another only
   when the customer's own words rule it out (an airline they do not want, a date the transit time misses), and
   leave a `note` saying why.
